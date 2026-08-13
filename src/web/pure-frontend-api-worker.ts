@@ -1,11 +1,12 @@
 /// <reference lib="webworker" />
 
-import { 任意接口 } from '@lsby/net-core'
+import { 任意接口, 执行已匹配接口, 默认请求附加参数 } from '@lsby/net-core'
 import bcrypt from 'bcryptjs'
 import { sql } from 'kysely'
 import { 环境变量 } from '../global/env'
 import { globalLog, kysely管理器, 检查数据库是否可用 } from '../global/global'
 import { init } from '../init/init'
+import { 已审阅的any } from '../tools/types'
 import { 本地接口列表 } from './local-api-list'
 import { 初始建表SQL } from './local-schema'
 
@@ -141,6 +142,7 @@ async function handleRequest(request: LocalApiRequest): Promise<LocalApiResponse
     query: Object.fromEntries(url.searchParams.entries()),
     headers: request.headers,
     method: request.method,
+    path: url.pathname,
     ip: '127.0.0.1',
   }
   let responseBody: unknown = null
@@ -168,17 +170,13 @@ async function handleRequest(request: LocalApiRequest): Promise<LocalApiResponse
     end: () => resMock,
     setHeader: () => resMock,
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  let apiLogic = matchedApi.获得接口逻辑()
-  let requestExtra = { ip: '127.0.0.1', log: globalLog.extend(url.pathname) }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  let pluginResult = await apiLogic.计算插件结果(reqMock as any, resMock as any, requestExtra)
-  if (pluginResult.getTag() === 'Left') {
-    await matchedApi.获得接口返回器().实现(reqMock as any, resMock as any, pluginResult, requestExtra)
-  } else {
+  await 执行已匹配接口({
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    let logicResult = await apiLogic.实现(pluginResult.assertRight().getRight(), {}, requestExtra)
-    await matchedApi.获得接口返回器().实现(reqMock as any, resMock as any, logicResult, requestExtra)
-  }
+    req: reqMock as 已审阅的any,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    res: resMock as 已审阅的any,
+    目标接口: matchedApi,
+    请求附加参数: { ...默认请求附加参数, log: globalLog.extend(url.pathname), 请求id: String(request.id) },
+  })
   return { id: request.id, status: responseStatus, body: JSON.stringify(responseBody) }
 }

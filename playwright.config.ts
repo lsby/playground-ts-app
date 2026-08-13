@@ -1,9 +1,11 @@
 import { defineConfig, devices } from '@playwright/test'
 import { config } from 'dotenv'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
 // Load test environment variables
-config({ path: path.resolve(__dirname, '.env', '.env.test.web') })
+let 当前目录 = path.dirname(fileURLToPath(import.meta.url))
+config({ path: path.resolve(当前目录, '.env', '.env.test.web') })
 
 let port = process.env.APP_PORT
 if (port === undefined) {

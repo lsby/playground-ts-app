@@ -28,7 +28,7 @@ test.describe('基础登录 E2E 测试', (): void => {
     await 演示_点击(page.getByRole('button', { name: '登录' }))
 
     // 等待跳转并判断是否登录成功
-    await page.waitForURL('**/')
+    await page.waitForURL('**/index.html')
     let 首页内容 = page.locator('lsby-index')
     await expect(首页内容).toBeVisible()
     await expect(page.getByText('你好世界')).toBeVisible()
