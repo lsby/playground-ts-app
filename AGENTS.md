@@ -120,8 +120,8 @@
 
 - **Tier 1 (UI 主线程)**: 负责渲染页面UI。传统的 HTTP 请求会被 `src/web/global/manager/api-manager.ts` 自动拦截，转换为基于 `MessageChannel` 的 Web Worker 通信，转发给 API Worker。
 - **Tier 2 (API Worker)**: 位于 `src/web/pure-frontend-api-worker.ts`。在此处加载原本跑在后端的业务逻辑与接口代码。为了让 Node.js 代码能在浏览器运行，打包器会根据 `package.json` 中的 `alias` 配置，借助 `src/web/mock/` 目录将 `fs`、`crypto`、`express` 等核心库 Mock 掉。
-- **Tier 3 (DB Worker)**: 位于 `src/web/local-sqlite-worker.ts`。在独立的 Worker 中基于 WebAssembly (WASM) 运行 SQLite，并通过 OPFS (Origin Private File System) 进行数据的浏览器本地持久化。
-- **多标签页并发安全**: 为防止多个浏览器标签页同时读写本地 SQLite 导致数据库损坏，系统启动时会利用 Web Locks API (`navigator.locks.request('lsby-pure-frontend:local.db')`) 申请排他锁。只有抢到锁的标签页才会初始化这些 Worker。
+- **Tier 3 (DB Worker)**: 位于 `src/web/local-sqlite-worker.ts`。在独立的 Worker 中基于 WebAssembly (WASM) 运行 SQLite，并通过 IndexedDB 进行浏览器本地持久化。当前明确使用 `useIdbStorage`，不依赖 OPFS 的 `FileSystemSyncAccessHandle`，也不使用 SharedArrayBuffer。
+- **多标签页并发安全**: 为防止多个浏览器标签页同时操作本地 SQLite，UI 主线程会在每次本地 API 请求或数据库管理命令的完整执行期间，通过 Web Locks API (`navigator.locks.request('lsby-pure-frontend:local.db')`) 持有跨标签页排他锁。其他标签页的请求会等待当前请求释放锁；Worker 本身是每个标签页按需创建并长期存活的，不存在“只有一个标签页可以初始化 Worker”的限制。
 - **构建与生成**: 开发时必须使用 `运行纯前端开发套件`，因为它会独占性地启动 `_持续生成纯前端本地API列表` 这类专属任务；纯前端的构建命令同样需要严格配合专有的 `.env.xxx.pure-frontend` 配置文件使用。
 
 5. **其他**

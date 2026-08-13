@@ -3,8 +3,8 @@ import { WaSqliteWorkerDialect } from 'kysely-wasqlite-worker'
 /**
  * SQLite runs in a dedicated Worker and persists its database through IndexedDB.
  *
- * This avoids the OPFS SharedArrayBuffer requirement, so separate browser tabs
- * can open the same local database without requiring COOP/COEP response headers.
+ * IndexedDB is used deliberately for broader browser compatibility. This path
+ * does not depend on OPFS FileSystemSyncAccessHandle or SharedArrayBuffer.
  */
 export let 创建sqlite数据库适配器 = (path: string): WaSqliteWorkerDialect =>
   new WaSqliteWorkerDialect({

@@ -65,10 +65,9 @@ async function 执行构建(): Promise<void> {
       '你只需要将当前文件夹下的所有文件部署到任意的**静态文件服务器**（如 Nginx、Vercel、Github Pages 等）即可。',
       '',
       '**⚠️ 注意：**',
-      '1. 必须在**安全上下文** (HTTPS 或者 localhost) 下运行，否则浏览器可能会禁止调用 OPFS 等最新特性。',
-      '2. 如果你在使用 sqlite 相关的 SharedArrayBuffer 并发能力，请确保你的 Web Server 配置了如下响应头以开启跨域隔离（如果是单进程则无需配置）：',
-      '   Cross-Origin-Opener-Policy: same-origin',
-      '   Cross-Origin-Embedder-Policy: require-corp',
+      '1. 必须在安全上下文（HTTPS 或 localhost）下运行。数据库通过 IndexedDB 持久化，并使用 Web Locks API 串行化不同标签页的本地 API 请求；部署前请确认目标浏览器支持 IndexedDB、Web Worker 和 Web Locks API。',
+      '2. 数据按站点 Origin 隔离；更换协议、域名或端口会进入另一份本地数据库。',
+      '3. 当前数据库后端不使用 OPFS 或 SharedArrayBuffer，无需配置 COOP/COEP 响应头。',
     ].join('\r\n')
     fs.writeFileSync(path.join(发布目录, '部署说明.md'), 说明内容)
 

@@ -367,6 +367,8 @@ function withPureFrontendDatabaseLock<T>(task: () => Promise<T>): Promise<T> {
   if ('locks' in navigator === false) {
     return Promise.reject(new Error('当前浏览器不支持 Web Locks API，无法安全地在多个页面间使用本地数据库'))
   }
+  // 锁覆盖一次本地 API 或管理命令的完整执行过程。每个标签页可以拥有自己的
+  // 长生命周期 Worker，但任意时刻只有一个标签页可以操作 IndexedDB 中的 SQLite。
   return navigator.locks.request<T>(
     pureFrontendDatabaseLockName,
     { mode: 'exclusive' },

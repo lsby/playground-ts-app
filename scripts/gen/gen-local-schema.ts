@@ -18,7 +18,7 @@ try {
 
   let 新内容 = [
     `// 该文件由脚本自动生成, 请勿修改.`,
-    `// 这是供前端 OPFS 数据库建表使用的 SQL 语句`,
+    `// 这是供前端 IndexedDB 持久化的 WASM-SQLite 数据库建表使用的 SQL 语句`,
     `export let 初始建表SQL = \``,
     sql,
     `\``,
