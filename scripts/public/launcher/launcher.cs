@@ -28,12 +28,24 @@ namespace LsbyLauncher
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string appPath = Path.Combine(baseDir, "app", "lsby-playground-ts-service.exe");
+            string markerPath = Path.Combine(baseDir, "data", "update-in-progress");
             IntPtr consoleWindow = GetConsoleWindow();
             ShowWindow(consoleWindow, SW_HIDE);
             bool isConsoleVisible = false;
 
             // 解决中文乱码
             Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+            if (File.Exists(markerPath))
+            {
+                ShowWindow(consoleWindow, SW_SHOW);
+                Console.WriteLine("检测到未完成的更新，请先运行 update.cmd 恢复旧版本。");
+                Console.WriteLine("按任意键关闭...");
+                Console.ReadKey();
+                return;
+            }
 
             Console.WriteLine("==================================================");
             Console.WriteLine("lsby-playground-ts-service 启动引导器");
@@ -46,7 +58,7 @@ namespace LsbyLauncher
 
             // 尝试读取应用本身的图标，失败则用默认图标
             try {
-                trayIcon.Icon = Icon.ExtractAssociatedIcon("lsby-playground-ts-service.exe");
+                trayIcon.Icon = Icon.ExtractAssociatedIcon(appPath);
             } catch {
                 trayIcon.Icon = SystemIcons.Application;
             }
@@ -71,16 +83,16 @@ namespace LsbyLauncher
             };
 
             // 3. 准备启动进程
+            Environment.CurrentDirectory = baseDir;
             if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ENV_FILE_PATH")))
             {
-                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                string envDir = Path.Combine(baseDir, ".env");
+                string envDir = Path.Combine(baseDir, "app", ".env");
                 if (Directory.Exists(envDir))
                 {
                     string[] envFiles = Directory.GetFiles(envDir, ".env.production.*");
                     if (envFiles.Length > 0)
                     {
-                        string relativePath = Path.Combine(".env", Path.GetFileName(envFiles[0]));
+                        string relativePath = Path.Combine("app", ".env", Path.GetFileName(envFiles[0]));
                         Environment.SetEnvironmentVariable("ENV_FILE_PATH", relativePath);
                     }
                 }
@@ -92,7 +104,8 @@ namespace LsbyLauncher
             }
 
             Process appProcess = new Process();
-            appProcess.StartInfo.FileName = "lsby-playground-ts-service.exe";
+            appProcess.StartInfo.FileName = appPath;
+            appProcess.StartInfo.WorkingDirectory = baseDir;
             appProcess.StartInfo.UseShellExecute = false; // 继承当前引导器的控制台句柄，这样日志会打印到我们的黑框里
 
             exitMenuItem.Click += (s, e) =>
@@ -130,7 +143,7 @@ namespace LsbyLauncher
             {
                 ShowWindow(consoleWindow, SW_SHOW);
                 Console.WriteLine("\n[引导器错误] 启动失败: " + ex.Message);
-                Console.WriteLine("确保 lsby-playground-ts-service.exe 存在于同级目录。");
+                Console.WriteLine("确保 app/lsby-playground-ts-service.exe 存在。");
                 Console.WriteLine("按任意键关闭...");
                 Console.ReadKey();
                 trayIcon.Visible = false;

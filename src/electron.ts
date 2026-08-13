@@ -22,11 +22,15 @@ async function main(): Promise<void> {
   }
 }
 let 已经启动服务器 = false
+let 获得单实例锁 = app.requestSingleInstanceLock()
 export let 主窗口: BrowserWindow | null = null
 
 let 资源目录 = process.resourcesPath
 let 预加载脚本路径 = path.join(资源目录, 'preload.js')
-let 窗口状态路径 = path.join(资源目录, 'window-state.json')
+let 用户数据目录 =
+  app.isPackaged === true ? path.resolve(path.dirname(process.execPath), '../data') : path.resolve('data')
+fs.mkdirSync(用户数据目录, { recursive: true })
+let 窗口状态路径 = path.join(用户数据目录, 'window-state.json')
 
 /**
  * 创建主窗口
@@ -182,10 +186,24 @@ async function 创建主窗口(): Promise<void> {
   })
 }
 
-app.on('ready', 创建主窗口)
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
-app.on('activate', async () => {
-  if (主窗口 === null) await 创建主窗口()
-})
+async function Electron就绪(): Promise<void> {
+  await 创建主窗口()
+}
+
+if (获得单实例锁 === false) {
+  app.quit()
+} else {
+  app.on('ready', Electron就绪)
+  app.on('second-instance', () => {
+    if (主窗口 !== null) {
+      if (主窗口.isMinimized() === true) 主窗口.restore()
+      主窗口.focus()
+    }
+  })
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit()
+  })
+  app.on('activate', async () => {
+    if (主窗口 === null) await 创建主窗口()
+  })
+}

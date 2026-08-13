@@ -1,0 +1,49 @@
+name: 发布 Electron 完整便携包
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release-electron:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.5.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Windows 下使用 hoisted 布局，避免 Electron/Parcel 的深层 pnpm 路径问题。
+      - name: 配置依赖布局
+        shell: pwsh
+        run: pnpm config set node-linker hoisted
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 准备 Electron 数据库
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path db | Out-Null
+          New-Item -ItemType File -Force -Path db/prod-electron.db | Out-Null
+
+      - name: 构建完整便携包
+        run: pnpm run public:electron
+
+      - name: 发布 GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release/electron/*-electron-*-win32-*.zip
