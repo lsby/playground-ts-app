@@ -6,6 +6,13 @@ import path from 'path'
 import { exit } from 'process'
 import { z } from 'zod'
 
+// ============= 配置区 =============
+let 推送目标列表 = [
+  { name: '默认', value: '' },
+  { name: '我的仓库', value: '0.0.0.0:0' },
+]
+// ============= 配置区 =============
+
 // 读取 package.json 文件并解析
 let 包信息路径 = path.resolve(import.meta.dirname, '../../package.json')
 let 包信息模式 = z.object({ name: z.string(), version: z.string() })
@@ -93,18 +100,47 @@ async function 执行打包(): Promise<void> {
     if (退出码 === 0) {
       // 打包成功，询问是否执行 push
       let { 是否推送 } = (await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: '是否推送',
-          message: `打包完成！是否要执行 (docker push ${用户输入镜像名}:${包信息.version}) ?`,
-          default: false,
-        },
+        { type: 'confirm', name: '是否推送', message: `打包完成！是否要执行 docker push ?`, default: false },
       ])) as { 是否推送: boolean }
 
       if (是否推送 === true) {
+        let { 目标仓库 } = (await inquirer.prompt([
+          {
+            type: 'list',
+            name: '目标仓库',
+            message: '请选择推送目标仓库:',
+            choices: [...推送目标列表, { name: '自定义仓库前缀', value: '__custom__' }],
+          },
+        ])) as { 目标仓库: string }
+
+        let 仓库前缀 = 目标仓库
+        if (目标仓库 === '__custom__') {
+          let { 自定义前缀 } = (await inquirer.prompt([
+            {
+              type: 'input',
+              name: '自定义前缀',
+              message: '请输入仓库前缀 (例如 registry.cn-hangzhou.aliyuncs.com/my-namespace):',
+            },
+          ])) as { 自定义前缀: string }
+          仓库前缀 = 自定义前缀.trim()
+        }
+
+        let 本地镜像名 = `${用户输入镜像名}:${包信息.version}`
+        let 最终推送镜像名 =
+          仓库前缀 !== '' ? `${仓库前缀.replace(/\/+$/, '')}/${用户输入镜像名}:${包信息.version}` : 本地镜像名
+
+        if (最终推送镜像名 !== 本地镜像名) {
+          console.log('执行命令: %O %O', 'docker', ['tag', 本地镜像名, 最终推送镜像名])
+          let tag退出码 = await 执行命令行('docker', ['tag', 本地镜像名, 最终推送镜像名])
+          if (tag退出码 !== 0) {
+            console.error(`docker tag 失败，退出码: ${tag退出码}`)
+            return
+          }
+        }
+
         // 执行 docker push
-        console.log('执行命令: %O %O', 'docker', ['push', `${用户输入镜像名}:${包信息.version}`])
-        let 推送退出码 = await 执行命令行('docker', ['push', `${用户输入镜像名}:${包信息.version}`])
+        console.log('执行命令: %O %O', 'docker', ['push', 最终推送镜像名])
+        let 推送退出码 = await 执行命令行('docker', ['push', 最终推送镜像名])
         console.log(`docker push 进程退出，退出码: ${推送退出码}`)
       }
     }
