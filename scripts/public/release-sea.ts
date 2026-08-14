@@ -159,7 +159,7 @@ async function 执行构建(): Promise<void> {
       let 启动脚本内容 = [
         '@echo off',
         'chcp 65001 >nul',
-        'echo 正在启动 lsby-playground-ts-service ...',
+        'echo Starting lsby-playground-ts-service ...',
         'echo.',
         'cd /d "%~dp0"',
         'set "ENV_FILE_PATH=./.env/.env.production.sea"',
@@ -167,7 +167,7 @@ async function 执行构建(): Promise<void> {
         'lsby-playground-ts-service.exe',
         'if errorlevel 1 (',
         '  echo.',
-        '  echo 程序异常退出, 按任意键关闭...',
+        '  echo Application exited with error. Press any key to close...',
         '  pause >nul',
         ')',
         '',

@@ -2,8 +2,9 @@ import { execFileSync, execSync } from 'child_process'
 import fs from 'fs'
 import open from 'open'
 import path from 'path'
+import readline from 'readline/promises'
 import { fileURLToPath } from 'url'
-import { 生成Electron便携资源, 获得Prisma迁移名称组 } from './electron-update-release'
+import { 写入AppPackageJson, 生成Electron便携资源, 获得Prisma迁移名称组 } from './electron-update-release'
 
 let __当前文件名 = fileURLToPath(import.meta.url)
 let __当前目录名 = path.dirname(__当前文件名)
@@ -48,8 +49,40 @@ async function 移动目录并等待文件句柄释放(源目录: string, 目标
   }
 }
 
+async function 询问是否打包Zip(): Promise<boolean> {
+  if (process.argv.includes('--zip') === true) {
+    console.log('📦 检测到 --zip 参数，自动生成 Electron 完整便携压缩包。')
+    return true
+  }
+  if (process.argv.includes('--nozip') === true || process.argv.includes('--no-zip') === true) {
+    console.log('💡 检测到 --nozip 参数，跳过 ZIP 压缩包打包。')
+    return false
+  }
+  if (
+    process.argv.includes('--yes') === true ||
+    process.argv.includes('-y') === true ||
+    process.argv.includes('--silent') === true
+  ) {
+    console.log('💡 静默模式且未指定 --zip，默认跳过 ZIP 压缩包打包。')
+    return false
+  }
+
+  let 终端 = readline.createInterface({ input: process.stdin, output: process.stdout })
+  try {
+    let 回答 = await 终端.question('📦 是否打包 Electron 完整便携压缩包 (.zip)？(y/N): ')
+    终端.close()
+    let 确认输入 = 回答.trim().toLowerCase()
+    return 确认输入 === 'y' || 确认输入 === 'yes'
+  } catch (_交互错误) {
+    终端.close()
+    return false
+  }
+}
+
 async function 执行构建(): Promise<void> {
   try {
+    let 是否生成Zip = await 询问是否打包Zip()
+
     let 环境源文件 = path.resolve(项目根目录, '.env/.env.production.electron')
     let 数据库源文件 = path.resolve(项目根目录, 'db/prod-electron.db')
 
@@ -148,7 +181,8 @@ async function 执行构建(): Promise<void> {
       let 更新脚本内容 = fs.readFileSync(path.join(更新脚本源目录, 'update.ps1'), 'utf8').replace(/^\uFEFF/, '')
       fs.writeFileSync(path.join(生成目录, 'scripts/update.ps1'), '\uFEFF' + 更新脚本内容, 'utf8')
       确保目录存在(path.join(生成目录, 'data/backups'))
-      console.log(`✅ 已生成启动与手动更新脚本`)
+      await 写入AppPackageJson(项目根目录, 生成目录)
+      console.log(`✅ 已生成 app/package.json 与更新脚本`)
 
       let Prisma迁移名称组 = 获得Prisma迁移名称组(path.join(生成目录, 'app/prisma/migrations'))
       if (Prisma迁移名称组.length > 0) {
@@ -191,7 +225,12 @@ async function 执行构建(): Promise<void> {
           console.error(`❌ 引导器 run.exe 编译失败:`, error)
         }
       }
-      await 生成Electron便携资源(项目根目录, 生成目录, 待清理路径)
+      if (是否生成Zip === true) {
+        console.log('正在生成 Electron 完整便携压缩包...')
+        await 生成Electron便携资源(项目根目录, 生成目录, 待清理路径)
+      } else {
+        console.log('💡 已跳过 ZIP 压缩包打包。')
+      }
     } else {
       // 在 macOS 下为 .app 包挂载内置启动引导器，解决 Finder 直接双击时 launchd 不传 ENV_FILE_PATH 与 cwd=/ 的问题
       let macOsBinDir = path.join(生成目录, 'lsby-playground-ts-service.app/Contents/MacOS')

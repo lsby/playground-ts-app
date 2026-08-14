@@ -9,6 +9,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $Root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $AppDir = Join-Path $Root 'app'
 $DataDir = Join-Path $Root 'data'
@@ -87,13 +88,35 @@ function Download-File([string]$Url, [string]$Destination) {
   Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Destination -Headers @{ 'User-Agent' = 'lsby-electron-manual-updater' }
 }
 
-function Download-LatestGitHubRelease([string]$RepositoryUrl, [string]$Destination) {
+function Download-LatestGitHubRelease($CurrentPackage, [string]$RepositoryUrl, [string]$Destination) {
   Read-GitHubToken
   $repository = Get-GitHubRepository $RepositoryUrl
   $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repository/releases/latest" -Headers (Get-GitHubHeaders 'application/vnd.github+json')
   $architecture = Get-Architecture
   $asset = @($release.assets | Where-Object { $_.name -match "-electron-.*-win32-$architecture\.zip$" }) | Select-Object -First 1
   if ($null -eq $asset) { throw "最新 Release 中没有找到 win32-$architecture Electron 完整便携 ZIP" }
+
+  $latestVersionStr = [string]$release.tag_name
+  if ($latestVersionStr -eq '' -or $null -eq $latestVersionStr) {
+    if ([string]$asset.name -match "-electron-(.*?)-win32-") {
+      $latestVersionStr = $Matches[1]
+    }
+  }
+  if ($latestVersionStr -ne '' -and $null -ne $latestVersionStr) {
+    try {
+      $latestVersion = Convert-ToVersion $latestVersionStr
+      $currentVersion = Convert-ToVersion ([string]$CurrentPackage.version)
+      if (-not $AllowSameOrDowngrade -and $latestVersion -le $currentVersion) {
+        Write-Host "当前已是最新版本 (v$($CurrentPackage.version))，无需更新。"
+        Remove-SafePath $StagingDir
+        Remove-SafePath $WorkDir
+        exit 0
+      }
+    } catch {
+      # 忽略版本转换异常，退回后置校验
+    }
+  }
+
   if ($null -eq $asset.digest -or -not ([string]$asset.digest).StartsWith('sha256:')) {
     throw 'GitHub Release Asset 没有 SHA-256 摘要，拒绝更新'
   }
@@ -124,7 +147,7 @@ function Select-UpdateZip($Package, [string]$Destination) {
   $defaultRepository = Get-RepositoryUrl $Package
   if ($UseDefaultRepository) {
     if ($defaultRepository -eq '') { throw 'package.json 没有 repository，无法使用默认仓库' }
-    Download-LatestGitHubRelease $defaultRepository $Destination
+    Download-LatestGitHubRelease $Package $defaultRepository $Destination
     return
   }
   if ($NonInteractive) { throw '非交互模式必须指定 -LocalZip、-ZipUrl 或 -UseDefaultRepository' }
@@ -138,9 +161,9 @@ function Select-UpdateZip($Package, [string]$Destination) {
   switch ($choice) {
     '1' {
       if ($defaultRepository -eq '') { throw 'package.json 没有 repository' }
-      Download-LatestGitHubRelease $defaultRepository $Destination
+      Download-LatestGitHubRelease $Package $defaultRepository $Destination
     }
-    '2' { Download-LatestGitHubRelease (Read-Host 'GitHub 仓库地址') $Destination }
+    '2' { Download-LatestGitHubRelease $Package (Read-Host 'GitHub 仓库地址') $Destination }
     '3' {
       Require-ManualSha256
       Download-File (Read-Host 'ZIP 下载地址') $Destination
@@ -212,7 +235,10 @@ function Assert-PackageIdentity($CurrentPackage, $NewPackage) {
   $currentVersion = Convert-ToVersion ([string]$CurrentPackage.version)
   $newVersion = Convert-ToVersion ([string]$NewPackage.version)
   if (-not $AllowSameOrDowngrade -and $newVersion -le $currentVersion) {
-    throw "目标版本 $($NewPackage.version) 不高于当前版本 $($CurrentPackage.version)"
+    Write-Host "目标版本 (v$($NewPackage.version)) 不高于当前版本 (v$($CurrentPackage.version))，无需更新。"
+    Remove-SafePath $StagingDir
+    Remove-SafePath $WorkDir
+    exit 0
   }
 }
 

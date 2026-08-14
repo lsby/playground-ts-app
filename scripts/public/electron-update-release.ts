@@ -28,10 +28,7 @@ async function 创建便携压缩包(便携包目录: string, 输出路径: stri
   })
 }
 
-export async function 生成Electron便携资源(项目根目录: string, 便携包目录: string, 发布目录: string): Promise<void> {
-  if (process.platform !== 'win32') return
-  if (process.arch !== 'x64' && process.arch !== 'arm64')
-    throw new Error(`暂不支持生成 ${process.arch} Electron 便携包`)
+export async function 写入AppPackageJson(项目根目录: string, 便携包目录: string): Promise<void> {
   let 源包信息 = 包信息模式.parse(JSON.parse(await fs.promises.readFile(path.join(项目根目录, 'package.json'), 'utf8')))
   let 便携包信息路径 = path.join(便携包目录, 'app/package.json')
   let Prisma迁移名称组 = 获得Prisma迁移名称组(path.join(便携包目录, 'app/prisma/migrations'))
@@ -50,6 +47,14 @@ export async function 生成Electron便携资源(项目根目录: string, 便携
     ) + '\n',
     'utf8',
   )
+}
+
+export async function 生成Electron便携资源(项目根目录: string, 便携包目录: string, 发布目录: string): Promise<void> {
+  if (process.platform !== 'win32') return
+  if (process.arch !== 'x64' && process.arch !== 'arm64')
+    throw new Error(`暂不支持生成 ${process.arch} Electron 便携包`)
+  await 写入AppPackageJson(项目根目录, 便携包目录)
+  let 源包信息 = 包信息模式.parse(JSON.parse(await fs.promises.readFile(path.join(项目根目录, 'package.json'), 'utf8')))
   let 项目名 = 源包信息.name.replace(/^@[^/]+\//, '')
   let 资源名称 = `${项目名}-electron-${源包信息.version}-win32-${process.arch}.zip`
   let 资源路径 = path.join(发布目录, 资源名称)

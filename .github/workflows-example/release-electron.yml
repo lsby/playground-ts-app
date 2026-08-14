@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release 标签名 (例如 v1.0.0，留空则自动根据 package.json 版本生成)'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -39,11 +44,26 @@ jobs:
           New-Item -ItemType File -Force -Path db/prod-electron.db | Out-Null
 
       - name: 构建完整便携包
-        run: pnpm run public:electron
+        run: pnpm run public:electron -- --zip
+
+      - name: 计算 Release 标签
+        id: get_tag
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}".StartsWith("refs/tags/")) {
+            $tag = "${{ github.ref_name }}"
+          } elseif ("${{ inputs.tag_name }}" -ne "") {
+            $tag = "${{ inputs.tag_name }}"
+          } else {
+            $ver = (Get-Content package.json | ConvertFrom-Json).version
+            $tag = "v$ver"
+          }
+          Write-Host "Release Tag: $tag"
+          "tag_name=$tag" >> $env:GITHUB_OUTPUT
 
       - name: 发布 GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.get_tag.outputs.tag_name }}
           generate_release_notes: true
-          files: release/electron/*-electron-*-win32-*.zip
+          files: release/electron/*.zip

@@ -3,9 +3,9 @@ chcp 65001 >nul
 cd /d "%~dp0"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\update.ps1" %*
 set "UPDATE_EXIT_CODE=%errorlevel%"
-if errorlevel 1 (
+if %UPDATE_EXIT_CODE% neq 0 (
   echo.
-  echo 更新未完成，请查看上方错误信息。
+  echo [ERROR] Update process failed. Please check error messages above.
 )
 pause
 exit /b %UPDATE_EXIT_CODE%

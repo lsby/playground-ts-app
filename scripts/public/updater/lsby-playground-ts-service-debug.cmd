@@ -3,8 +3,8 @@ chcp 65001 >nul
 cd /d "%~dp0"
 
 if exist "data\update-in-progress" (
-  echo 检测到未完成的更新，已拒绝启动应用。
-  echo 请先运行 update.cmd 恢复旧版本。
+  echo [ERROR] Unfinished update detected. Startup rejected.
+  echo Please run update.cmd to restore or complete update first.
   pause
   exit /b 1
 )
@@ -14,6 +14,6 @@ set "DEBUG=@lsby:*,@lsby:playground-ts-service:*"
 start /wait "" "app\lsby-playground-ts-service.exe"
 if errorlevel 1 (
   echo.
-  echo 程序异常退出，退出码: %errorlevel%
+  echo [ERROR] Application exited with error code: %errorlevel%
   pause
 )
