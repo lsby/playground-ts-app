@@ -105,25 +105,10 @@ async function 执行打包(): Promise<void> {
 
       if (是否推送 === true) {
         let { 目标仓库 } = (await inquirer.prompt([
-          {
-            type: 'list',
-            name: '目标仓库',
-            message: '请选择推送目标仓库:',
-            choices: [...推送目标列表, { name: '自定义仓库前缀', value: '__custom__' }],
-          },
+          { type: 'list', name: '目标仓库', message: '请选择推送目标仓库:', choices: 推送目标列表 },
         ])) as { 目标仓库: string }
 
         let 仓库前缀 = 目标仓库
-        if (目标仓库 === '__custom__') {
-          let { 自定义前缀 } = (await inquirer.prompt([
-            {
-              type: 'input',
-              name: '自定义前缀',
-              message: '请输入仓库前缀 (例如 registry.cn-hangzhou.aliyuncs.com/my-namespace):',
-            },
-          ])) as { 自定义前缀: string }
-          仓库前缀 = 自定义前缀.trim()
-        }
 
         let 本地镜像名 = `${用户输入镜像名}:${包信息.version}`
         let 最终推送镜像名 =
