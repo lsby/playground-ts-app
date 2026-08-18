@@ -32,6 +32,7 @@ async function 主函数(): Promise<void> {
 
   // 3. 拼接命令
   let 环境变量 = { ...process.env }
+  环境变量['DEMO_MODE'] = 演示模式 === true ? 'true' : 'false'
 
   let 参数列表 = ['test']
   if (运行目标 !== 'all') {
@@ -40,7 +41,6 @@ async function 主函数(): Promise<void> {
 
   if (演示模式 === true) {
     参数列表.push('--headed')
-    环境变量['DEMO_MODE'] = 'true'
   }
 
   // 支持透传额外的参数 (例如 npm run test:e2e -- --ui)
