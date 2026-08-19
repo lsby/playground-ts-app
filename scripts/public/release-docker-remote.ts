@@ -159,7 +159,7 @@ async function 主函数(): Promise<void> {
   let { host: 服务器地址, username: 用户名, password: 密码, useMirror: 是否使用镜像 } = 目标服务器
 
   let 镜像参数 = 是否使用镜像
-    ? '--build-arg NPM_REGISTRY=https://registry.npmmirror.com --build-arg PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma --build-arg ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/'
+    ? '--build-arg NPM_REGISTRY=https://registry.npmmirror.com --build-arg PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma --build-arg ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ --build-arg DEBIAN_MIRROR=mirrors.ustc.edu.cn'
     : ''
   if (复用本地构建 === true) {
     镜像参数 += ' --build-arg SKIP_BUILD=true'
