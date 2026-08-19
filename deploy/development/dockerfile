@@ -20,7 +20,6 @@ COPY patche[s] ./patches/
 # 配置分层镜像并安装依赖
 RUN corepack enable && \
     pnpm config set registry ${NPM_REGISTRY} && \
-    pnpm config set @lsby:registry https://registry.npmjs.org && \
     pnpm install --ignore-scripts
 
 # 拷贝剩余源码
@@ -55,7 +54,6 @@ COPY --from=builder /opt/app/patche[s] /opt/app/patches/
 # 安装依赖
 RUN corepack enable && \
     pnpm config set registry ${NPM_REGISTRY} && \
-    pnpm config set @lsby:registry https://registry.npmjs.org && \
     pnpm install --ignore-scripts
 
 # ====================

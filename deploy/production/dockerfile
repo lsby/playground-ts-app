@@ -20,7 +20,6 @@ COPY patche[s] ./patches/
 # 安装 pnpm 依赖
 RUN corepack enable && \
     pnpm config set registry ${NPM_REGISTRY} && \
-    pnpm config set @lsby:registry https://registry.npmjs.org && \
     pnpm install --ignore-scripts
 
 # 拷贝剩余源码
@@ -55,7 +54,6 @@ COPY --from=builder /opt/app/patche[s] /opt/app/patches/
 # 只安装生产环境依赖，并跳过脚本执行
 RUN corepack enable && \
     pnpm config set registry ${NPM_REGISTRY} && \
-    pnpm config set @lsby:registry https://registry.npmjs.org && \
     pnpm install --prod --ignore-scripts
 
 # ====================

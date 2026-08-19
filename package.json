@@ -51,7 +51,7 @@
     "prepare": "husky",
     "public:docker:local": "tsx scripts/public/release-docker-local.ts",
     "public:docker:remote": "tsx scripts/public/release-docker-remote.ts",
-    "public:electron": "npm run db:push:prod:electron && dotenv -e ./.env/.env.production.electron -- npm run _check:all && dotenv -e ./.env/.env.production.electron -- npm run _build:all && tsx scripts/public/release-electron.ts",
+    "public:electron": "tsx scripts/public/release-electron.ts",
     "public:npm": "npm publish --access public",
     "public:sea": "npm run db:push:prod:sea && dotenv -e ./.env/.env.production.sea -- npm run _check:all && dotenv -e ./.env/.env.production.sea -- npm run _build:all && tsx scripts/public/release-sea.ts",
     "public:web:pure-frontend": "dotenv -e ./.env/.env.production.pure-frontend -- npm run _build:web:pure-frontend && tsx scripts/public/release-pure-frontend.ts",

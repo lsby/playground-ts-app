@@ -83,6 +83,11 @@ async function 执行构建(): Promise<void> {
   try {
     let 是否生成Zip = await 询问是否打包Zip()
 
+    console.log('正在执行前置准备工作 (db:push, check, build)...')
+    execSync('npm run db:push:prod:electron', { stdio: 'inherit', cwd: 项目根目录 })
+    execSync('dotenv -e ./.env/.env.production.electron -- npm run _check:all', { stdio: 'inherit', cwd: 项目根目录 })
+    execSync('dotenv -e ./.env/.env.production.electron -- npm run _build:all', { stdio: 'inherit', cwd: 项目根目录 })
+
     let 环境源文件 = path.resolve(项目根目录, '.env/.env.production.electron')
     let 数据库源文件 = path.resolve(项目根目录, 'db/prod-electron.db')
 

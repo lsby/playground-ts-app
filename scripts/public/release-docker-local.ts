@@ -44,46 +44,59 @@ function 执行命令行(命令: string, 参数: string[], 工作目录?: string
 
 // 打包流程
 async function 执行打包(): Promise<void> {
-  // 用户选择镜像名称
-  let { 用户输入镜像名 } = (await inquirer.prompt([
+  // 询问所有配置
+  let 回答 = (await inquirer.prompt([
     { type: 'input', name: '用户输入镜像名', message: '请输入镜像名称（默认: ' + 项目名称 + '）:', default: 项目名称 },
-  ])) as { 用户输入镜像名: string }
-
-  // 二次确认用户输入的镜像名称
-  let { 是否确认镜像名 } = (await inquirer.prompt([
     {
       type: 'confirm',
       name: '是否确认镜像名',
-      message: `最终的镜像名称是 "${用户输入镜像名}:${包信息.version}"，确认无误吗？`,
+      message: (答案: any): string => `最终的镜像名称是 "${答案.用户输入镜像名}:${包信息.version}"，确认无误吗？`,
       default: true,
     },
-  ])) as { 是否确认镜像名: boolean }
-
-  if (是否确认镜像名 === false) {
-    console.log('用户取消了镜像名称确认。')
-    exit(1)
-  }
-
-  console.log(`镜像名称已确认: ${用户输入镜像名}:${包信息.version}`)
-
-  // 用户选择打包环境
-  let { 选择环境 } = (await inquirer.prompt([
     {
       type: 'list',
       name: '选择环境',
       message: '请选择打包环境:',
       choices: ['development', 'production'],
       default: 'development',
+      when: (答案: any): boolean => 答案.是否确认镜像名 === true,
     },
-  ])) as { 选择环境: 'development' | 'production' }
+    {
+      type: 'confirm',
+      name: '是否推送',
+      message: `打包完成！是否要执行 docker push ?`,
+      default: false,
+      when: (答案: any): boolean => 答案.是否确认镜像名 === true,
+    },
+    {
+      type: 'list',
+      name: '目标仓库',
+      message: '请选择推送目标仓库:',
+      choices: 推送目标列表,
+      when: (答案: any): boolean => 答案.是否确认镜像名 === true && 答案.是否推送 === true,
+    },
+  ])) as {
+    用户输入镜像名: string
+    是否确认镜像名: boolean
+    选择环境: 'development' | 'production'
+    是否推送: boolean
+    目标仓库?: string
+  }
+
+  if (回答.是否确认镜像名 === false) {
+    console.log('用户取消了镜像名称确认。')
+    exit(1)
+  }
+
+  console.log(`镜像名称已确认: ${回答.用户输入镜像名}:${包信息.version}`)
 
   // 根据用户输入生成 Docker 构建命令
-  let docker文件路径 = path.join('deploy', 选择环境, 'dockerfile')
+  let docker文件路径 = path.join('deploy', 回答.选择环境, 'dockerfile')
   let 项目根目录 = path.resolve(import.meta.dirname, '../..')
   console.log('执行命令: %O %O', 'docker', [
     'build',
     '-t',
-    `${用户输入镜像名}:${包信息.version}`,
+    `${回答.用户输入镜像名}:${包信息.version}`,
     '-f',
     docker文件路径,
     '.',
@@ -92,42 +105,31 @@ async function 执行打包(): Promise<void> {
   try {
     let 退出码 = await 执行命令行(
       'docker',
-      ['build', '-t', `${用户输入镜像名}:${包信息.version}`, '-f', docker文件路径, '.'],
+      ['build', '-t', `${回答.用户输入镜像名}:${包信息.version}`, '-f', docker文件路径, '.'],
       项目根目录,
     )
     console.log(`docker build 进程退出，退出码: ${退出码}`)
 
-    if (退出码 === 0) {
-      // 打包成功，询问是否执行 push
-      let { 是否推送 } = (await inquirer.prompt([
-        { type: 'confirm', name: '是否推送', message: `打包完成！是否要执行 docker push ?`, default: false },
-      ])) as { 是否推送: boolean }
+    if (退出码 === 0 && 回答.是否推送 === true && 回答.目标仓库 !== undefined) {
+      let 仓库前缀 = 回答.目标仓库
 
-      if (是否推送 === true) {
-        let { 目标仓库 } = (await inquirer.prompt([
-          { type: 'list', name: '目标仓库', message: '请选择推送目标仓库:', choices: 推送目标列表 },
-        ])) as { 目标仓库: string }
+      let 本地镜像名 = `${回答.用户输入镜像名}:${包信息.version}`
+      let 最终推送镜像名 =
+        仓库前缀 !== '' ? `${仓库前缀.replace(/\/+$/, '')}/${回答.用户输入镜像名}:${包信息.version}` : 本地镜像名
 
-        let 仓库前缀 = 目标仓库
-
-        let 本地镜像名 = `${用户输入镜像名}:${包信息.version}`
-        let 最终推送镜像名 =
-          仓库前缀 !== '' ? `${仓库前缀.replace(/\/+$/, '')}/${用户输入镜像名}:${包信息.version}` : 本地镜像名
-
-        if (最终推送镜像名 !== 本地镜像名) {
-          console.log('执行命令: %O %O', 'docker', ['tag', 本地镜像名, 最终推送镜像名])
-          let tag退出码 = await 执行命令行('docker', ['tag', 本地镜像名, 最终推送镜像名])
-          if (tag退出码 !== 0) {
-            console.error(`docker tag 失败，退出码: ${tag退出码}`)
-            return
-          }
+      if (最终推送镜像名 !== 本地镜像名) {
+        console.log('执行命令: %O %O', 'docker', ['tag', 本地镜像名, 最终推送镜像名])
+        let tag退出码 = await 执行命令行('docker', ['tag', 本地镜像名, 最终推送镜像名])
+        if (tag退出码 !== 0) {
+          console.error(`docker tag 失败，退出码: ${tag退出码}`)
+          return
         }
-
-        // 执行 docker push
-        console.log('执行命令: %O %O', 'docker', ['push', 最终推送镜像名])
-        let 推送退出码 = await 执行命令行('docker', ['push', 最终推送镜像名])
-        console.log(`docker push 进程退出，退出码: ${推送退出码}`)
       }
+
+      // 执行 docker push
+      console.log('执行命令: %O %O', 'docker', ['push', 最终推送镜像名])
+      let 推送退出码 = await 执行命令行('docker', ['push', 最终推送镜像名])
+      console.log(`docker push 进程退出，退出码: ${推送退出码}`)
     }
   } catch (错误) {
     console.error('构建出错: ', 错误)
@@ -137,50 +139,42 @@ async function 执行打包(): Promise<void> {
 
 // 导出流程
 async function 执行导出(): Promise<void> {
-  // 用户选择镜像名称
-  let { 用户输入镜像名 } = (await inquirer.prompt([
+  // 询问所有导出配置
+  let 回答 = (await inquirer.prompt([
     {
       type: 'input',
       name: '用户输入镜像名',
       message: '请输入要导出的镜像名称（默认: ' + 项目名称 + '）:',
       default: 项目名称,
     },
-  ])) as { 用户输入镜像名: string }
-
-  // 二次确认要导出的镜像
-  let { 是否确认镜像名 } = (await inquirer.prompt([
     {
       type: 'confirm',
       name: '是否确认镜像名',
-      message: `要导出的镜像名称是 "${用户输入镜像名}:${包信息.version}"，确认无误吗？`,
+      message: (答案: any): string => `要导出的镜像名称是 "${答案.用户输入镜像名}:${包信息.version}"，确认无误吗？`,
       default: true,
     },
-  ])) as { 是否确认镜像名: boolean }
-
-  if (是否确认镜像名 === false) {
-    console.log('用户取消了镜像名称确认。')
-    exit(1)
-  }
-
-  // 默认文件名将斜杠替换为短横线
-  let 默认文件名 = `${用户输入镜像名.replace(/\//g, '-')}-${包信息.version}.tar`
-  let { 导出文件名 } = (await inquirer.prompt([
     {
       type: 'input',
       name: '导出文件名',
       message: '请输入导出的 tar 文件名（保存在项目根目录下）:',
-      default: 默认文件名,
+      default: (答案: any): string => `${答案.用户输入镜像名.replace(/\//g, '-')}-${包信息.version}.tar`,
+      when: (答案: any): boolean => 答案.是否确认镜像名 === true,
     },
-  ])) as { 导出文件名: string }
+  ])) as { 用户输入镜像名: string; 是否确认镜像名: boolean; 导出文件名?: string }
+
+  if (回答.是否确认镜像名 === false || 回答.导出文件名 === undefined) {
+    console.log('用户取消了镜像名称确认。')
+    exit(1)
+  }
 
   let 项目根目录 = path.resolve(import.meta.dirname, '../..')
-  let 导出绝对路径 = path.resolve(项目根目录, 导出文件名)
+  let 导出绝对路径 = path.resolve(项目根目录, 回答.导出文件名)
 
   console.log(`镜像将导出为: ${导出绝对路径}`)
-  console.log('执行命令: %O %O', 'docker', ['save', '-o', 导出绝对路径, `${用户输入镜像名}:${包信息.version}`])
+  console.log('执行命令: %O %O', 'docker', ['save', '-o', 导出绝对路径, `${回答.用户输入镜像名}:${包信息.version}`])
 
   try {
-    let 退出码 = await 执行命令行('docker', ['save', '-o', 导出绝对路径, `${用户输入镜像名}:${包信息.version}`])
+    let 退出码 = await 执行命令行('docker', ['save', '-o', 导出绝对路径, `${回答.用户输入镜像名}:${包信息.version}`])
     console.log(`docker save 进程退出，退出码: ${退出码}`)
     if (退出码 === 0) {
       console.log(`导出成功！文件已保存至: ${导出绝对路径}`)
