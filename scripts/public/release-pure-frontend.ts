@@ -1,3 +1,4 @@
+import { execSync } from 'child_process'
 import fs from 'fs'
 import open from 'open'
 import path from 'path'
@@ -35,6 +36,16 @@ function 递归复制(源路径: string, 目标路径: string): void {
 
 async function 执行构建(): Promise<void> {
   try {
+    console.log('正在执行前置准备工作 (check, build)...')
+    execSync('dotenv -e ./.env/.env.production.pure-frontend -- npm run _check:all', {
+      stdio: 'inherit',
+      cwd: 项目根目录,
+    })
+    execSync('dotenv -e ./.env/.env.production.pure-frontend -- npm run _build:web:pure-frontend', {
+      stdio: 'inherit',
+      cwd: 项目根目录,
+    })
+
     console.log('[1/3] 正在准备发布目录...')
     if (fs.existsSync(发布目录) === true) {
       fs.rmSync(发布目录, { recursive: true, force: true })

@@ -56,6 +56,11 @@ function 递归复制(源路径: string, 目标路径: string): void {
 
 async function 执行构建(): Promise<void> {
   try {
+    console.log('正在执行前置准备工作 (db:push, check, build)...')
+    execSync('npm run db:push:prod:sea', { stdio: 'inherit', cwd: 项目根目录 })
+    execSync('dotenv -e ./.env/.env.production.sea -- npm run _check:all', { stdio: 'inherit', cwd: 项目根目录 })
+    execSync('dotenv -e ./.env/.env.production.sea -- npm run _build:all', { stdio: 'inherit', cwd: 项目根目录 })
+
     let 环境源文件 = path.join(项目根目录, '.env/.env.production.sea')
     let 数据库源文件 = path.join(项目根目录, 'db/prod-sea.db')
 
