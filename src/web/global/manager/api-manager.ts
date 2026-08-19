@@ -1,4 +1,5 @@
 import { web请求 } from '@lsby/ts-http-extend'
+import { 环境变量 } from '../../../global/env'
 import { 已审阅的any } from '../../../tools/types'
 import { InterfaceType } from '../../../types/interface-type'
 import { 错误提示 } from '../manager/toast-manager'
@@ -209,7 +210,7 @@ export class API管理器类 {
           ? JSON.stringify(请求结果.data)
           : String(请求结果.data)
       let 提示 = `请求接口失败: ${接口路径}: ${错误详情}`
-      void 错误提示(提示)
+      错误提示(提示)
       throw new Error(提示)
     }
     return 请求结果.data as 已审阅的any
@@ -227,7 +228,6 @@ export class API管理器类 {
 
 export let API管理器 = new API管理器类()
 
-import { 环境变量 } from '../../../global/env'
 if ('serviceWorker' in navigator && 环境变量.BUILD_TARGET === 'pure-frontend') {
   serviceWorkerReady = navigator.serviceWorker
     .register(new URL('../../sw.ts', import.meta.url), { type: 'module' })

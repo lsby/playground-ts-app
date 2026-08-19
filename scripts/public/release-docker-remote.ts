@@ -216,15 +216,19 @@ async function 主函数(): Promise<void> {
 
     // ====================
     // 步骤: 打包并上传 (仅 build, run, rededeploy 模式需要)
-    // ====================
     if (模式 === 'build' || 模式 === 'run' || 模式 === 'redeploy') {
       if (复用本地构建 === true) {
+        let 环境名 = typeof 环境 === 'string' ? 环境 : 'production'
+        let envFile = `./.env/.env.${环境名}.web`
+        if (fs.existsSync(path.join(本地根目录, envFile)) === false) {
+          throw new Error(`找不到对应的环境变量文件: ${envFile}`)
+        }
         日志.打印(`📦 正在本地生成代码 (gen)...`)
         await 执行本地命令('npm run _gen:all', { 工作目录: 本地根目录 })
         日志.打印(`🔍 正在本地检查代码 (check)...`)
-        await 执行本地命令('npm run _check:all', { 工作目录: 本地根目录 })
-        日志.打印(`📦 正在本地预构建项目 (用于远程复用 dist，避免服务器内存溢出假死)...`)
-        await 执行本地命令('npm run _build:all', { 工作目录: 本地根目录 })
+        await 执行本地命令(`npx dotenv -e ${envFile} -- npm run _check:all`, { 工作目录: 本地根目录 })
+        日志.打印(`📦 正在本地预构建项目 (使用 ${envFile}，避免服务器内存溢出假死)...`)
+        await 执行本地命令(`npx dotenv -e ${envFile} -- npm run _build:all`, { 工作目录: 本地根目录 })
       }
 
       日志.打印(`🧹 清理旧的本地压缩包`)
