@@ -115,12 +115,24 @@ async function 执行构建(): Promise<void> {
       await 移动目录并等待文件句柄释放(构建程序目录, path.join(生成目录, 'app'))
     } else {
       let 子项组 = fs.existsSync(待清理路径) === true ? fs.readdirSync(待清理路径) : []
-      let macApp目录 = 子项组.find(
-        (项) => fs.existsSync(path.join(待清理路径, 项, 'lsby-playground-ts-service.app')) === true,
-      )
-      let macTarget目录 = 子项组.find((项) => 项.startsWith('mac-'))
-      let 目标目录名 = macApp目录 ?? macTarget目录 ?? 子项组.find((项) => 项.startsWith('mac')) ?? 'mac'
-      生成目录 = path.join(待清理路径, 目标目录名)
+      let 构建程序目录名 =
+        子项组.find((项) => fs.existsSync(path.join(待清理路径, 项, 'lsby-playground-ts-service.app')) === true) ??
+        子项组.find((项) => 项.startsWith('mac'))
+      if (构建程序目录名 === undefined) {
+        throw new Error('❌ 未找到 electron-builder 生成的 macOS .app 目录')
+      }
+      let 源App路径 = path.join(待清理路径, 构建程序目录名, 'lsby-playground-ts-service.app')
+      生成目录 = path.join(待清理路径, 'mac-portable')
+      确保目录存在(生成目录)
+      let 目标App路径 = path.join(生成目录, 'lsby-playground-ts-service.app')
+      if (fs.existsSync(目标App路径) === true) {
+        fs.rmSync(目标App路径, { recursive: true, force: true })
+      }
+      await 移动目录并等待文件句柄释放(源App路径, 目标App路径)
+      let 原始目录 = path.join(待清理路径, 构建程序目录名)
+      if (原始目录 !== 生成目录 && fs.existsSync(原始目录) === true) {
+        fs.rmSync(原始目录, { recursive: true, force: true })
+      }
     }
 
     console.log('正在进行后处理...')
@@ -136,23 +148,19 @@ async function 执行构建(): Promise<void> {
     if (fs.existsSync(path.dirname(appResourcesEnv)) === true) {
       环境目标路径组.push(appResourcesEnv)
     }
+    let 环境内容 = fs
+      .readFileSync(环境源文件, 'utf8')
+      .replace(/^DB_PATH\s*=.*$/m, 'DB_PATH = "./data/db/prod-electron.db"')
+      .replace(/^DB_BACKUP_PATH\s*=.*$/m, 'DB_BACKUP_PATH = "./data/backups"')
     for (let 目标目录 of 环境目标路径组) {
       确保目录存在(目标目录)
       let 环境目标文件 = path.join(目标目录, '.env.production.electron')
-      if (process.platform === 'win32') {
-        let 环境内容 = fs
-          .readFileSync(环境源文件, 'utf8')
-          .replace(/^DB_PATH\s*=.*$/m, 'DB_PATH = "./data/db/prod-electron.db"')
-          .replace(/^DB_BACKUP_PATH\s*=.*$/m, 'DB_BACKUP_PATH = "./data/backups"')
-        fs.writeFileSync(环境目标文件, 环境内容, 'utf8')
-      } else {
-        fs.copyFileSync(环境源文件, 环境目标文件)
-      }
-      console.log(`✅ 已复制 ${环境源文件} 到 ${环境目标文件}`)
+      fs.writeFileSync(环境目标文件, 环境内容, 'utf8')
+      console.log(`✅ 已写入环境变量到 ${环境目标文件}`)
     }
 
     // 复制数据库
-    let 数据库目标路径组: string[] = [path.join(生成目录, process.platform === 'win32' ? 'data/db' : 'db')]
+    let 数据库目标路径组: string[] = [path.join(生成目录, 'data/db')]
     let appResourcesDb = path.join(生成目录, 'lsby-playground-ts-service.app/Contents/Resources/app/db')
     if (fs.existsSync(path.dirname(appResourcesDb)) === true) {
       数据库目标路径组.push(appResourcesDb)
@@ -163,15 +171,20 @@ async function 执行构建(): Promise<void> {
       fs.copyFileSync(数据库源文件, 数据库目标文件)
       console.log(`✅ 已复制 ${数据库源文件} 到 ${数据库目标文件}`)
     }
+    确保目录存在(path.join(生成目录, 'data/backups'))
 
-    if (process.platform === 'win32') {
-      fs.cpSync(path.join(项目根目录, 'prisma'), path.join(生成目录, 'app/prisma'), { recursive: true })
-      fs.copyFileSync(path.join(项目根目录, 'prisma.config.ts'), path.join(生成目录, 'app/prisma.config.ts'))
-      console.log('✅ 已复制 Prisma Schema 与 migrations')
-    }
+    // 复制 Prisma 与 migrations
+    let appPrisma目标目录 =
+      process.platform === 'win32'
+        ? path.join(生成目录, 'app')
+        : path.join(生成目录, 'lsby-playground-ts-service.app/Contents/Resources/app')
+    fs.cpSync(path.join(项目根目录, 'prisma'), path.join(appPrisma目标目录, 'prisma'), { recursive: true })
+    fs.copyFileSync(path.join(项目根目录, 'prisma.config.ts'), path.join(appPrisma目标目录, 'prisma.config.ts'))
+    console.log('✅ 已复制 Prisma Schema 与 migrations')
 
+    // 复制更新脚本与写入 package.json
+    let 更新脚本源目录 = path.join(__当前目录名, 'updater')
     if (process.platform === 'win32') {
-      let 更新脚本源目录 = path.join(__当前目录名, 'updater')
       for (let 文件名 of ['lsby-playground-ts-service-debug.cmd', 'update.cmd']) {
         let 源路径 = path.join(更新脚本源目录, 文件名)
         let 目标路径 = path.join(生成目录, 文件名)
@@ -180,29 +193,88 @@ async function 执行构建(): Promise<void> {
       确保目录存在(path.join(生成目录, 'scripts'))
       let 更新脚本内容 = fs.readFileSync(path.join(更新脚本源目录, 'update.ps1'), 'utf8').replace(/^\uFEFF/, '')
       fs.writeFileSync(path.join(生成目录, 'scripts/update.ps1'), '\uFEFF' + 更新脚本内容, 'utf8')
-      确保目录存在(path.join(生成目录, 'data/backups'))
-      await 写入AppPackageJson(项目根目录, 生成目录)
-      console.log(`✅ 已生成 app/package.json 与更新脚本`)
+    } else {
+      let 目标UpdateCommand = path.join(生成目录, 'update.command')
+      fs.copyFileSync(path.join(更新脚本源目录, 'update.command'), 目标UpdateCommand)
+      fs.chmodSync(目标UpdateCommand, 0o755)
 
-      let Prisma迁移名称组 = 获得Prisma迁移名称组(path.join(生成目录, 'app/prisma/migrations'))
-      if (Prisma迁移名称组.length > 0) {
-        let Electron程序路径 = path.join(生成目录, 'app/lsby-playground-ts-service.exe')
-        let PrismaCli路径 = path.join(生成目录, 'app/resources/app/node_modules/prisma/build/index.js')
-        let Prisma配置路径 = path.join(生成目录, 'app/prisma.config.ts')
-        let Prisma环境 = {
-          ...process.env,
-          ELECTRON_RUN_AS_NODE: '1',
-          DB_PATH_PRISMA: `file:${path.join(生成目录, 'data/db/prod-electron.db').replaceAll('\\', '/')}`,
-          NODE_PATH: path.join(生成目录, 'app/resources/app/node_modules'),
+      确保目录存在(path.join(生成目录, 'scripts'))
+      let 目标UpdateSh = path.join(生成目录, 'scripts/update.sh')
+      fs.copyFileSync(path.join(更新脚本源目录, 'update.sh'), 目标UpdateSh)
+      fs.chmodSync(目标UpdateSh, 0o755)
+    }
+    await 写入AppPackageJson(项目根目录, 生成目录)
+    console.log(`✅ 已生成 package.json 与更新脚本`)
+
+    // 在 macOS 下为 .app 包挂载内置启动引导器，解决 Finder 直接双击时 launchd 不传 ENV_FILE_PATH 与 cwd=/ 的问题
+    if (process.platform === 'darwin') {
+      let macOsBinDir = path.join(生成目录, 'lsby-playground-ts-service.app/Contents/MacOS')
+      let 原生可执行文件 = path.join(macOsBinDir, 'lsby-playground-ts-service')
+      let 真实二进制文件 = path.join(macOsBinDir, 'lsby-playground-ts-service-bin')
+
+      if (fs.existsSync(原生可执行文件) === true) {
+        if (fs.existsSync(真实二进制文件) === true) {
+          fs.rmSync(真实二进制文件)
         }
-        console.log('正在验证默认数据库的 Prisma migrations...')
-        execFileSync(Electron程序路径, [PrismaCli路径, 'migrate', 'deploy', '--config', Prisma配置路径], {
-          cwd: path.join(生成目录, 'app'),
-          env: Prisma环境,
-          stdio: 'inherit',
-        })
-      }
+        fs.renameSync(原生可执行文件, 真实二进制文件)
 
+        let appLauncher脚本 = [
+          '#!/usr/bin/env bash',
+          'DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"',
+          'APP_RESOURCES_DIR="$( cd "$DIR/../Resources/app" >/dev/null 2>&1 && pwd )"',
+          'PORTABLE_ROOT="$( cd "$DIR/../../.." >/dev/null 2>&1 && pwd )"',
+          'if [ -f "$PORTABLE_ROOT/.env/.env.production.electron" ]; then',
+          '  export ENV_FILE_PATH="$PORTABLE_ROOT/.env/.env.production.electron"',
+          '  cd "$PORTABLE_ROOT"',
+          'elif [ -f "$APP_RESOURCES_DIR/.env/.env.production.electron" ]; then',
+          '  export ENV_FILE_PATH="$APP_RESOURCES_DIR/.env/.env.production.electron"',
+          '  if [ -d "$PORTABLE_ROOT/data" ]; then',
+          '    cd "$PORTABLE_ROOT"',
+          '  else',
+          '    cd "$APP_RESOURCES_DIR"',
+          '  fi',
+          'fi',
+          'export DEBUG="@lsby:*,@lsby:playground-ts-service:*"',
+          'exec "$DIR/lsby-playground-ts-service-bin" "$@"',
+        ].join('\n')
+        fs.writeFileSync(原生可执行文件, appLauncher脚本, { encoding: 'utf8', mode: 0o755 })
+        console.log(`✅ 已为 .app 成功注入内置启动引导器`)
+      }
+    }
+
+    // 验证默认数据库的 Prisma migrations
+    let Prisma迁移名称组 = 获得Prisma迁移名称组(path.join(appPrisma目标目录, 'prisma/migrations'))
+    if (Prisma迁移名称组.length > 0) {
+      let Electron程序路径 =
+        process.platform === 'win32'
+          ? path.join(生成目录, 'app/lsby-playground-ts-service.exe')
+          : path.join(生成目录, 'lsby-playground-ts-service.app/Contents/MacOS/lsby-playground-ts-service-bin')
+      let PrismaCli路径 =
+        process.platform === 'win32'
+          ? path.join(生成目录, 'app/resources/app/node_modules/prisma/build/index.js')
+          : path.join(
+              生成目录,
+              'lsby-playground-ts-service.app/Contents/Resources/app/node_modules/prisma/build/index.js',
+            )
+      let Prisma配置路径 = path.join(appPrisma目标目录, 'prisma.config.ts')
+      let Prisma环境 = {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        DB_PATH_PRISMA: `file:${path.join(生成目录, 'data/db/prod-electron.db').replaceAll('\\', '/')}`,
+        NODE_PATH:
+          process.platform === 'win32'
+            ? path.join(生成目录, 'app/resources/app/node_modules')
+            : path.join(生成目录, 'lsby-playground-ts-service.app/Contents/Resources/app/node_modules'),
+      }
+      console.log('正在验证默认数据库的 Prisma migrations...')
+      execFileSync(Electron程序路径, [PrismaCli路径, 'migrate', 'deploy', '--config', Prisma配置路径], {
+        cwd: process.platform === 'win32' ? path.join(生成目录, 'app') : appPrisma目标目录,
+        env: Prisma环境,
+        stdio: 'inherit',
+      })
+    }
+
+    if (process.platform === 'win32') {
       // 生成 start.exe (C# 引导器)
       let cscPath = 寻找内置Csc编译器()
       let launcher源文件 = path.join(__当前目录名, 'launcher', 'launcher.cs')
@@ -225,42 +297,13 @@ async function 执行构建(): Promise<void> {
           console.error(`❌ 引导器 run.exe 编译失败:`, error)
         }
       }
-      if (是否生成Zip === true) {
-        console.log('正在生成 Electron 完整便携压缩包...')
-        await 生成Electron便携资源(项目根目录, 生成目录, 待清理路径)
-      } else {
-        console.log('💡 已跳过 ZIP 压缩包打包。')
-      }
+    }
+
+    if (是否生成Zip === true) {
+      console.log('正在生成 Electron 完整便携压缩包...')
+      await 生成Electron便携资源(项目根目录, 生成目录, 待清理路径)
     } else {
-      // 在 macOS 下为 .app 包挂载内置启动引导器，解决 Finder 直接双击时 launchd 不传 ENV_FILE_PATH 与 cwd=/ 的问题
-      let macOsBinDir = path.join(生成目录, 'lsby-playground-ts-service.app/Contents/MacOS')
-      let 原生可执行文件 = path.join(macOsBinDir, 'lsby-playground-ts-service')
-      let 真实二进制文件 = path.join(macOsBinDir, 'lsby-playground-ts-service-bin')
-
-      if (fs.existsSync(原生可执行文件) === true) {
-        if (fs.existsSync(真实二进制文件) === true) {
-          fs.rmSync(真实二进制文件)
-        }
-        fs.renameSync(原生可执行文件, 真实二进制文件)
-
-        let appLauncher脚本 = [
-          '#!/usr/bin/env bash',
-          'DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"',
-          'APP_RESOURCES_DIR="$( cd "$DIR/../Resources/app" >/dev/null 2>&1 && pwd )"',
-          'if [ -f "$APP_RESOURCES_DIR/.env/.env.production.electron" ]; then',
-          '  export ENV_FILE_PATH="$APP_RESOURCES_DIR/.env/.env.production.electron"',
-          '  cd "$APP_RESOURCES_DIR"',
-          'elif [ -f "$DIR/../../.env/.env.production.electron" ]; then',
-          '  OUTER_ENV="$( cd "$DIR/../../.env" >/dev/null 2>&1 && pwd )"',
-          '  export ENV_FILE_PATH="$OUTER_ENV/.env.production.electron"',
-          '  cd "$DIR/../../"',
-          'fi',
-          'export DEBUG="@lsby:*,@lsby:playground-ts-service:*"',
-          'exec "$DIR/lsby-playground-ts-service-bin" "$@"',
-        ].join('\n')
-        fs.writeFileSync(原生可执行文件, appLauncher脚本, { encoding: 'utf8', mode: 0o755 })
-        console.log(`✅ 已为 .app 成功注入内置启动引导器`)
-      }
+      console.log('💡 已跳过 ZIP 压缩包打包。')
     }
 
     // 5. 构建完成后打开文件夹

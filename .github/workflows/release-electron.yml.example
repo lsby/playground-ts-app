@@ -16,7 +16,10 @@ permissions:
 
 jobs:
   release-electron:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,24 +33,33 @@ jobs:
           cache: pnpm
 
       # Windows 下使用 hoisted 布局，避免 Electron/Parcel 的深层 pnpm 路径问题。
-      - name: 配置依赖布局
+      - name: 配置依赖布局 (Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: pnpm config set node-linker hoisted
 
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
 
-      - name: 准备 Electron 数据库
+      - name: 准备 Electron 数据库 (Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path db | Out-Null
           New-Item -ItemType File -Force -Path db/prod-electron.db | Out-Null
 
+      - name: 准备 Electron 数据库 (macOS)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p db
+          touch db/prod-electron.db
+
       - name: 构建完整便携包
         run: pnpm run public:electron -- --zip
 
-      - name: 计算 Release 标签
-        id: get_tag
+      - name: 计算 Release 标签 (Windows)
+        if: runner.os == 'Windows'
+        id: get_tag_win
         shell: pwsh
         run: |
           if ("${{ github.ref }}".StartsWith("refs/tags/")) {
@@ -61,9 +73,24 @@ jobs:
           Write-Host "Release Tag: $tag"
           "tag_name=$tag" >> $env:GITHUB_OUTPUT
 
+      - name: 计算 Release 标签 (macOS)
+        if: runner.os != 'Windows'
+        id: get_tag_unix
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            tag="${{ github.ref_name }}"
+          elif [[ -n "${{ inputs.tag_name }}" ]]; then
+            tag="${{ inputs.tag_name }}"
+          else
+            ver=$(node -p "require('./package.json').version")
+            tag="v$ver"
+          fi
+          echo "Release Tag: $tag"
+          echo "tag_name=$tag" >> "$GITHUB_OUTPUT"
+
       - name: 发布 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.get_tag.outputs.tag_name }}
+          tag_name: ${{ steps.get_tag_win.outputs.tag_name || steps.get_tag_unix.outputs.tag_name }}
           generate_release_notes: true
           files: release/electron/*.zip
