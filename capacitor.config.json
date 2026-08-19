@@ -1,1 +1,1 @@
-{ "appId": "lsby.playground.ts.service", "appName": "lsby-playground-ts-service", "webDir": "dist/src/web" }
+{ "appId": "lsby.playground.ts.app", "appName": "lsby-playground-ts-app", "webDir": "dist/src/web" }

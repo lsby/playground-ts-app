@@ -10,8 +10,8 @@ if exist "data\update-in-progress" (
 )
 
 set "ENV_FILE_PATH=app\.env\.env.production.electron"
-set "DEBUG=@lsby:*,@lsby:playground-ts-service:*"
-start /wait "" "app\lsby-playground-ts-service.exe"
+set "DEBUG=@lsby:*,@lsby:playground-ts-app:*"
+start /wait "" "app\lsby-playground-ts-app.exe"
 if errorlevel 1 (
   echo.
   echo [ERROR] Application exited with error code: %errorlevel%

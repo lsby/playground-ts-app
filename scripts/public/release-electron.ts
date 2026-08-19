@@ -116,15 +116,15 @@ async function 执行构建(): Promise<void> {
     } else {
       let 子项组 = fs.existsSync(待清理路径) === true ? fs.readdirSync(待清理路径) : []
       let 构建程序目录名 =
-        子项组.find((项) => fs.existsSync(path.join(待清理路径, 项, 'lsby-playground-ts-service.app')) === true) ??
+        子项组.find((项) => fs.existsSync(path.join(待清理路径, 项, 'lsby-playground-ts-app.app')) === true) ??
         子项组.find((项) => 项.startsWith('mac'))
       if (构建程序目录名 === undefined) {
         throw new Error('❌ 未找到 electron-builder 生成的 macOS .app 目录')
       }
-      let 源App路径 = path.join(待清理路径, 构建程序目录名, 'lsby-playground-ts-service.app')
+      let 源App路径 = path.join(待清理路径, 构建程序目录名, 'lsby-playground-ts-app.app')
       生成目录 = path.join(待清理路径, 'mac-portable')
       确保目录存在(生成目录)
-      let 目标App路径 = path.join(生成目录, 'lsby-playground-ts-service.app')
+      let 目标App路径 = path.join(生成目录, 'lsby-playground-ts-app.app')
       if (fs.existsSync(目标App路径) === true) {
         fs.rmSync(目标App路径, { recursive: true, force: true })
       }
@@ -144,7 +144,7 @@ async function 执行构建(): Promise<void> {
     let 环境目标路径组: string[] = [
       path.join(process.platform === 'win32' ? path.join(生成目录, 'app') : 生成目录, '.env'),
     ]
-    let appResourcesEnv = path.join(生成目录, 'lsby-playground-ts-service.app/Contents/Resources/app/.env')
+    let appResourcesEnv = path.join(生成目录, 'lsby-playground-ts-app.app/Contents/Resources/app/.env')
     if (fs.existsSync(path.dirname(appResourcesEnv)) === true) {
       环境目标路径组.push(appResourcesEnv)
     }
@@ -161,7 +161,7 @@ async function 执行构建(): Promise<void> {
 
     // 复制数据库
     let 数据库目标路径组: string[] = [path.join(生成目录, 'data/db')]
-    let appResourcesDb = path.join(生成目录, 'lsby-playground-ts-service.app/Contents/Resources/app/db')
+    let appResourcesDb = path.join(生成目录, 'lsby-playground-ts-app.app/Contents/Resources/app/db')
     if (fs.existsSync(path.dirname(appResourcesDb)) === true) {
       数据库目标路径组.push(appResourcesDb)
     }
@@ -177,7 +177,7 @@ async function 执行构建(): Promise<void> {
     let appPrisma目标目录 =
       process.platform === 'win32'
         ? path.join(生成目录, 'app')
-        : path.join(生成目录, 'lsby-playground-ts-service.app/Contents/Resources/app')
+        : path.join(生成目录, 'lsby-playground-ts-app.app/Contents/Resources/app')
     fs.cpSync(path.join(项目根目录, 'prisma'), path.join(appPrisma目标目录, 'prisma'), { recursive: true })
     fs.copyFileSync(path.join(项目根目录, 'prisma.config.ts'), path.join(appPrisma目标目录, 'prisma.config.ts'))
     console.log('✅ 已复制 Prisma Schema 与 migrations')
@@ -185,7 +185,7 @@ async function 执行构建(): Promise<void> {
     // 复制更新脚本与写入 package.json
     let 更新脚本源目录 = path.join(__当前目录名, 'updater')
     if (process.platform === 'win32') {
-      for (let 文件名 of ['lsby-playground-ts-service-debug.cmd', 'update.cmd']) {
+      for (let 文件名 of ['lsby-playground-ts-app-debug.cmd', 'update.cmd']) {
         let 源路径 = path.join(更新脚本源目录, 文件名)
         let 目标路径 = path.join(生成目录, 文件名)
         fs.copyFileSync(源路径, 目标路径)
@@ -208,9 +208,9 @@ async function 执行构建(): Promise<void> {
 
     // 在 macOS 下为 .app 包挂载内置启动引导器，解决 Finder 直接双击时 launchd 不传 ENV_FILE_PATH 与 cwd=/ 的问题
     if (process.platform === 'darwin') {
-      let macOsBinDir = path.join(生成目录, 'lsby-playground-ts-service.app/Contents/MacOS')
-      let 原生可执行文件 = path.join(macOsBinDir, 'lsby-playground-ts-service')
-      let 真实二进制文件 = path.join(macOsBinDir, 'lsby-playground-ts-service-bin')
+      let macOsBinDir = path.join(生成目录, 'lsby-playground-ts-app.app/Contents/MacOS')
+      let 原生可执行文件 = path.join(macOsBinDir, 'lsby-playground-ts-app')
+      let 真实二进制文件 = path.join(macOsBinDir, 'lsby-playground-ts-app-bin')
 
       if (fs.existsSync(原生可执行文件) === true) {
         if (fs.existsSync(真实二进制文件) === true) {
@@ -234,8 +234,8 @@ async function 执行构建(): Promise<void> {
           '    cd "$APP_RESOURCES_DIR"',
           '  fi',
           'fi',
-          'export DEBUG="@lsby:*,@lsby:playground-ts-service:*"',
-          'exec "$DIR/lsby-playground-ts-service-bin" "$@"',
+          'export DEBUG="@lsby:*,@lsby:playground-ts-app:*"',
+          'exec "$DIR/lsby-playground-ts-app-bin" "$@"',
         ].join('\n')
         fs.writeFileSync(原生可执行文件, appLauncher脚本, { encoding: 'utf8', mode: 0o755 })
         console.log(`✅ 已为 .app 成功注入内置启动引导器`)
@@ -247,15 +247,12 @@ async function 执行构建(): Promise<void> {
     if (Prisma迁移名称组.length > 0) {
       let Electron程序路径 =
         process.platform === 'win32'
-          ? path.join(生成目录, 'app/lsby-playground-ts-service.exe')
-          : path.join(生成目录, 'lsby-playground-ts-service.app/Contents/MacOS/lsby-playground-ts-service-bin')
+          ? path.join(生成目录, 'app/lsby-playground-ts-app.exe')
+          : path.join(生成目录, 'lsby-playground-ts-app.app/Contents/MacOS/lsby-playground-ts-app-bin')
       let PrismaCli路径 =
         process.platform === 'win32'
           ? path.join(生成目录, 'app/resources/app/node_modules/prisma/build/index.js')
-          : path.join(
-              生成目录,
-              'lsby-playground-ts-service.app/Contents/Resources/app/node_modules/prisma/build/index.js',
-            )
+          : path.join(生成目录, 'lsby-playground-ts-app.app/Contents/Resources/app/node_modules/prisma/build/index.js')
       let Prisma配置路径 = path.join(appPrisma目标目录, 'prisma.config.ts')
       let Prisma环境 = {
         ...process.env,
@@ -264,7 +261,7 @@ async function 执行构建(): Promise<void> {
         NODE_PATH:
           process.platform === 'win32'
             ? path.join(生成目录, 'app/resources/app/node_modules')
-            : path.join(生成目录, 'lsby-playground-ts-service.app/Contents/Resources/app/node_modules'),
+            : path.join(生成目录, 'lsby-playground-ts-app.app/Contents/Resources/app/node_modules'),
       }
       console.log('正在验证默认数据库的 Prisma migrations...')
       execFileSync(Electron程序路径, [PrismaCli路径, 'migrate', 'deploy', '--config', Prisma配置路径], {
@@ -278,14 +275,14 @@ async function 执行构建(): Promise<void> {
       // 生成 start.exe (C# 引导器)
       let cscPath = 寻找内置Csc编译器()
       let launcher源文件 = path.join(__当前目录名, 'launcher', 'launcher.cs')
-      let runExe路径 = path.join(生成目录, 'lsby-playground-ts-service-start.exe')
+      let runExe路径 = path.join(生成目录, 'lsby-playground-ts-app-start.exe')
 
       if (cscPath === null || fs.existsSync(cscPath) === false) {
-        console.warn(`⚠️ 未找到 C# 编译器，跳过 lsby-playground-ts-service-start.exe 的编译。`)
+        console.warn(`⚠️ 未找到 C# 编译器，跳过 lsby-playground-ts-app-start.exe 的编译。`)
       } else if (fs.existsSync(launcher源文件) === false) {
-        console.warn(`⚠️ 未找到引导器源码: ${launcher源文件}，跳过 lsby-playground-ts-service-start.exe 的编译。`)
+        console.warn(`⚠️ 未找到引导器源码: ${launcher源文件}，跳过 lsby-playground-ts-app-start.exe 的编译。`)
       } else {
-        console.log('✅ 正在编译引导器 lsby-playground-ts-service-start.exe ...')
+        console.log('✅ 正在编译引导器 lsby-playground-ts-app-start.exe ...')
         try {
           // 使用 /target:exe 避免控制台流异常
           execSync(

@@ -81,7 +81,7 @@ async function 主函数(): Promise<void> {
       type: 'input',
       name: '项目名',
       message: '请输入新的项目名 (例如: my-awesome-project):',
-      default: 'playground-ts-service',
+      default: 'playground-ts-app',
     },
   ])
 
@@ -108,7 +108,7 @@ async function 主函数(): Promise<void> {
     {
       type: 'confirm',
       name: '确认',
-      message: `确认将项目从 "@lsby/playground-ts-service" 重命名为 "@${回答_步骤1.作者名}/${回答_步骤1.项目名}"?`,
+      message: `确认将项目从 "@lsby/playground-ts-app" 重命名为 "@${回答_步骤1.作者名}/${回答_步骤1.项目名}"?`,
       default: false,
     },
   ])
@@ -125,13 +125,13 @@ async function 主函数(): Promise<void> {
   let 配置: 重命名配置 = {
     旧作者名: 'lsby',
     新作者名: 作者名,
-    旧项目名_斜杠: '@lsby/playground-ts-service',
+    旧项目名_斜杠: '@lsby/playground-ts-app',
     新项目名_斜杠: `@${作者名}/${项目名}`,
-    旧项目名_冒号: '@lsby:playground-ts-service',
+    旧项目名_冒号: '@lsby:playground-ts-app',
     新项目名_冒号: `@${作者名}:${项目名}`,
-    旧项目名_点分: 'lsby.playground.ts.service',
+    旧项目名_点分: 'lsby.playground.ts.app',
     新项目名_点分: `${作者名}.${项目名.replaceAll('-', '.')}`,
-    旧项目名_短横线: 'lsby-playground-ts-service',
+    旧项目名_短横线: 'lsby-playground-ts-app',
     新项目名_短横线: `${作者名}-${项目名}`,
   }
 
