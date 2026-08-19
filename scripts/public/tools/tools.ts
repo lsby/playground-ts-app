@@ -157,16 +157,41 @@ export async function 执行远程命令(
 }
 
 export async function 上传文件(ssh: NodeSSH, 本地路径: string, 远程路径: string): Promise<void> {
-  try {
-    await ssh.putFile(本地路径, 远程路径)
-  } catch (错误) {
-    throw new Error(`文件上传失败 [${本地路径} -> ${远程路径}]: ${错误}`)
-  }
+  // 弃用 SFTP，改用 SSH 数据流直传。
+  // 通过 SSH 终端直传能保证路径上下文与后续 Shell 脚本绝对一致，同时省去 SFTP 的协议开销，速度更快。
+  return new Promise((resolve, reject) => {
+    ssh.connection.exec(`cat > "${远程路径}"`, (err: Error | undefined | null, stream: any) => {
+      if (err !== undefined && err !== null) return reject(new Error(`文件上传启动失败: ${err.message}`))
+
+      let readStream = fs.createReadStream(本地路径)
+      readStream.pipe(stream)
+
+      stream.on('exit', (code: number | null) => {
+        stream.close()
+        if (code !== 0 && code !== null) reject(new Error(`文件上传失败，远程退出码: ${code}`))
+        else resolve()
+      })
+      stream.on('error', reject)
+      readStream.on('error', reject)
+    })
+  })
 }
+
 export async function 下载文件(ssh: NodeSSH, 远程路径: string, 本地路径: string): Promise<void> {
-  try {
-    await ssh.getFile(本地路径, 远程路径)
-  } catch (错误) {
-    throw new Error(`文件下载失败 [${远程路径} -> ${本地路径}]: ${错误}`)
-  }
+  return new Promise((resolve, reject) => {
+    ssh.connection.exec(`cat "${远程路径}"`, (err: Error | undefined | null, stream: any) => {
+      if (err !== undefined && err !== null) return reject(new Error(`文件下载启动失败: ${err.message}`))
+
+      let writeStream = fs.createWriteStream(本地路径)
+      stream.pipe(writeStream)
+
+      stream.on('exit', (code: number | null) => {
+        stream.close()
+        if (code !== 0 && code !== null) reject(new Error(`文件下载失败，远程退出码: ${code}`))
+        else resolve()
+      })
+      stream.on('error', reject)
+      writeStream.on('error', reject)
+    })
+  })
 }
