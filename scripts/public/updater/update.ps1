@@ -22,8 +22,8 @@ $PreviousRootManifestPath = Join-Path $WorkDir 'previous-root-entries.json'
 $DbBackupDir = Join-Path $WorkDir 'db.backup'
 $MarkerPath = Join-Path $DataDir 'update-in-progress'
 $PackagePath = Join-Path $AppDir 'package.json'
-$AppExeName = 'lsby-playground-ts-service.exe'
-$AppProcessName = 'lsby-playground-ts-service'
+$AppExeName = 'lsby-playground-ts-app.exe'
+$AppProcessName = 'lsby-playground-ts-app'
 $script:DownloadSha256 = $ExpectedSha256
 $script:ResolvedGitHubToken = if ($GitHubToken -ne '') { $GitHubToken } else { [string]$env:GITHUB_TOKEN }
 
@@ -209,7 +209,7 @@ function Expand-ValidatedZip([string]$ZipPath) {
   } finally {
     $archive.Dispose()
   }
-  foreach ($requiredPath in @('app\package.json', "app\$AppExeName", 'app\.env\.env.production.electron', 'update.cmd', 'scripts\update.ps1', 'lsby-playground-ts-service-start.exe')) {
+  foreach ($requiredPath in @('app\package.json', "app\$AppExeName", 'app\.env\.env.production.electron', 'update.cmd', 'scripts\update.ps1', 'lsby-playground-ts-app-start.exe')) {
     if (-not (Test-Path -LiteralPath (Join-Path $StagingDir $requiredPath) -PathType Leaf)) { throw "ZIP 缺少 $requiredPath" }
   }
   $stagedAppDir = Join-Path $StagingDir 'app'
@@ -361,7 +361,7 @@ try {
   Remove-Item -LiteralPath $MarkerPath -Force
   Remove-SafePath $StagingDir
   Remove-SafePath $WorkDir
-  Write-Host '更新成功。现在可以运行 lsby-playground-ts-service-start.exe 启动新版本。'
+  Write-Host '更新成功。现在可以运行 lsby-playground-ts-app-start.exe 启动新版本。'
   exit 0
 } catch {
   Write-Host "更新失败: $($_.Exception.Message)" -ForegroundColor Red

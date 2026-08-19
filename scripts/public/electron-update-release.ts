@@ -33,7 +33,7 @@ function 获得App资源目录(便携包目录: string): string {
   if (process.platform === 'win32') {
     return path.join(便携包目录, 'app')
   }
-  return path.join(便携包目录, 'lsby-playground-ts-service.app/Contents/Resources/app')
+  return path.join(便携包目录, 'lsby-playground-ts-app.app/Contents/Resources/app')
 }
 
 export async function 写入AppPackageJson(项目根目录: string, 便携包目录: string): Promise<void> {

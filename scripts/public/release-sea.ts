@@ -93,7 +93,7 @@ async function 执行构建(): Promise<void> {
 
     console.log('[5/9] 正在准备可执行文件...')
     let Node可执行文件 = process.execPath
-    let 可执行文件名 = process.platform === 'win32' ? 'lsby-playground-ts-service.exe' : 'lsby-playground-ts-service'
+    let 可执行文件名 = process.platform === 'win32' ? 'lsby-playground-ts-app.exe' : 'lsby-playground-ts-app'
     let 目标可执行文件 = path.join(发布目录, 可执行文件名)
     fs.copyFileSync(Node可执行文件, 目标可执行文件)
 
@@ -159,12 +159,12 @@ async function 执行构建(): Promise<void> {
       let 启动脚本内容 = [
         '@echo off',
         'chcp 65001 >nul',
-        'echo Starting lsby-playground-ts-service ...',
+        'echo Starting lsby-playground-ts-app ...',
         'echo.',
         'cd /d "%~dp0"',
         'set "ENV_FILE_PATH=./.env/.env.production.sea"',
-        'set "DEBUG=@lsby:*,@lsby:playground-ts-service:*"',
-        'lsby-playground-ts-service.exe',
+        'set "DEBUG=@lsby:*,@lsby:playground-ts-app:*"',
+        'lsby-playground-ts-app.exe',
         'if errorlevel 1 (',
         '  echo.',
         '  echo Application exited with error. Press any key to close...',
@@ -173,20 +173,20 @@ async function 执行构建(): Promise<void> {
         '',
       ].join('\r\n')
       fs.writeFileSync(path.join(发布目录, 'run.cmd'), 启动脚本内容)
-      fs.writeFileSync(path.join(发布目录, 'lsby-playground-ts-service-debug.cmd'), 启动脚本内容)
-      console.log(`✅ 已生成 ${path.join(发布目录, 'lsby-playground-ts-service-debug.cmd')}`)
+      fs.writeFileSync(path.join(发布目录, 'lsby-playground-ts-app-debug.cmd'), 启动脚本内容)
+      console.log(`✅ 已生成 ${path.join(发布目录, 'lsby-playground-ts-app-debug.cmd')}`)
 
       // 生成 start.exe (C# 引导器)
       let cscPath = 寻找内置Csc编译器()
       let launcher源文件 = path.join(__当前目录名, 'launcher', 'launcher.cs')
-      let runExe路径 = path.join(发布目录, 'lsby-playground-ts-service-start.exe')
+      let runExe路径 = path.join(发布目录, 'lsby-playground-ts-app-start.exe')
 
       if (cscPath === null || fs.existsSync(cscPath) === false) {
-        console.warn(`⚠️ 未找到 C# 编译器，跳过 lsby-playground-ts-service-start.exe 的编译。`)
+        console.warn(`⚠️ 未找到 C# 编译器，跳过 lsby-playground-ts-app-start.exe 的编译。`)
       } else if (fs.existsSync(launcher源文件) === false) {
-        console.warn(`⚠️ 未找到引导器源码: ${launcher源文件}，跳过 lsby-playground-ts-service-start.exe 的编译。`)
+        console.warn(`⚠️ 未找到引导器源码: ${launcher源文件}，跳过 lsby-playground-ts-app-start.exe 的编译。`)
       } else {
-        console.log('✅ 正在编译引导器 lsby-playground-ts-service-start.exe ...')
+        console.log('✅ 正在编译引导器 lsby-playground-ts-app-start.exe ...')
         try {
           // 使用 /target:exe 避免控制台流异常
           execSync(
@@ -204,12 +204,12 @@ async function 执行构建(): Promise<void> {
         'DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"',
         'cd "$DIR"',
         'export ENV_FILE_PATH="./.env/.env.production.sea"',
-        'export DEBUG="@lsby:*,@lsby:playground-ts-service:*"',
+        'export DEBUG="@lsby:*,@lsby:playground-ts-app:*"',
         'echo "=================================================="',
-        'echo "lsby-playground-ts-service (SEA单文件服务) 启动引导器"',
+        'echo "lsby-playground-ts-app (SEA单文件服务) 启动引导器"',
         'echo "=================================================="',
         'echo "正在启动后台服务..."',
-        './lsby-playground-ts-service',
+        './lsby-playground-ts-app',
         'EXIT_CODE=$?',
         'if [ $EXIT_CODE -ne 0 ]; then',
         '  echo ""',

@@ -1,6 +1,6 @@
 services:
   app:
-    image: lsby-playground-ts-service-dev
+    image: lsby-playground-ts-app-dev
     build:
       context: ../../
       dockerfile: ./deploy/development/dockerfile
