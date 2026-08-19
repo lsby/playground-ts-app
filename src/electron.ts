@@ -28,7 +28,11 @@ export let 主窗口: BrowserWindow | null = null
 let 资源目录 = process.resourcesPath
 let 预加载脚本路径 = path.join(资源目录, 'preload.js')
 let 用户数据目录 =
-  app.isPackaged === true ? path.resolve(path.dirname(process.execPath), '../data') : path.resolve('data')
+  app.isPackaged === true
+    ? process.platform === 'darwin'
+      ? path.resolve(path.dirname(process.execPath), '../../../data')
+      : path.resolve(path.dirname(process.execPath), '../data')
+    : path.resolve('data')
 fs.mkdirSync(用户数据目录, { recursive: true })
 let 窗口状态路径 = path.join(用户数据目录, 'window-state.json')
 
