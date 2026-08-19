@@ -72,6 +72,18 @@
 
 ## 开发工作流
 
+### 初始化与配置命令 (Setup)
+
+在基于本模板新建项目或进行初始化配置时，提供了以下 setup 命令：
+
+1. **端口分配与初始化 (`pnpm setup:ports`)**:
+   - 运行脚本: `scripts/setup/init-ports.ts`
+   - 作用: 自动扫描并分配一组随机空闲端口（包括 `APP_PORT`、`WEB_PORT`、`WEB_HMR_PORT`、`TEST_APP_PORT`、`TEST_WEB_PORT`、`TEST_WEB_HMR_PORT`），并批量同步更新至所有环境的 `.env` 配置文件（开发、生产、纯前端、测试等）以及 Docker 部署配置文件（`docker-compose.yml`、`dockerfile`）中，彻底解除硬编码并避免多项目本地端口冲突。
+
+2. **项目全局重命名 (`pnpm setup:rename`)**:
+   - 运行脚本: `scripts/setup/rename-project.ts`
+   - 作用: 交互式项目重命名工具。通过命令行交互提示输入新的作者名和项目名，自动将项目内所有出现的作者与项目名变体（包括 `@作者/项目名`、`@作者:项目名`、`作者.项目.名`、`作者-项目名`）在所有文本文件中进行全局批量替换，并自动跳过构建产物与依赖目录。
+
 ### 项目约定
 
 1. **API接口定义**
