@@ -1,6 +1,5 @@
 import { 组件基类 } from '../../base/base'
 import { 创建元素 } from '../../global/tools/create-element'
-import { 悬浮管理组件 } from '../general/management-float'
 import { 横向tab组件 } from '../general/tabs/tabs-horizontal'
 import { 纵向tab组件 } from '../general/tabs/tabs-vertical'
 
@@ -115,6 +114,5 @@ export class 首页组件 extends 组件基类<发出事件类型, 监听事件�
     tabs.添加标签页({ 标签: '系统' }, 系统容器)
 
     this.shadow.append(tabs)
-    this.shadow.append(new 悬浮管理组件())
   }
 }
