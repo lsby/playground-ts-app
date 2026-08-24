@@ -184,14 +184,14 @@ async function 执行构建(): Promise<void> {
       // 生成 start.exe (C# 引导器)
       let cscPath = 寻找内置Csc编译器()
       let launcher源文件 = path.join(__当前目录名, 'launcher', 'launcher.cs')
-      let runExe路径 = path.join(发布目录, 'lsby-playground-ts-app-start.exe')
+      let runExe路径 = path.join(发布目录, 'lsby-playground-ts-app.exe')
 
       if (cscPath === null || fs.existsSync(cscPath) === false) {
-        console.warn(`⚠️ 未找到 C# 编译器，跳过 lsby-playground-ts-app-start.exe 的编译。`)
+        console.warn(`⚠️ 未找到 C# 编译器，跳过 lsby-playground-ts-app.exe 的编译。`)
       } else if (fs.existsSync(launcher源文件) === false) {
-        console.warn(`⚠️ 未找到引导器源码: ${launcher源文件}，跳过 lsby-playground-ts-app-start.exe 的编译。`)
+        console.warn(`⚠️ 未找到引导器源码: ${launcher源文件}，跳过 lsby-playground-ts-app.exe 的编译。`)
       } else {
-        console.log('✅ 正在编译引导器 lsby-playground-ts-app-start.exe ...')
+        console.log('✅ 正在编译引导器 lsby-playground-ts-app.exe ...')
         try {
           // 使用 /target:exe 避免控制台流异常
           execSync(
