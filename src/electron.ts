@@ -52,6 +52,7 @@ async function 创建主窗口(): Promise<void> {
   let 端口 = 环境变量.WEB_PORT
 
   if (开发环境 === false) {
+    端口 = 环境变量.APP_PORT
     // 生产环境下：先处理端口冲突（先检查后启动）
     if ((await 检查端口可用(端口)) === false) {
       端口 = await 获取随机可用端口()
