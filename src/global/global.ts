@@ -17,7 +17,7 @@ export let syncLogCallBack = async (level: string, namespace: string, content: s
 export let globalLog = new Log(环境变量.DEBUG_NAME).pipe(syncLogCallBack)
 export let kysely管理器 = Kysely管理器.从适配器创建<DB>(
   创建sqlite数据库适配器(环境变量.DB_PATH),
-  环境变量.NODE_ENV === 'production' ? [] : ['query', 'error'],
+  环境变量.NODE_ENV === 'development' ? ['query', 'error'] : [],
 )
 // export let kysely管理器 = Kysely管理器.从适配器创建<DB>(
 //   创建pg数据库适配器({
@@ -27,7 +27,7 @@ export let kysely管理器 = Kysely管理器.从适配器创建<DB>(
 //     password: 环境变量.DB_PWD,
 //     database: 环境变量.DB_NAME,
 //   }),
-//   环境变量.NODE_ENV === 'production' ? [] : ['query', 'error'],
+//   环境变量.NODE_ENV === 'development' ? ['query', 'error'] : [],
 // )
 // export let kysely管理器 = Kysely管理器.从适配器创建<DB>(
 //   创建mysql数据库适配器({
@@ -37,7 +37,7 @@ export let kysely管理器 = Kysely管理器.从适配器创建<DB>(
 //     password: 环境变量.DB_PWD,
 //     database: 环境变量.DB_NAME,
 //   }),
-//   环境变量.NODE_ENV === 'production' ? [] : ['query', 'error'],
+//   环境变量.NODE_ENV === 'development' ? ['query', 'error'] : [],
 // )
 
 export async function 检查数据库是否可用(): Promise<void> {
