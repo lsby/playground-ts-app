@@ -5,7 +5,7 @@ services:
       context: ../../
       dockerfile: ./deploy/development/dockerfile
     ports:
-      - 3000:3000
+      - 3000:34656
     env_file:
       - ../../.env/.env.development.web
     restart: always

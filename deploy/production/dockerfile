@@ -75,6 +75,6 @@ COPY --from=builder /opt/app/.env/.env.production.web /opt/app/.env/.env.product
 COPY --from=builder /opt/app/prisma /opt/app/prisma
 COPY --from=builder /opt/app/prisma.config.ts /opt/app/prisma.config.ts
 
-EXPOSE 80
+EXPOSE 34656
 
 CMD ["sh", "-c", "mkdir -p /opt/app/db; if [ ! -f /opt/app/db/prod-web.db ]; then echo 'Initializing database from default'; cp /opt/app/db-default-prod-web.db /opt/app/db/prod-web.db; else echo 'Database already exists'; fi; if [ -d \"prisma/migrations\" ] && [ \"$(ls -A prisma/migrations)\" ]; then npx dotenv -e ./.env/.env.production.web -- prisma migrate deploy; else PRISMA_GENERATE_SKIP=true npx dotenv -e ./.env/.env.production.web -- prisma db push; fi && npm run run:service:prod"]

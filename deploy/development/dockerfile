@@ -75,6 +75,6 @@ COPY --from=builder /opt/app/dist/src/web /opt/app/dist/src/web
 COPY --from=builder /opt/app/public /opt/app/public
 COPY --from=builder /opt/app/.env/.env.development.web /opt/app/.env/.env.development.web
 
-EXPOSE 3000
+EXPOSE 34656
 
 CMD ["sh", "-c", "mkdir -p /opt/app/db; if [ ! -f /opt/app/db/dev-web.db ]; then echo 'Initializing database from default'; cp /opt/app/db-default-dev-web.db /opt/app/db/dev-web.db; else echo 'Database already exists'; fi; npx dotenv -e ./.env/.env.development.web -- prisma migrate deploy && npm run run:service:dev"]

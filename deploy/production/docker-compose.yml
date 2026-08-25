@@ -5,7 +5,7 @@ services:
       context: ../../
       dockerfile: ./deploy/production/dockerfile
     ports:
-      - 80:80
+      - 80:34656
     env_file:
       - ../../.env/.env.production.web
     restart: always
