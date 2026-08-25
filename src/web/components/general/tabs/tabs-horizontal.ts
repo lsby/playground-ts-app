@@ -62,11 +62,11 @@ export class 横向tab组件 extends 组件基类<tabHorizontal发出事件类�
     style.height = '100%'
 
     this.标签头容器.style.display = 'flex'
-    this.标签头容器.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)'
+    this.标签头容器.style.borderBottom = '1px solid var(--边框颜色)'
     this.标签头容器.style.gap = '15px'
     this.标签头容器.style.padding = '0.8em 1.8em'
     this.标签头容器.style.alignItems = 'center'
-    this.标签头容器.style.background = 'linear-gradient(90deg, rgba(139, 92, 246, 0.03), rgba(59, 130, 246, 0.03))'
+    this.标签头容器.style.background = 'var(--tab-头部背景)'
     this.标签头容器.style.backdropFilter = 'blur(10px)'
     this.标签头容器.style.overflowX = 'auto'
     this.标签头容器.style.flexShrink = '0'
@@ -100,40 +100,38 @@ export class 横向tab组件 extends 组件基类<tabHorizontal发出事件类�
           padding: '0.55em 1.3em',
           border: '1px solid transparent',
           borderRadius: '10px',
-          background: 选中
-            ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.15))'
-            : 'transparent',
-          borderColor: 选中 ? 'rgba(139, 92, 246, 0.25)' : 'transparent',
-          color: 选中 ? '#a78bfa' : 'rgba(255, 255, 255, 0.45)',
+          background: 选中 ? 'var(--tab-激活背景)' : 'transparent',
+          borderColor: 选中 ? 'var(--tab-激活边框)' : 'transparent',
+          color: 选中 ? 'var(--tab-激活文字)' : 'var(--tab-未激活文字)',
           fontWeight: '600',
           fontSize: '0.92em',
           cursor: 'pointer',
           userSelect: 'none',
           outline: 'none',
-          boxShadow: 选中 ? '0 4px 15px rgba(139, 92, 246, 0.08)' : 'none',
+          boxShadow: 选中 ? '0 4px 15px var(--tab-阴影)' : 'none',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         },
       })
 
       if (选中 === false) {
         按钮.onmouseenter = (): void => {
-          按钮.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'
-          按钮.style.color = '#ffffff'
+          按钮.style.backgroundColor = 'var(--tab-悬浮背景)'
+          按钮.style.color = 'var(--tab-悬浮文字)'
           按钮.style.transform = 'translateY(-1px)'
         }
         按钮.onmouseleave = (): void => {
           按钮.style.backgroundColor = 'transparent'
-          按钮.style.color = 'rgba(255, 255, 255, 0.45)'
+          按钮.style.color = 'var(--tab-未激活文字)'
           按钮.style.transform = 'translateY(0)'
         }
       } else {
         按钮.onmouseenter = (): void => {
           按钮.style.transform = 'translateY(-1px)'
-          按钮.style.boxShadow = '0 6px 20px rgba(139, 92, 246, 0.15)'
+          按钮.style.boxShadow = '0 6px 20px var(--tab-阴影)'
         }
         按钮.onmouseleave = (): void => {
           按钮.style.transform = 'translateY(0)'
-          按钮.style.boxShadow = '0 4px 15px rgba(139, 92, 246, 0.08)'
+          按钮.style.boxShadow = '0 4px 15px var(--tab-阴影)'
         }
       }
 
