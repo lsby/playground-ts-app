@@ -425,7 +425,7 @@ assert_package_identity() {
   fi
 }
 
-invoke_prisma() {
+invoke_raw_migration() {
   local staged_app="$1"
   shift
   local app_resources="$staged_app/Contents/Resources/app"
@@ -434,13 +434,11 @@ invoke_prisma() {
   if [ ! -f "$electron_bin" ]; then
     electron_bin="$macos_dir/lsby-playground-ts-app"
   fi
-  local prisma_cli="$app_resources/node_modules/prisma/build/index.js"
-  local prisma_config="$app_resources/prisma.config.ts"
+  local push_prod_js="$app_resources/dist/scripts/db/push-prod.js"
 
   ELECTRON_RUN_AS_NODE=1 \
   DB_PATH_PRISMA="file:$DB_DIR/prod-electron.db" \
-  NODE_PATH="$app_resources/node_modules" \
-  "$electron_bin" "$prisma_cli" "$@" --config "$prisma_config"
+  "$electron_bin" "$push_prod_js" "$@"
 }
 
 restore_previous_version() {
@@ -554,11 +552,11 @@ if [ -d "$STAGED_MIGRATIONS_DIR" ] && [ "$(ls -A "$STAGED_MIGRATIONS_DIR" 2>/dev
 
   if [ -z "$OLD_BASELINE" ]; then
     log_info "检测到首次引入 Prisma migrations，正在建立迁移基线..."
-    invoke_prisma "$STAGED_APP_DIR" migrate resolve --applied "$FIRST_MIGRATION"
+    invoke_raw_migration "$STAGED_APP_DIR" --applied "$FIRST_MIGRATION"
   fi
 
-  log_info "正在执行 Prisma migrations..."
-  invoke_prisma "$STAGED_APP_DIR" migrate deploy
+  log_info "正在执行原生 SQL migrations..."
+  invoke_raw_migration "$STAGED_APP_DIR"
 else
   log_info "更新包没有 Prisma migrations，跳过数据库迁移。"
 fi

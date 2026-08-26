@@ -250,29 +250,16 @@ async function 执行构建(): Promise<void> {
     // 验证默认数据库的 Prisma migrations
     let Prisma迁移名称组 = 获得Prisma迁移名称组(path.join(appPrisma目标目录, 'prisma/migrations'))
     if (Prisma迁移名称组.length > 0) {
-      let PrismaCli路径 =
+      let PushProdCli路径 =
         process.platform === 'win32'
-          ? path.join(生成目录, 'app/resources/app/node_modules/prisma/build/index.js')
-          : path.join(生成目录, 'lsby-playground-ts-app.app/Contents/Resources/app/node_modules/prisma/build/index.js')
-      let Prisma配置路径 = path.join(appPrisma目标目录, 'prisma.config.ts')
+          ? path.join(生成目录, 'app/resources/app/dist/scripts/db/push-prod.js')
+          : path.join(生成目录, 'lsby-playground-ts-app.app/Contents/Resources/app/dist/scripts/db/push-prod.js')
       let Prisma环境 = {
         ...process.env,
         DB_PATH_PRISMA: `file:${path.join(生成目录, 'data/db/prod-electron.db').replaceAll('\\', '/')}`,
-        NODE_PATH:
-          process.platform === 'win32'
-            ? path.join(生成目录, 'app/resources/app/node_modules')
-            : path.join(生成目录, 'lsby-playground-ts-app.app/Contents/Resources/app/node_modules'),
       }
-      console.log('正在验证默认数据库的 Prisma migrations...')
-      try {
-        execFileSync(process.execPath, [PrismaCli路径, 'migrate', 'deploy', '--config', Prisma配置路径], {
-          cwd: process.platform === 'win32' ? path.join(生成目录, 'app') : appPrisma目标目录,
-          env: Prisma环境,
-          stdio: 'inherit',
-        })
-      } catch (error) {
-        console.warn('⚠️ 验证 migrations 提示:', error)
-      }
+      console.log('正在验证默认数据库的原生 SQL migrations...')
+      execFileSync(process.execPath, [PushProdCli路径], { cwd: appPrisma目标目录, env: Prisma环境, stdio: 'inherit' })
     }
 
     if (process.platform === 'win32') {

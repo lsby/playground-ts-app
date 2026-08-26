@@ -242,29 +242,23 @@ function Assert-PackageIdentity($CurrentPackage, $NewPackage) {
   }
 }
 
-function Invoke-Prisma([string]$ProgramDir, [string[]]$Arguments) {
+function Invoke-RawMigration([string]$ProgramDir, [string[]]$Arguments) {
   $electronPath = Join-Path $ProgramDir $AppExeName
-  $prismaCliPath = Join-Path $ProgramDir 'resources\app\node_modules\prisma\build\index.js'
-  $prismaConfigPath = Join-Path $ProgramDir 'prisma.config.ts'
-  if (-not (Test-Path -LiteralPath $prismaCliPath -PathType Leaf)) { throw '新程序缺少 Prisma CLI' }
-  if (-not (Test-Path -LiteralPath $prismaConfigPath -PathType Leaf)) { throw '新程序缺少 prisma.config.ts' }
+  $pushProdJsPath = Join-Path $ProgramDir 'resources\app\dist\scripts\db\push-prod.js'
+  if (-not (Test-Path -LiteralPath $pushProdJsPath -PathType Leaf)) { throw '新程序缺少 db/push-prod.js' }
   $oldElectronRunAsNode = $env:ELECTRON_RUN_AS_NODE
   $oldDatabaseUrl = $env:DB_PATH_PRISMA
-  $oldNodePath = $env:NODE_PATH
   try {
     $env:ELECTRON_RUN_AS_NODE = '1'
     $env:DB_PATH_PRISMA = 'file:' + ([System.IO.Path]::GetFullPath((Join-Path $DbDir 'prod-electron.db')).Replace('\', '/'))
-    $env:NODE_PATH = Join-Path $ProgramDir 'resources\app\node_modules'
-    $processArguments = @($prismaCliPath) + $Arguments + @('--config', $prismaConfigPath) | ForEach-Object { '"' + $_.Replace('"', '\"') + '"' }
-    $prismaProcess = Start-Process -FilePath $electronPath -ArgumentList $processArguments -WorkingDirectory $ProgramDir -NoNewWindow -Wait -PassThru
-    if ($prismaProcess.ExitCode -ne 0) { throw "Prisma 命令执行失败，退出码: $($prismaProcess.ExitCode)" }
+    $processArguments = @($pushProdJsPath) + $Arguments | ForEach-Object { '"' + $_.Replace('"', '\"') + '"' }
+    $migrationProcess = Start-Process -FilePath $electronPath -ArgumentList $processArguments -WorkingDirectory $ProgramDir -NoNewWindow -Wait -PassThru
+    if ($migrationProcess.ExitCode -ne 0) { throw "原生 SQL 迁移脚本执行失败，退出码: $($migrationProcess.ExitCode)" }
   } finally {
     if ($null -eq $oldElectronRunAsNode) { Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue }
     else { $env:ELECTRON_RUN_AS_NODE = $oldElectronRunAsNode }
     if ($null -eq $oldDatabaseUrl) { Remove-Item Env:DB_PATH_PRISMA -ErrorAction SilentlyContinue }
     else { $env:DB_PATH_PRISMA = $oldDatabaseUrl }
-    if ($null -eq $oldNodePath) { Remove-Item Env:NODE_PATH -ErrorAction SilentlyContinue }
-    else { $env:NODE_PATH = $oldNodePath }
   }
 }
 
@@ -336,10 +330,10 @@ try {
     }
     if ($null -eq $package.prismaMigrationBaseline) {
       Write-Host '检测到首次引入 Prisma migrations，正在建立迁移基线...'
-      Invoke-Prisma $stagedAppDir @('migrate', 'resolve', '--applied', $firstPrismaMigrationName)
+      Invoke-RawMigration $stagedAppDir @('--applied', $firstPrismaMigrationName)
     }
-    Write-Host '正在执行 Prisma migrations...'
-    Invoke-Prisma $stagedAppDir @('migrate', 'deploy')
+    Write-Host '正在执行原生 SQL migrations...'
+    Invoke-RawMigration $stagedAppDir @()
   } else {
     Write-Host '更新包没有 Prisma migrations，跳过数据库迁移。'
   }
