@@ -178,8 +178,8 @@ async function 执行构建(): Promise<void> {
         '',
       ].join('\r\n')
       fs.writeFileSync(path.join(发布目录, 'run.cmd'), 启动脚本内容)
-      fs.writeFileSync(path.join(发布目录, 'lsby-playground-ts-app-debug.cmd'), 启动脚本内容)
-      console.log(`✅ 已生成 ${path.join(发布目录, 'lsby-playground-ts-app-debug.cmd')}`)
+      fs.writeFileSync(path.join(发布目录, 'app-debug.cmd'), 启动脚本内容)
+      console.log(`✅ 已生成 ${path.join(发布目录, 'app-debug.cmd')}`)
 
       // 生成 start.exe (C# 引导器)
       let cscPath = 寻找内置Csc编译器()

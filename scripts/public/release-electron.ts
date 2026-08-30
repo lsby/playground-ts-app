@@ -190,7 +190,7 @@ async function 执行构建(): Promise<void> {
     // 复制更新脚本与写入 package.json
     let 更新脚本源目录 = path.join(__当前目录名, 'updater')
     if (process.platform === 'win32') {
-      for (let 文件名 of ['lsby-playground-ts-app-debug.cmd', 'update.cmd']) {
+      for (let 文件名 of ['app-debug.cmd', 'update.cmd']) {
         let 源路径 = path.join(更新脚本源目录, 文件名)
         let 目标路径 = path.join(生成目录, 文件名)
         fs.copyFileSync(源路径, 目标路径)
