@@ -1,11 +1,12 @@
 import { 组件基类 } from '../../../base/base'
 import { 创建元素 } from '../../../global/tools/create-element'
+import { 滚动容器 } from '../base/scroll-container'
 
 type 横向tab配置 = { 路由键?: string | undefined }
 export type tabHorizontal发出事件类型 = { 切换: { 当前索引: number } }
 type 监听事件类型 = {}
 
-type 标签页项 = { 标签: string; 内容: HTMLElement; 标识?: string | undefined }
+type 标签页项 = { 标签: string; 内容: HTMLElement; 内容滚动容器: 滚动容器; 标识?: string | undefined }
 
 export class 横向tab组件 extends 组件基类<tabHorizontal发出事件类型, 监听事件类型> {
   static {
@@ -24,8 +25,14 @@ export class 横向tab组件 extends 组件基类<tabHorizontal发出事件类�
   }
 
   public 添加标签页(配置: { 标签: string; 标识?: string | undefined }, 内容: HTMLElement): void {
-    this.标签页列表.push({ 标签: 配置.标签, 标识: 配置.标识, 内容 })
-    this.appendChild(内容)
+    let 内容滚动容器 = new 滚动容器({ 方向: 'vertical' })
+    let 滚动容器样式 = 内容滚动容器.获得宿主样式()
+    滚动容器样式.flex = '1'
+    滚动容器样式.minWidth = '0'
+    滚动容器样式.minHeight = '0'
+    内容滚动容器.appendChild(内容)
+    this.标签页列表.push({ 标签: 配置.标签, 标识: 配置.标识, 内容, 内容滚动容器 })
+    this.appendChild(内容滚动容器)
   }
 
   public override async 刷新(): Promise<void> {
@@ -144,18 +151,13 @@ export class 横向tab组件 extends 组件基类<tabHorizontal发出事件类�
 
     this.标签页列表.forEach((项, idx) => {
       if (idx === this.当前索引) {
+        项.内容滚动容器.style.display = 'block'
         项.内容.style.display = 'flex'
-        项.内容.style.flex = '1'
         项.内容.style.flexDirection = 'column'
         项.内容.style.minHeight = '0'
         项.内容.style.minWidth = '0'
-        let 已经有overflow样式: boolean =
-          项.内容.style.overflow !== '' || 项.内容.style.overflowY !== '' || 项.内容.style.overflowX !== ''
-        if (已经有overflow样式 === false) {
-          项.内容.style.overflow = 'auto'
-        }
       } else {
-        项.内容.style.display = 'none'
+        项.内容滚动容器.style.display = 'none'
       }
     })
   }

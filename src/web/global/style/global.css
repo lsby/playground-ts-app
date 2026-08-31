@@ -35,6 +35,12 @@
   --tab-头部背景: linear-gradient(90deg, rgba(139, 92, 246, 0.03), rgba(59, 130, 246, 0.03));
   --tab-头部竖向背景: linear-gradient(180deg, rgba(139, 92, 246, 0.03), rgba(59, 130, 246, 0.03));
   --tab-阴影: rgba(139, 92, 246, 0.1);
+  --滚动条宽度: 6px;
+  --滚动条标准宽度: thin;
+  --滚动条轨道颜色: transparent;
+  --滚动条滑块颜色: var(--边框颜色);
+  --滚动条滑块悬浮颜色: var(--次要文字颜色);
+  --滚动条圆角: 3px;
 }
 
 html[data-theme='light'] {
@@ -154,6 +160,29 @@ html[data-theme='dark'] {
     --tab-头部竖向背景: linear-gradient(180deg, rgba(139, 92, 246, 0.03), rgba(59, 130, 246, 0.03));
     --tab-阴影: rgba(139, 92, 246, 0.2);
   }
+}
+
+* {
+  scrollbar-width: var(--滚动条标准宽度);
+  scrollbar-color: var(--滚动条滑块颜色) var(--滚动条轨道颜色);
+}
+
+*::-webkit-scrollbar {
+  width: var(--滚动条宽度);
+  height: var(--滚动条宽度);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--滚动条轨道颜色);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--滚动条滑块颜色);
+  border-radius: var(--滚动条圆角);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--滚动条滑块悬浮颜色);
 }
 
 body {

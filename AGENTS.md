@@ -108,6 +108,8 @@
   - 自定义组件直接 `new` 出来：`private 按钮 = new 主要按钮({ ... })`
   - 然后在 `当加载时()` 等生命周期中追加：`this.shadow.append(this.结果)`
 - 支持黑暗模式: `src/web/global/style/global.css` 内定义了相关 css 变量
+- **滚动条统一规范**：滚动条宽度、轨道、滑块、悬浮色和圆角只能在 `src/web/global/style/global.css` 的 `--滚动条*` 变量中定义。全局 `*` 的标准属性（`scrollbar-width`、`scrollbar-color`）与 `*::-webkit-scrollbar`、组件基类、通用滚动容器必须通过这些变量保持完全一致，严禁在各组件中复制或硬编码另一套可见滚动条样式。
+- 新建滚动区域时优先使用 `src/web/components/general/base/scroll-container.ts` 的 `滚动容器`，由布局组件明确持有滚动职责；不要默认把 `overflow: auto` 写到插槽传入的业务内容上。Shadow DOM 内确实需要直接创建滚动元素时，必须使用 `src/web/global/style/scrollbar.ts` 的 `获得滚动条样式`。
 - 使用 `src/web/global/api-manager.ts` 来请求后端
   这是一个包装过的http请求, 第三个参数是一个回调, 可以直接获得后端 ws 的推送信息
   参考 `src/web/components/demo/ws-demo.ts`
