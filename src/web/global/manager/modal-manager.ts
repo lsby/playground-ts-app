@@ -169,6 +169,21 @@ class 模态框管理器 {
 
   public async 显示(选项: 模态框选项, 内容: HTMLElement): Promise<void> {
     let { 遮罩, 框, 内容: 内容容器, 标题元素, 关闭按钮, 最大化按钮 } = this.创建模态框框架()
+    let 鼠标是否在遮罩按下 = false
+
+    遮罩.onmousedown = (event: MouseEvent): void => {
+      鼠标是否在遮罩按下 = event.button === 0 && event.target === 遮罩
+    }
+    遮罩.onmouseup = async (event: MouseEvent): Promise<void> => {
+      let 是否关闭 = 选项.可关闭 !== false && event.button === 0 && 鼠标是否在遮罩按下 && event.target === 遮罩
+      鼠标是否在遮罩按下 = false
+      if (是否关闭 === true) {
+        await this.关闭()
+      }
+    }
+    遮罩.onmouseleave = (): void => {
+      鼠标是否在遮罩按下 = false
+    }
 
     // 设置标题
     标题元素.textContent = 选项.标题
