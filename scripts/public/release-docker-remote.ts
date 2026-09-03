@@ -18,7 +18,19 @@ import {
 } from './tools/tools'
 
 // ============= 配置区 =============
-let 服务器列表 = [{ name: '默认服务器', value: { host: '0.0.0.0', username: 'xxx', password: 'xxx', useMirror: true } }]
+type 服务器配置 = { host: string; username: string; password: string; useMirror: boolean; deployRootDir?: string }
+let 服务器列表: { name: string; value: 服务器配置 }[] = [
+  {
+    name: '默认服务器',
+    value: {
+      host: '0.0.0.0',
+      username: 'xxx',
+      password: 'xxx',
+      useMirror: true,
+      // deployRootDir: '/volume2/docker/local',
+    },
+  },
+]
 // ============= 配置区 =============
 
 // 读取项目名称
@@ -102,7 +114,7 @@ async function 主函数(): Promise<void> {
       message: (待回答: any): string => {
         if (待回答.模式 === 'run' || 待回答.模式 === 'redeploy') {
           let 提示消息 = [
-            `运行模式将使用项目打包内容覆盖远程运行目录 (~/${项目名称}/run/${待回答.环境}) 中的同名文件`,
+            `运行模式将使用项目打包内容覆盖部署根目录下的 ${项目名称}/run/${待回答.环境} 中的同名文件`,
             '这通常是预期的, 但请确保您了解后果:',
             '- 打包内容会覆盖运行目录中的同名文件',
             '- 远程新生成的文件及外部持久化数据不受影响',
@@ -111,7 +123,7 @@ async function 主函数(): Promise<void> {
 
           if (待回答.模式 === 'redeploy') {
             提示消息 = [
-              `彻底重部署模式将完全删除该环境的远程运行目录 (~/${项目名称}/run/${待回答.环境})`,
+              `彻底重部署模式将完全删除部署根目录下的 ${项目名称}/run/${待回答.环境}`,
               '这将导致:',
               '- 强制停止并移除当前容器和关联镜像',
               '- 删除运行目录下的所有文件 (包括不在项目仓库中的数据/持久化文件等)',
@@ -126,7 +138,7 @@ async function 主函数(): Promise<void> {
           return (
             [
               `🚨 警告: 此操作将从服务器彻底删除该项目的所有痕迹!`,
-              `项目根目录: ~/${项目名称}`,
+              `项目根目录: <部署根目录>/${项目名称}`,
               '操作包含:',
               '- 停止所有运行中的容器 (跨环境)',
               '- 清理所有关联镜像',
@@ -178,21 +190,26 @@ async function 主函数(): Promise<void> {
     let compose命令 = await 获取Compose命令(sshClient)
     日志.打印(`🐳 检测到 Compose 命令: ${compose命令}`)
 
-    // 获取远程家目录并初始化路径
-    let 远程家目录 = (await 执行远程命令(sshClient, 'echo $HOME', { 打印输出: false })).stdout.trim()
-    let 远程根目录 = path.posix.join(远程家目录, 项目名称)
-    let 远程上传目录 = path.posix.resolve(远程根目录, 'upload')
+    // 获取远程部署根目录并初始化路径
+    let 远程部署根目录 =
+      目标服务器.deployRootDir ?? (await 执行远程命令(sshClient, 'echo $HOME', { 打印输出: false })).stdout.trim()
+    let 远程项目根目录 = path.posix.join(远程部署根目录, 项目名称)
+    let 远程上传目录 = path.posix.resolve(远程项目根目录, 'upload')
     let 远程压缩包路径: string = path.posix.resolve(远程上传目录, `${项目名称}.tar.gz`)
     let 远程构建目录 =
-      typeof 环境 === 'string' ? path.posix.resolve(远程根目录, 'build', 环境) : path.posix.resolve(远程根目录, 'build')
+      typeof 环境 === 'string'
+        ? path.posix.resolve(远程项目根目录, 'build', 环境)
+        : path.posix.resolve(远程项目根目录, 'build')
     let 远程构建docker目录: string = path.posix.resolve(远程构建目录, 'deploy')
     let 远程运行目录 =
-      typeof 环境 === 'string' ? path.posix.resolve(远程根目录, 'run', 环境) : path.posix.resolve(远程根目录, 'run')
+      typeof 环境 === 'string'
+        ? path.posix.resolve(远程项目根目录, 'run', 环境)
+        : path.posix.resolve(远程项目根目录, 'run')
     let 远程运行部署目录: string = path.posix.resolve(远程运行目录, 'deploy')
 
     日志.打印(`📂 远程路径初始化完成:`)
-    日志.打印(`- 远程家目录: ${远程家目录}`)
-    日志.打印(`- 远程根目录: ${远程根目录}`)
+    日志.打印(`- 远程部署根目录: ${远程部署根目录}`)
+    日志.打印(`- 远程项目根目录: ${远程项目根目录}`)
     日志.打印(`- 远程上传目录: ${远程上传目录}`)
     日志.打印(`- 远程构建目录: ${远程构建目录}`)
     日志.打印(`- 远程运行目录: ${远程运行目录}`)
@@ -363,7 +380,7 @@ async function 主函数(): Promise<void> {
     // 模式: 删除项目
     // ====================
     if (模式 === 'delete') {
-      let 运行根目录 = path.posix.resolve(远程根目录, 'run')
+      let 运行根目录 = path.posix.resolve(远程项目根目录, 'run')
       if ((await 远程路径是否存在(sshClient, 运行根目录)) === true) {
         日志.打印(`🔍 探测到运行根目录，尝试清理运行中的容器和镜像...`)
         let 环境列表内容 = (await 执行远程命令(sshClient, `ls -1 ${运行根目录}`, { 打印输出: false })).stdout
@@ -386,8 +403,8 @@ async function 主函数(): Promise<void> {
         }
       }
 
-      日志.打印(`🧹 正在从远程物理删除整个项目根目录: ${远程根目录}`)
-      await 执行远程命令(sshClient, `rm -rf ${远程根目录}`)
+      日志.打印(`🧹 正在从远程物理删除整个项目根目录: ${远程项目根目录}`)
+      await 执行远程命令(sshClient, `rm -rf ${远程项目根目录}`)
       日志.打印(`✨ 项目已彻底从服务器删除`)
       return
     }
