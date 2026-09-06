@@ -3,6 +3,10 @@
 # =========================
 /node_modules
 /OCR-portable-python*
+/.env/.env.*
+!/.env/*.example
+/deploy/servers.local.json
+/test/unit/unit-test.test.ts
 
 # =========================
 # 编译与打包产物
@@ -30,6 +34,7 @@
 # =========================
 /db/*
 /data/window-state.json
+/.setup-state.json
 
 # =========================
 # MAC
@@ -40,3 +45,11 @@
 # Git 配置
 # =========================
 !**/.gitkeep
+
+# =========================
+# 临时文件与不需要打包的目录
+# =========================
+/tmp/
+*.docx
+*.pdf
+*.pptx

@@ -41,6 +41,12 @@ jobs:
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
 
+      - name: 创建 Electron 生产环境配置
+        env:
+          ELECTRON_ENV_FILE: ${{ secrets.ELECTRON_ENV_FILE }}
+        run: |
+          node -e 'let fs = require("fs"); let value = process.env.ELECTRON_ENV_FILE; if (value === undefined || value === "") throw new Error("缺少仓库 Secret ELECTRON_ENV_FILE"); fs.mkdirSync(".env", { recursive:true }); fs.writeFileSync(".env/.env.production.electron", value.endsWith("\n") ? value : value + "\n")'
+
       - name: 准备 Electron 数据库 (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -55,7 +61,7 @@ jobs:
           touch db/prod-electron.db
 
       - name: 构建完整便携包
-        run: pnpm run public:electron -- --zip
+        run: npm run task -- public:electron -- --zip
 
       - name: 计算 Release 标签 (Windows)
         if: runner.os == 'Windows'

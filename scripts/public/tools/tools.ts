@@ -4,6 +4,10 @@ import { NodeSSH } from 'node-ssh'
 import * as path from 'path'
 import { 日志类 } from './model'
 
+export function 转义PosixShell参数(参数: string): string {
+  return `'${参数.replaceAll("'", `'"'"'`)}'`
+}
+
 export function 获取Git忽略名单(项目根目录: string): string[] {
   let 忽略文件路径 = path.join(项目根目录, '.gitignore')
 
@@ -35,7 +39,37 @@ export function 获取完整忽略名单(项目根目录: string): string[] {
   return [...获取Git忽略名单(项目根目录), '.git/**']
 }
 
-export async function 压缩项目(输出路径: string, 源码目录: string, 忽略名单: string[], 日志?: 日志类): Promise<void> {
+export type 压缩项目参数 = {
+  输出路径: string
+  源码目录: string
+  忽略名单: string[]
+  日志?: 日志类
+  强制包含文件组?: string[]
+  覆盖文本文件组?: Array<{ 相对路径: string; 内容: string }>
+}
+
+export async function 压缩项目(参数: 压缩项目参数): Promise<void> {
+  let { 输出路径, 源码目录, 忽略名单, 日志, 强制包含文件组 = [], 覆盖文本文件组 = [] } = 参数
+  let 强制包含文件信息组 = 强制包含文件组.map((文件) => {
+    let 绝对路径 = path.resolve(源码目录, 文件)
+    let 相对路径 = path.relative(源码目录, 绝对路径)
+    if (相对路径.startsWith('..') === true || path.isAbsolute(相对路径) === true) {
+      throw new Error(`强制包含的打包文件必须位于项目内: ${文件}`)
+    }
+    if (fs.existsSync(绝对路径) === false || fs.statSync(绝对路径).isFile() === false) {
+      throw new Error(`强制包含的打包文件不存在: ${文件}`)
+    }
+    return { 绝对路径, 相对路径: 相对路径.replace(/\\/g, '/') }
+  })
+  let 覆盖文本文件信息组 = 覆盖文本文件组.map((文件) => {
+    let 绝对路径 = path.resolve(源码目录, 文件.相对路径)
+    let 相对路径 = path.relative(源码目录, 绝对路径)
+    if (相对路径 === '' || 相对路径.startsWith('..') === true || path.isAbsolute(相对路径) === true) {
+      throw new Error(`覆盖的打包文件必须位于项目内: ${文件.相对路径}`)
+    }
+    return { ...文件, 相对路径: 相对路径.replace(/\\/g, '/') }
+  })
+
   return new Promise((resolve, reject) => {
     let 输出 = fs.createWriteStream(输出路径)
     let 归档器 = archiver('tar', { gzip: true, gzipOptions: { level: 9 } })
@@ -67,15 +101,22 @@ export async function 压缩项目(输出路径: string, 源码目录: string, �
     if (相对输出路径.startsWith('..') === false && path.isAbsolute(相对输出路径) === false) {
       最终忽略名单.push(相对输出路径)
     }
+    最终忽略名单.push(...覆盖文本文件信息组.map((文件) => 文件.相对路径))
 
     归档器.glob('**/*', { cwd: 源码目录, ignore: 最终忽略名单, dot: true })
+    for (let 文件 of 强制包含文件信息组) {
+      归档器.file(文件.绝对路径, { name: 文件.相对路径 })
+    }
+    for (let 文件 of 覆盖文本文件信息组) {
+      归档器.append(文件.内容, { name: 文件.相对路径 })
+    }
 
     归档器.finalize().catch(reject)
   })
 }
 
 export async function 远程路径是否存在(ssh: NodeSSH, 路径: string): Promise<boolean> {
-  let 结果 = await 执行远程命令(ssh, `[ -d "${路径}" ]`, { 打印输出: false, 抛出错误: false })
+  let 结果 = await 执行远程命令(ssh, `[ -d ${转义PosixShell参数(路径)} ]`, { 打印输出: false, 抛出错误: false })
   return 结果.code === 0
 }
 
@@ -105,7 +146,7 @@ export async function 获取Compose镜像列表(
 
   let 命令 = 最终compose命令
   if (项目名称 !== undefined) {
-    命令 += ` -p ${项目名称}`
+    命令 += ` -p ${转义PosixShell参数(项目名称)}`
   }
   命令 += ' images -q'
 
@@ -122,7 +163,7 @@ export async function 清理旧镜像(
   for (let 镜像ID of 旧镜像列表) {
     if (新镜像列表.includes(镜像ID) === false) {
       日志.打印(`检测到旧镜像 ID: ${镜像ID} 已不再用于本项目，尝试执行删除 (docker image rm)...`)
-      await 执行远程命令(ssh, `docker image rm ${镜像ID} || true`)
+      await 执行远程命令(ssh, `docker image rm ${转义PosixShell参数(镜像ID)} || true`)
     }
   }
 }
@@ -160,7 +201,7 @@ export async function 上传文件(ssh: NodeSSH, 本地路径: string, 远程路
   // 弃用 SFTP，改用 SSH 数据流直传。
   // 通过 SSH 终端直传能保证路径上下文与后续 Shell 脚本绝对一致，同时省去 SFTP 的协议开销，速度更快。
   return new Promise((resolve, reject) => {
-    ssh.connection.exec(`cat > "${远程路径}"`, (err: Error | undefined | null, stream: any) => {
+    ssh.connection.exec(`cat > ${转义PosixShell参数(远程路径)}`, (err: Error | undefined | null, stream: any) => {
       if (err !== undefined && err !== null) return reject(new Error(`文件上传启动失败: ${err.message}`))
 
       let readStream = fs.createReadStream(本地路径)
@@ -179,7 +220,7 @@ export async function 上传文件(ssh: NodeSSH, 本地路径: string, 远程路
 
 export async function 下载文件(ssh: NodeSSH, 远程路径: string, 本地路径: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    ssh.connection.exec(`cat "${远程路径}"`, (err: Error | undefined | null, stream: any) => {
+    ssh.connection.exec(`cat ${转义PosixShell参数(远程路径)}`, (err: Error | undefined | null, stream: any) => {
       if (err !== undefined && err !== null) return reject(new Error(`文件下载启动失败: ${err.message}`))
 
       let writeStream = fs.createWriteStream(本地路径)

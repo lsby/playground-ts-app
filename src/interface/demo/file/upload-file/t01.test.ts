@@ -6,7 +6,7 @@ import streamToBlob from 'stream-to-blob'
 import { z } from 'zod'
 import { cleanDB } from '../../../../../scripts/db/clean-db'
 import { 环境变量 } from '../../../../global/env'
-import { kysely管理器 } from '../../../../global/global'
+import { kysely管理器, 系统配置ID } from '../../../../global/global'
 import 接口 from './index'
 
 let name = 'admin'
@@ -22,7 +22,7 @@ export default new 接口测试(
     await cleanDB(db)
     await db
       .insertInto('system_config')
-      .values({ id: randomUUID(), is_initialized: 1, enable_register: 0, version: '', jwt_secret: '123' })
+      .values({ id: 系统配置ID, is_initialized: 1, enable_register: 0, version: '', jwt_secret: '123' })
       .execute()
     await db
       .insertInto('user')

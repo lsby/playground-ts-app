@@ -27,15 +27,15 @@ COPY . .
 
 # 执行构建脚本
 ARG SKIP_BUILD=false
-RUN if [ "$SKIP_BUILD" != "true" ]; then \
+RUN --mount=type=secret,id=app_env,target=/opt/app/.env/.env.production.web,required=true if [ "$SKIP_BUILD" != "true" ]; then \
       export PARCEL_WORKER_BACKEND=process && \
-      npm run _build:all; \
+      npm run task -- build:all --env ./.env/.env.production.web; \
     else \
       echo "Skipping build, using pre-built dist folder."; \
     fi
 
 # 初始化默认数据库
-RUN echo "\n" | npm run db:push:prod:web
+RUN --mount=type=secret,id=app_env,target=/opt/app/.env/.env.production.web,required=true echo "\n" | npm run task -- db:push:prod:web
 
 # ====================
 # 安装阶段
@@ -71,10 +71,10 @@ COPY --from=builder /opt/app/package.json /opt/app/
 COPY --from=builder /opt/app/tsconfig.json /opt/app/
 COPY --from=builder /opt/app/dist /opt/app/dist
 COPY --from=builder /opt/app/public /opt/app/public
-COPY --from=builder /opt/app/.env/.env.production.web /opt/app/.env/.env.production.web
 COPY --from=builder /opt/app/prisma /opt/app/prisma
 COPY --from=builder /opt/app/prisma.config.ts /opt/app/prisma.config.ts
 
+# setup-port: app
 EXPOSE 34656
 
-CMD ["sh", "-c", "mkdir -p /opt/app/db; if [ ! -f /opt/app/db/prod-web.db ]; then echo 'Initializing database from default'; cp /opt/app/db-default-prod-web.db /opt/app/db/prod-web.db; else echo 'Database already exists'; fi; if [ -d \"prisma/migrations\" ] && [ \"$(ls -A prisma/migrations)\" ]; then npx dotenv -e ./.env/.env.production.web -- prisma migrate deploy; else PRISMA_GENERATE_SKIP=true npx dotenv -e ./.env/.env.production.web -- prisma db push; fi && npm run run:service:prod"]
+CMD ["sh", "-c", "mkdir -p /opt/app/db; if [ ! -f /opt/app/db/prod-web.db ]; then echo 'Initializing database from default'; cp /opt/app/db-default-prod-web.db /opt/app/db/prod-web.db; else echo 'Database already exists'; fi; ENV_FILE_PATH=./.env/.env.production.web node ./dist/scripts/db/push-prod.js && exec env DEBUG='@lsby:*,@lsby:playground-ts-app:*,-@lsby:ts-env*' ENV_FILE_PATH=./.env/.env.production.web node ./dist/src/server.js"]

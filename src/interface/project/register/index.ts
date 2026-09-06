@@ -10,6 +10,7 @@ import { Left, Right } from '@lsby/ts-fp-data'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
+import { 系统配置ID } from '../../../global/const'
 import { 环境变量 } from '../../../global/env'
 import { kysely插件 } from '../../../global/plugin'
 import { 检查唯一性 } from '../../../interface-logic/check/check-exist'
@@ -25,7 +26,12 @@ let 接口逻辑实现 = 接口逻辑
   .空逻辑()
   .绑定(
     接口逻辑.构造([kysely插件], async (参数, _逻辑附加参数, _请求附加参数) => {
-      let 配置 = await 参数.kysely.获得句柄().selectFrom('system_config').select('enable_register').executeTakeFirst()
+      let 配置 = await 参数.kysely
+        .获得句柄()
+        .selectFrom('system_config')
+        .select('enable_register')
+        .where('id', '=', 系统配置ID)
+        .executeTakeFirst()
       if ((配置?.enable_register ?? 0) !== 1) {
         return new Left('注册未启用' as const)
       }

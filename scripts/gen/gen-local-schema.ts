@@ -2,10 +2,10 @@ import { execSync } from 'child_process'
 import * as fs from 'fs'
 
 try {
-  let stdout = execSync(
-    'npx dotenv -e ./.env/.env.development.web -- prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script',
-    { encoding: 'utf-8' },
-  )
+  let stdout = execSync('prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script', {
+    encoding: 'utf-8',
+    env: { ...process.env, DB_PATH_PRISMA: 'file:./db/generate-local-schema.db' },
+  })
 
   // 过滤掉第一行可能的 'Loaded Prisma config from prisma.config.ts.' 等干扰输出
   let sql = stdout

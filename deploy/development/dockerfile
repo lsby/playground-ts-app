@@ -27,15 +27,15 @@ COPY . .
 
 # 执行构建脚本
 ARG SKIP_BUILD=false
-RUN if [ "$SKIP_BUILD" != "true" ]; then \
+RUN --mount=type=secret,id=app_env,target=/opt/app/.env/.env.development.web,required=true if [ "$SKIP_BUILD" != "true" ]; then \
       export PARCEL_WORKER_BACKEND=process && \
-      npm run _build:all; \
+      npm run task -- build:all --env ./.env/.env.development.web; \
     else \
       echo "Skipping build, using pre-built dist folder."; \
     fi
 
 # 初始化默认数据库
-RUN echo "\n" | npm run db:push:dev:web
+RUN --mount=type=secret,id=app_env,target=/opt/app/.env/.env.development.web,required=true echo "\n" | npm run task -- db:push:dev:web
 
 # ====================
 # 安装阶段
@@ -72,9 +72,10 @@ COPY --from=builder /opt/app/src /opt/app/src
 COPY --from=builder /opt/app/prisma /opt/app/prisma
 COPY --from=builder /opt/app/prisma.config.ts /opt/app/prisma.config.ts
 COPY --from=builder /opt/app/dist/src/web /opt/app/dist/src/web
+COPY --from=builder /opt/app/dist/scripts/db/push-prod.js /opt/app/dist/scripts/db/push-prod.js
 COPY --from=builder /opt/app/public /opt/app/public
-COPY --from=builder /opt/app/.env/.env.development.web /opt/app/.env/.env.development.web
 
+# setup-port: app
 EXPOSE 34656
 
-CMD ["sh", "-c", "mkdir -p /opt/app/db; if [ ! -f /opt/app/db/dev-web.db ]; then echo 'Initializing database from default'; cp /opt/app/db-default-dev-web.db /opt/app/db/dev-web.db; else echo 'Database already exists'; fi; npx dotenv -e ./.env/.env.development.web -- prisma migrate deploy && npm run run:service:dev"]
+CMD ["sh", "-c", "mkdir -p /opt/app/db; if [ ! -f /opt/app/db/dev-web.db ]; then echo 'Initializing database from default'; cp /opt/app/db-default-dev-web.db /opt/app/db/dev-web.db; else echo 'Database already exists'; fi; ENV_FILE_PATH=./.env/.env.development.web node ./dist/scripts/db/push-prod.js && exec env DEBUG='@lsby:*,@lsby:playground-ts-app:*,-@lsby:ts-env*' ENV_FILE_PATH=./.env/.env.development.web node ./node_modules/tsx/dist/cli.mjs watch --exclude ./src/types/**/* --exclude ./src/interface/interface-list.ts --inspect ./src/server.ts"]

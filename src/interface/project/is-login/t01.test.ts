@@ -1,8 +1,7 @@
 import { 接口测试 } from '@lsby/net-core'
 import assert from 'assert'
-import { randomUUID } from 'crypto'
 import { cleanDB } from '../../../../scripts/db/clean-db'
-import { kysely管理器 } from '../../../global/global'
+import { kysely管理器, 系统配置ID } from '../../../global/global'
 import { POST_JSON请求用例 } from '../../../tools/request'
 import 接口 from './index'
 
@@ -14,7 +13,7 @@ export default new 接口测试(
     await cleanDB(db)
     await db
       .insertInto('system_config')
-      .values({ id: randomUUID(), is_initialized: 1, enable_register: 0, version: '', jwt_secret: '123' })
+      .values({ id: 系统配置ID, is_initialized: 1, enable_register: 0, version: '', jwt_secret: '123' })
       .execute()
   },
   async (): Promise<object> => {

@@ -1,0 +1,10 @@
+[
+  {
+    "name": "本机密码示例",
+    "host": "127.0.0.1",
+    "username": "your-username",
+    "password": "your-password",
+    "useMirror": true,
+    "deployRootDir": null
+  }
+]

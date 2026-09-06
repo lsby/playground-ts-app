@@ -1,3 +1,8 @@
-import { App } from '../../src/app/app'
+import { afterAll } from 'vitest'
+import { 应用单例 } from '../../src/app/app'
 
-await new App().run().catch(console.error)
+await 应用单例.run()
+
+afterAll(async (): Promise<void> => {
+  await 应用单例.close()
+})

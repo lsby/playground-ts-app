@@ -1,3 +1,4 @@
-npm run _gen:all
-npm run _check:type
-npx lint-staged
+npm run task -- generate
+git add -- src/interface/interface-list.ts src/types/db.ts src/types/interface-type.ts src/web/local-api-list.ts src/web/local-schema.ts src/web/components/index.ts src/app/meta-info.ts
+npm run task -- check:type
+pnpm exec lint-staged

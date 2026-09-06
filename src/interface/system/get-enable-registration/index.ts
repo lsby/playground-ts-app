@@ -9,6 +9,7 @@ import {
 } from '@lsby/net-core'
 import { Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
+import { 系统配置ID } from '../../../global/const'
 import { kysely插件 } from '../../../global/plugin'
 
 let 接口路径 = '/api/system/get-enable-registration' as const
@@ -16,7 +17,12 @@ let 接口方法 = 'post' as const
 
 let 接口逻辑实现 = 接口逻辑.空逻辑().绑定(
   接口逻辑.构造([new JSON参数解析插件(z.object({}), {}), kysely插件], async (参数, _逻辑附加参数, _请求附加参数) => {
-    let 配置 = await 参数.kysely.获得句柄().selectFrom('system_config').select('enable_register').executeTakeFirst()
+    let 配置 = await 参数.kysely
+      .获得句柄()
+      .selectFrom('system_config')
+      .select('enable_register')
+      .where('id', '=', 系统配置ID)
+      .executeTakeFirst()
     return new Right({ enable_register: Boolean(配置?.enable_register ?? 0) })
   }),
 )

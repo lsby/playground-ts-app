@@ -7,6 +7,8 @@ import { DB } from '../types/db'
 import { 创建sqlite数据库适配器 } from './db/db-dialect'
 import { 环境变量 } from './env'
 
+export { 系统配置ID } from './const'
+
 export let 即时任务管理器 = new 即时任务管理器类({ 最大并发数: 10, 历史记录保留天数: 7 })
 export let 定时任务管理器 = new 定时任务管理器类()
 export let 日志模型实例 = new 日志模型()
@@ -52,7 +54,7 @@ export async function 检查数据库是否可用(): Promise<void> {
     }
     let 友好错误 = new Error(
       `数据库未就绪或未完成初始化！\n` +
-        `这通常是因为您还没有运行数据库同步/推送命令（例如："npm run db:push:dev:web"）。\n` +
+        `这通常是因为您还没有运行数据库同步/推送命令（例如："npm run task -- db:push:dev:web"）。\n` +
         `请先确保您的数据库已启动（如果使用 pg/mysql），然后执行相应的推送命令来新建数据库和表结构。\n` +
         `底层错误详情: ${错误消息}`,
     )

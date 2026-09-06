@@ -9,6 +9,7 @@ let __当前目录名 = path.dirname(__当前文件名)
 let 项目根目录 = path.resolve(__当前目录名, '../../')
 let 相对发布目录 = 'release/sea'
 let 发布目录 = path.join(项目根目录, 相对发布目录)
+let 打包环境文件名 = '.env.production.sea'
 
 function 寻找内置Csc编译器(): string | null {
   let 框架目录组 = ['C:\\Windows\\Microsoft.NET\\Framework64', 'C:\\Windows\\Microsoft.NET\\Framework']
@@ -56,12 +57,11 @@ function 递归复制(源路径: string, 目标路径: string): void {
 
 async function 执行构建(): Promise<void> {
   try {
-    console.log('正在执行前置准备工作 (db:push, check, build)...')
-    execSync('npm run db:push:prod:sea', { stdio: 'inherit', cwd: 项目根目录 })
-    execSync('dotenv -e ./.env/.env.production.sea -- npm run _check:all', { stdio: 'inherit', cwd: 项目根目录 })
-    execSync('dotenv -e ./.env/.env.production.sea -- npm run _build:all', { stdio: 'inherit', cwd: 项目根目录 })
-
-    let 环境源文件 = path.join(项目根目录, '.env/.env.production.sea')
+    let 环境源文件相对路径 = process.env['ENV_FILE_PATH']
+    if (环境源文件相对路径 === undefined || 环境源文件相对路径 === '') {
+      throw new Error('❌ 缺少 ENV_FILE_PATH，请通过 npm run task -- public:sea 运行发布流程。')
+    }
+    let 环境源文件 = path.resolve(项目根目录, 环境源文件相对路径)
     let 数据库源文件 = path.join(项目根目录, 'db/prod-sea.db')
 
     // 提前检查
@@ -156,7 +156,7 @@ async function 执行构建(): Promise<void> {
     let 环境目标目录 = path.join(发布目录, '.env')
     确保目录存在(环境目标目录)
     let 环境变量内容 = fs.readFileSync(环境源文件, 'utf-8')
-    fs.writeFileSync(path.join(环境目标目录, '.env.production.sea'), 环境变量内容)
+    fs.writeFileSync(path.join(环境目标目录, 打包环境文件名), 环境变量内容)
 
     console.log('[9/9] 正在生成启动脚本...')
     if (process.platform === 'win32') {
@@ -167,7 +167,7 @@ async function 执行构建(): Promise<void> {
         'echo Starting lsby-playground-ts-app ...',
         'echo.',
         'cd /d "%~dp0"',
-        'set "ENV_FILE_PATH=./.env/.env.production.sea"',
+        `set "ENV_FILE_PATH=./.env/${打包环境文件名}"`,
         'set "DEBUG=@lsby:*,@lsby:playground-ts-app:*"',
         'lsby-playground-ts-app.exe',
         'if errorlevel 1 (',
@@ -208,7 +208,7 @@ async function 执行构建(): Promise<void> {
         '#!/usr/bin/env bash',
         'DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"',
         'cd "$DIR"',
-        'export ENV_FILE_PATH="./.env/.env.production.sea"',
+        `export ENV_FILE_PATH="./.env/${打包环境文件名}"`,
         'export DEBUG="@lsby:*,@lsby:playground-ts-app:*"',
         'echo "=================================================="',
         'echo "lsby-playground-ts-app (SEA单文件服务) 启动引导器"',

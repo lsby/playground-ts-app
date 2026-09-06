@@ -2,6 +2,7 @@ import { JWT异步插件 } from '@lsby/net-core-jwt'
 import { Kysely插件 } from '@lsby/net-core-kysely'
 import { Task } from '@lsby/ts-fp-data'
 import { z, ZodObject, ZodString, ZodUndefined, ZodUnion } from 'zod'
+import { 系统配置ID } from './const'
 import { 环境变量 } from './env'
 import { kysely管理器 } from './global'
 
@@ -11,7 +12,12 @@ class JWT单例 {
     JWT异步插件<z.ZodObject<{ userId: ZodUnion<[ZodString, ZodUndefined]> }>>
   > {
     if (this.jwt句柄 !== null) return this.jwt句柄
-    let 系统数据 = await kysely管理器.获得句柄().selectFrom('system_config').selectAll().executeTakeFirst()
+    let 系统数据 = await kysely管理器
+      .获得句柄()
+      .selectFrom('system_config')
+      .selectAll()
+      .where('id', '=', 系统配置ID)
+      .executeTakeFirst()
     let jwt密钥 = 系统数据?.jwt_secret
     if (jwt密钥 === undefined) throw new Error('无法加载jwt密钥')
     this.jwt句柄 = new JWT异步插件(z.object({ userId: z.string().or(z.undefined()) }), jwt密钥, 环境变量.JWT_EXPIRES_IN)

@@ -3,7 +3,7 @@ import { format } from 'node:util'
 import { 已审阅的any } from '../../tools/types'
 import { 集线器模型, 集线器监听器宿主 } from '../hub/hub-model'
 
-export type 即时任务状态 = '等待中' | '运行中' | '已完成' | '已失败'
+export type 即时任务状态 = '等待中' | '运行中' | '已完成' | '已失败' | '已取消'
 export type 即时任务优先级 = number // 数字越大 优先级越高
 
 export type 日志类型 = { 时间: Date; 消息: string }
@@ -176,6 +176,7 @@ export abstract class 即时任务抽象类<输出类型> {
             resolve(结果)
             break
           case '已失败':
+          case '已取消':
             let 错误 = this.获得错误信息()
             reject(错误 ?? new Error('任务失败'))
             break

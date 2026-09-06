@@ -83,7 +83,7 @@ let 读取迁移组 = (迁移目录: string): 迁移[] => {
     })
 }
 
-let 执行Prisma命令 = (命令: 'db push' | 'generate'): void => {
+let 执行Prisma命令 = (命令: 'generate'): void => {
   execSync(`prisma ${命令}`, { stdio: 'inherit' })
 }
 
@@ -209,16 +209,13 @@ let 执行迁移 = (数据库: sqlite3.Database, 迁移: 迁移): void => {
 let 主函数 = (): void => {
   let 数据库路径 = 获得数据库路径()
   process.env['DB_PATH_PRISMA'] = `file:${数据库路径.replaceAll('\\', '/')}`
+  let 参数组 = process.argv.slice(2)
   let 迁移组 = 读取迁移组(path.join(process.cwd(), 'prisma', 'migrations'))
-  let 是否本地命令 = 获得环境文件参数() !== null
+  let 是否生成类型 = 获得环境文件参数() !== null || 参数组.includes('--generate')
   if (迁移组.length === 0) {
-    if (是否本地命令 === false) {
-      throw new Error('未检测到任何迁移，打包环境不能使用 Prisma db push')
-    }
-    console.log('未检测到任何迁移，使用 Prisma db push 初始化数据库')
-    执行Prisma命令('db push')
-    执行Prisma命令('generate')
-    return
+    throw new Error(
+      '未检测到任何迁移。请先在开发环境运行 npm run task -- db:push:dev:web 生成第一份 migration 并提交 Git；CI、测试、生产和打包环境只允许应用已提交的迁移。',
+    )
   }
   let 数据库目录 = path.dirname(数据库路径)
   if (fs.existsSync(数据库目录) === false) {
@@ -232,7 +229,6 @@ let 主函数 = (): void => {
     let 已完成记录表 = 读取已完成迁移记录表(数据库)
     校验已完成迁移(迁移组, 已完成记录表)
 
-    let 参数组 = process.argv.slice(2)
     let 标记参数位置 = 参数组.indexOf('--applied')
     if (标记参数位置 !== -1) {
       let 迁移名称 = 参数组[标记参数位置 + 1]
@@ -253,7 +249,7 @@ let 主函数 = (): void => {
   } finally {
     数据库.close()
   }
-  if (是否本地命令 === true) {
+  if (是否生成类型 === true) {
     执行Prisma命令('generate')
   }
 }

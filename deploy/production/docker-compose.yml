@@ -4,14 +4,21 @@ services:
     build:
       context: ../../
       dockerfile: ./deploy/production/dockerfile
+      secrets:
+        - app_env
     ports:
+      # setup-port: app
       - 80:34656
     env_file:
       - ../../.env/.env.production.web
     restart: always
     volumes:
       - ../../db:/opt/app/db
+      - ../../.env/.env.production.web:/opt/app/.env/.env.production.web:ro
     logging:
       options:
         max-size: '100m'
         max-file: '5'
+secrets:
+  app_env:
+    file: ../../.env/.env.production.web

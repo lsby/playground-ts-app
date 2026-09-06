@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { randomBytes, randomUUID } from 'crypto'
 import { version } from '../app/meta-info'
+import { 系统配置ID } from '../global/const'
 import { 环境变量 } from '../global/env'
 import { globalLog, kysely管理器, 检查数据库是否可用 } from '../global/global'
 
@@ -9,7 +10,12 @@ export async function init(): Promise<void> {
   let log = globalLog.extend('init')
 
   await log.debug('检索系统配置...')
-  let 系统数据 = await kysely管理器.获得句柄().selectFrom('system_config').selectAll().executeTakeFirst()
+  let 系统数据 = await kysely管理器
+    .获得句柄()
+    .selectFrom('system_config')
+    .selectAll()
+    .where('id', '=', 系统配置ID)
+    .executeTakeFirst()
 
   // 1. 处理 JWT 密钥
   let jwt密钥 = 系统数据?.jwt_secret
@@ -60,7 +66,7 @@ export async function init(): Promise<void> {
       .获得句柄()
       .insertInto('system_config')
       .values({
-        id: randomUUID(),
+        id: 系统配置ID,
         is_initialized: 1,
         enable_register: 0,
         enable_get_interface_type: 0,
@@ -80,7 +86,12 @@ export async function init(): Promise<void> {
     await log.debug('初始化流程结束')
   } else if (系统数据.version !== version) {
     await log.debug('初始化标记已存在, 且版本不一致, 更新系统版本号...')
-    await kysely管理器.获得句柄().updateTable('system_config').set({ version: version }).execute()
+    await kysely管理器
+      .获得句柄()
+      .updateTable('system_config')
+      .set({ version: version })
+      .where('id', '=', 系统配置ID)
+      .execute()
     await log.debug('升级流程结束')
   } else {
     await log.debug('初始化标记已存在, 且版本一致, 正常启动')

@@ -1,219 +1,208 @@
-# lsby-playground-ts-app AI 编码指南
+# lsby-playground-ts-app 开发路牌
 
-## 架构概览
+本文件同时面向开发者和 AI。它不重复解释源码，而是指出不同任务应先阅读的示例、实现入口和不可破坏的边界。
 
-这是一个具有多个部署目标的全栈 TypeScript 应用程序:
+## 使用方式
 
-- **Web 服务器**: Express-like 服务器
-- **纯前端应用**: 后端逻辑与数据库打包至浏览器 Worker 本地运行的应用
-- **桌面应用**: 使用 Electron 编译的桌面应用
-- **安卓应用**: 使用 Capacitor 编译的安卓应用
-- **命令行应用**: 命令行应用
+- 修改代码前，先根据任务类型找到最接近的 demo，完整阅读相关前后端实现和测试，再沿用其结构。
+- demo 用来展示标准写法；项目业务代码应写入 `src/interface/project/`、`src/web/components/project/` 等项目目录。除非任务本身是维护示例，否则不要把业务需求写进 demo。
+- 优先复用现有接口逻辑、组件、管理器和任务，不要另造平行体系。
+- 本文件只记录路牌和不变量。实现细节以当前源码、配置和类型检查结果为准；路径或行为变化时同步更新这里的路牌。
 
-## 项目架构
+## 核心建模
 
-1. **数据库层**
+接口层基于 `@lsby/net-core`，核心分层是：
 
-- 使用 Prisma + Kysely 管理数据库
-- Schema 定义在 `prisma/schema.prisma`
-- 应用 Prisma 时会生成 Kysely 使用的类型: `src/types/db.ts`
-- 总是使用 `npm run db:push:xxx` 生成迁移。如果迁移失败（如 Prisma 生成了错误的 SQL），直接手动去生成的 migration 文件夹中修改 `.sql` 文件，修改完成后再次运行 `npm run db:push:xxx` 重新应用即可。
-- 不要使用 `prisma db push`, 因为它会调整数据库但不生成迁移文件, 产生脱节
+1. 插件负责解析输入、注入能力和承载副作用。
+2. 接口逻辑负责组合可复用的业务过程。
+3. 返回器负责协议适配和输出。
 
-2. **接口层**
+请求参数、响应、错误、上下文和 WebSocket 消息都应处于类型契约内。同一份接口逻辑既可以作为 HTTP 接口运行，也可以在其他接口中直接调用。
 
-- 接口: `src/interface/`
-  - 接口示例: `src/interface/demo`
-  - 项目相关接口请写到: `src/interface/project`
-- 通用接口抽象: `src/interface-logic`
-- 系统会自动生成接口列表: `src/interface/interface-list.ts`
-- 系统会自动生成接口类型: `src/types/interface-type.ts`
-- 接口可以在内部被调用, 参考 `src/interface/demo/base/sub/index.ts` 对 `src/interface/demo/base/add/index.ts` 的调用
+最小完整示例：`src/interface/demo/base/add/index.ts`。内部复用示例：`src/interface/demo/base/sub/index.ts`。
 
-3. **任务系统**
+## 项目入口
 
-- 即时任务: `src/job/instant-job/`
-  - 抽象类: `src/model/instant-job/instant-job.ts`
-  - 管理器: `src/model/instant-job/instant-job-manager.ts`
-  - 支持优先级、重试机制和并发控制
-- 定时任务: `src/job/scheduled-job/`
-  - 抽象类: `src/model/scheduled-job/scheduled-job.ts`
-  - 管理器: `src/model/scheduled-job/scheduled-job-manager.ts`
-  - 使用cron表达式进行调度
+| 要找的内容         | 入口                                                 |
+| ------------------ | ---------------------------------------------------- |
+| Prisma Schema      | `prisma/schema.prisma`                               |
+| API 接口           | `src/interface/`                                     |
+| 可复用接口逻辑     | `src/interface-logic/`                               |
+| Web Components     | `src/web/components/`                                |
+| 前端页面           | `src/web/page/`                                      |
+| 前端全局管理器     | `src/web/global/manager/`                            |
+| 即时任务           | `src/job/instant-job/`、`src/model/job-instant/`     |
+| 定时任务           | `src/job/scheduled-job/`、`src/model/job-scheduled/` |
+| Electron 主进程    | `src/electron.ts`、`src/electron/`                   |
+| CLI                | `src/cli.ts`                                         |
+| 环境变量模型       | `src/global/env.ts`                                  |
+| 应用路径与运行目标 | `src/app/app.ts`                                     |
+| 任务定义           | `scripts/task/taskfile.ts`                           |
 
-4. **Web 前端**
+运行目标包括 Web、纯前端、Electron、SEA、Android 和 CLI。涉及跨环境路径、打包或运行差异时，必须先查看对应入口和 Taskfile，不要根据当前工作目录猜测。
 
-- 前端代码: `src/web/`
-- 前端使用自封装的 Web Components 框架: `src/web/base/base.ts`
-- 前端组件: `src/web/components`
-  - 示例组件: `src/web/components/demo`
-  - 通用组件: `src/web/components/general`
-  - 基础通用组件: `src/web/components/general/base`
-  - 基础表单组件: `src/web/components/general/form`
-  - 流程控制: `src/web/components/process`
-  - 项目组件: `src/web/components/project`
-- 前端全局样式: `src/web/global/style`
-- 前端全局管理器: `src/web/global/manager`
-  - 包含提示框管理器, 对话框管理器, 吐司消息管理器, API 管理器, 日志管理器等
-- 前端页面入口: `src/web/page`
-  - 包含多个 html 入口, 每个 html 文件对应一个 url
-  - 演示页面: `src/web/page/demo.html`
-- 系统会自动生成组件列表: `src/web/components/index.ts`
-- 请求后端请使用 API管理器(`src/web/global/manager/api-manager.ts`), 它会自动推断接口的参数和返回类型, 严禁将返回值通过`as`强制类型转换
+## 后端接口路牌
 
-4. **Electron应用**
+新建项目业务接口放在 `src/interface/project/`。尽可能使用 POST 接口。
 
-- 主进程入口: `src/electron.ts`
-- 相关功能函数和类型: `src/electron`
+| 场景                                   | 先阅读                                                                  |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| 最小 JSON 接口、返回类型、导出内调入口 | `src/interface/demo/base/add/index.ts`                                  |
+| 带错误详情的返回                       | `src/interface/demo/base/div/index.ts`                                  |
+| 调用另一个接口逻辑、组合登录能力       | `src/interface/demo/base/sub/index.ts`                                  |
+| CRUD 与通用检查逻辑                    | `src/interface/demo/curd/user/`、`src/interface-logic/components/crud/` |
+| 表单参数                               | `src/interface/demo/form/form-submit/index.ts`                          |
+| 静态文件返回                           | `src/interface/demo/file/static-file/index.ts`                          |
+| 动态文件返回                           | `src/interface/demo/file/dynamic-file/index.ts`                         |
+| 流式文件返回                           | `src/interface/demo/file/stream-file/index.ts`                          |
+| 多文件上传                             | `src/interface/demo/file/upload-file/index.ts`                          |
+| WebSocket                              | `src/interface/demo/ws/ws-test/index.ts`                                |
+| 回滚与清理                             | `src/interface/demo/logic-advanced/rollback-test/index.ts`              |
+| 自定义 CORS 插件                       | `src/interface/demo/plugin-advanced/custom-cors/index.ts`               |
+| 包装 Express 中间件                    | `src/interface/demo/plugin-advanced/express-middleware-wrap/index.ts`   |
+| 递归或共享复杂类型                     | `src/interface/demo/plugin-advanced/custom-type-export/`                |
+| 纯前端可运行接口                       | `src/interface/demo/pure/pure-string/index.ts`                          |
+| Electron 能力接口                      | `src/interface/demo/electron/`                                          |
 
-5. **CLI应用**
+### 接口硬约束
 
-- 命令行入口: `src/cli.ts`
+- 不要用 `z.any()`、`any` 或不安全的 `as` 绕过接口契约。
+- 递归或共享复杂类型参考 `custom-type-export`：类型放在独立 `types.ts`，通过 `NetCoreExportType` 导出；每个接口入口在本地声明严格的 `z.lazy()` Schema。
+- 前端接口类型由生成器产生，不要手写重复的请求或响应类型。
+- 需要旧数据或旧接口兼容时，不要自行加入兼容分支，先询问用户是否需要兼容。
 
-## 开发工作流
+## Web 前端路牌
 
-### 初始化与配置命令 (Setup)
+前端使用项目自己的 Web Components 框架。组件基类位于 `src/web/base/base.ts`，演示页组装位于 `src/web/components/project/demo/demo.ts`。
 
-在基于本模板新建项目或进行初始化配置时，提供了以下 setup 命令：
+| 场景                            | 先阅读                                               |
+| ------------------------------- | ---------------------------------------------------- |
+| 基础组件、输入框、API 调用      | `src/web/components/demo/add-demo.ts`                |
+| 持有元素引用和本地状态          | `src/web/components/demo/todo-list-demo.ts`          |
+| 表格、分页、表单、对话框和 CRUD | `src/web/components/demo/user-management-demo.ts`    |
+| 文件选择、拖拽、FormData 上传   | `src/web/components/demo/file-upload/`               |
+| WebSocket 推送                  | `src/web/components/demo/ws-demo.ts`                 |
+| 对话框                          | `src/web/components/demo/dialog-demo.ts`             |
+| Toast                           | `src/web/components/demo/toast-demo.ts`              |
+| 页面跳转                        | `src/web/components/demo/to-demo.ts`                 |
+| Electron                        | `src/web/components/demo/electron-demo.ts`           |
+| Capacitor                       | `src/web/components/demo/capacitor-demo.ts`          |
+| 获取生成的接口类型              | `src/web/components/demo/get-interface-type-demo.ts` |
+| 登录与注册表单                  | `src/web/components/project/login/login.ts`          |
+| 系统设置表单                    | `src/web/components/project/user/settings.ts`        |
 
-1. **端口分配与初始化 (`pnpm setup:ports`)**:
-   - 运行脚本: `scripts/setup/init-ports.ts`
-   - 作用: 自动扫描并分配一组随机空闲端口（包括 `APP_PORT`、`WEB_PORT`、`WEB_HMR_PORT`、`TEST_APP_PORT`、`TEST_WEB_PORT`、`TEST_WEB_HMR_PORT`），并批量同步更新至所有环境的 `.env` 配置文件（开发、生产、纯前端、测试等）以及 Docker 部署配置文件（`docker-compose.yml`、`dockerfile`）中，彻底解除硬编码并避免多项目本地端口冲突。
+通用组件优先从以下位置复用：
 
-2. **项目全局重命名 (`pnpm setup:rename`)**:
-   - 运行脚本: `scripts/setup/rename-project.ts`
-   - 作用: 交互式项目重命名工具。通过命令行交互提示输入新的作者名和项目名，自动将项目内所有出现的作者与项目名变体（包括 `@作者/项目名`、`@作者:项目名`、`作者.项目.名`、`作者-项目名`）在所有文本文件中进行全局批量替换，并自动跳过构建产物与依赖目录。
+- 基础组件：`src/web/components/general/base/`
+- 表单组件：`src/web/components/general/form/`
+- 表格：`src/web/components/general/table/`
+- 标签页：`src/web/components/general/tabs/`
+- 流程组件：`src/web/components/process/`
 
-### Docker 远程部署架构
+### 前端硬约束
 
-- `scripts/public/release-docker-remote.ts` 是通用部署框架。项目通常只需要配置服务器列表并维护 `deploy/development`、`deploy/production` 中的 Docker 文件；已有通用流程能够满足需求时，不要另建项目专用的远程部署脚本或 `deploy/<项目名>` 目录。
-- 服务器配置中的 `deployRootDir` 表示“部署根目录”，不是 SSH 用户的“家目录”。项目目录固定根据 `package.json` 中规范化后的项目名生成：`<部署根目录>/<项目名>`。未配置 `deployRootDir` 时，才以远程用户的 `$HOME` 作为默认部署根目录。
-- 远程目录结构由通用脚本统一管理：
+- 请求后端统一使用 `src/web/global/manager/api-manager.ts`，不得强制转换返回类型。WebSocket 用法参考 `ws-demo.ts`。
+- 标准元素使用 `src/web/global/tools/create-element.ts` 创建，自定义组件直接 `new`；把需要复用的元素保存为类成员，避免 `document.createElement` 和 DOM 查询。
+- 优先使用 `onxxx` 属性，不要默认使用 `addEventListener` 长期持有回调。
+- 组件注册名使用英文，文件名使用英文短横线；界面中不使用 emoji。
+- 样式优先通过类型化的 `style` 属性设置，不使用 `cssText` 拼接。
+- 支持暗色模式，颜色优先复用 `src/web/global/style/global.css` 中的变量。
+- 滚动区域优先使用 `src/web/components/general/base/scroll-container.ts`。Shadow DOM 确需自行创建滚动元素时，使用 `src/web/global/style/scrollbar.ts`；不要在组件中复制滚动条样式。
 
-  ```text
-  <部署根目录>/<项目名>/
-  ├─ upload/
-  ├─ build/<环境>/
-  └─ run/<环境>/
-  ```
+## 数据库、环境与生成文件
 
-- `deploy/<环境>/docker-compose.yml` 在 `run/<环境>/deploy/<环境>` 中执行。相对卷路径应按这个位置计算。例如生产环境中的 `../../db:/opt/app/db` 实际对应 `run/production/db`，与通用脚本同步 SQLite 数据库的位置保持一致。
-- 需要脱离项目运行目录生命周期、跨彻底重部署保留的大体积数据，才使用明确的宿主机绝对路径挂载。选择绝对路径后，应同时确认备份、迁移和删除行为，不要假定通用脚本仍会自动处理该目录。
-- 普通运行 (`run`) 会将新的打包内容覆盖到现有 `run/<环境>`，不会预先清空未被覆盖的文件；打包内容中若包含同名数据库或数据文件，仍会发生覆盖。
-- 彻底重部署 (`redeploy`) 会先删除整个 `run/<环境>`，因此位于该目录内的相对卷（包括 `db`、`data`）也会被删除。需要保留时必须先备份，或有意识地改为项目运行目录外的绝对挂载。
-- 删除项目 (`delete`) 会移除 `<部署根目录>/<项目名>` 整体；挂载在该目录之外的数据不会随项目目录删除，但相关容器仍会被移除。
-- 不同运行目标的环境变量语义不同时，应建立独立的环境变量文件，例如 Docker 使用单独的 `.env.production.docker`。不要在 Compose 中暗中覆盖另一目标环境文件里的 `BUILD_TARGET`。
-- 修改 Dockerfile 和 Compose 时尽量保留模板原有结构，只加入项目真正需要的系统依赖、端口、环境文件和数据卷，避免复制或重写通用部署能力。
+### 数据库
 
-### 项目约定
+- Schema：`prisma/schema.prisma`。
+- 开发迁移入口：`scripts/db/push-dev.ts`；其他环境应用入口：`scripts/db/push-prod.ts`。
+- 统一运行 `npm run task -- db:push:xxx`，禁止使用 `prisma db push`。
+- 开发数据库通过 `prisma migrate dev` 创建或应用 migration；生产、测试、CI 和打包环境只应用已有 migrations，没有 migration 时必须失败。
+- 模板不提交默认 migration。新项目首次运行 `npm run task -- db:push:dev:web` 后，必须提交生成的 `prisma/migrations`。
+- Prisma 生成错误 SQL 时，修改生成的 `migration.sql` 后再通过对应任务应用；不要静默改写已经发布并执行的迁移。
+- 数据库时间统一存 UTC。
 
-1. **API接口定义**
+### 环境变量与路径
 
-- 尽可能写 post 接口而不是 get 接口
-- **递归/共享类型定义与导出**:
-  - 由于后端生成器 (基于 AST 解析) 无法跨文件深入解析 `z.lazy` 等复杂递归 Zod Schema，当接口需要返回或接收复杂的递归类型时，请遵循以下规范：
-    1. **使用专用文件导出类型**: 将 TypeScript 类型定义在单独的 `types.ts` 文件中，并通过 `@lsby/net-core` 的 `NetCoreExportType<'TypeName', Type>` 暴露给系统，这会自动将此 TS 类型写入生成的前端 `interface-type.ts` 中。(参考示例: `src/interface/demo/plugin-advanced/custom-type-export/types.ts`)
-    2. **本地声明 Zod Schema**: 在每个使用该类型的 API 接口文件 (`index.ts`) 内，**本地重新声明**该递归类型的 `z.lazy()` Schema。通过这种方式，既能让生成器正常工作，也能保持入口的严格类型校验。严禁在 API 响应结构中使用 `z.any()` 逃避检查。(参考示例: `src/interface/demo/plugin-advanced/custom-type-export/index.ts`)
+- 所有环境变量由 `src/global/env.ts` 使用 Zod 严格校验，不提供业务兜底值。
+- 业务代码不得直接读取 `process.env`，统一使用 `环境变量` 对象。
+- 不要使用 `process.cwd()` 或向上搜索 `package.json` 推断项目根目录。按 `BUILD_TARGET` 和 `NODE_ENV` 显式计算路径，参考 `src/app/app.ts`。
+- `.env/*.example` 和 `deploy/servers.example.json` 是公开示例，禁止放入真实密钥、密码或私钥；实际配置与 `.setup-state.json` 必须保持 Git 忽略。
 
-2. **Web组件开发**
+### 派生源码
 
-- 组件的注册名不要使用中文
-- 前端代码及界面中不要使用 emoji
-- 尽可能复用通用组件: `src/web/components/general`, 便于统一样式和行为
-  - 尽可能复用基础通用组件: `src/web/components/general/base`, 便于统一样式和行为
-  - 尽可能复用基础表单组件: `src/web/components/general/form`, 便于统一样式和行为
-- 尽可能使用工厂函数创建元素: `src/web/global/tools/create-element.ts`
-- 不要直接使用 `document.createElement`（会丢失类型信息），也**极力避免使用 DOM 查询**（如 `querySelector`），而是将组件作为类`new`出来, 或使用`创建元素`工厂函数。
-- **获取对象引用的正确做法**：将元素直接作为类的成员变量实例化，从而天生持有引用。
-  - 标准元素使用工厂函数：`private 结果 = 创建元素('p')`
-  - 自定义组件直接 `new` 出来：`private 按钮 = new 主要按钮({ ... })`
-  - 然后在 `当加载时()` 等生命周期中追加：`this.shadow.append(this.结果)`
-- 支持黑暗模式: `src/web/global/style/global.css` 内定义了相关 css 变量
-- **滚动条统一规范**：滚动条宽度、轨道、滑块、悬浮色和圆角只能在 `src/web/global/style/global.css` 的 `--滚动条*` 变量中定义。全局 `*` 的标准属性（`scrollbar-width`、`scrollbar-color`）与 `*::-webkit-scrollbar`、组件基类、通用滚动容器必须通过这些变量保持完全一致，严禁在各组件中复制或硬编码另一套可见滚动条样式。
-- 新建滚动区域时优先使用 `src/web/components/general/base/scroll-container.ts` 的 `滚动容器`，由布局组件明确持有滚动职责；不要默认把 `overflow: auto` 写到插槽传入的业务内容上。Shadow DOM 内确实需要直接创建滚动元素时，必须使用 `src/web/global/style/scrollbar.ts` 的 `获得滚动条样式`。
-- 使用 `src/web/global/api-manager.ts` 来请求后端
-  这是一个包装过的http请求, 第三个参数是一个回调, 可以直接获得后端 ws 的推送信息
-  参考 `src/web/components/demo/ws-demo.ts`
+`npm run generate` 会更新数据库类型、接口列表和类型、Web 组件索引、纯前端 API 与 Schema、应用元信息。生成定义见 `scripts/task/taskfile.ts`。
 
-3. **环境变量与多环境架构**
+这些派生文件属于源码，必须提交 Git；不要手动维护它们：
 
-- **环境变量规范**:
-  - 全局环境变量受到 `zod` 的严格校验，位于 `src/global/env.ts`。其中最核心的三个维度是：
-    1. `NODE_ENV`: 运行环境 (`development`, `production`, `test`)。
-    2. `BUILD_TARGET`: 编译目标 (`web`, `electron`, `sea`, `pure-frontend`)。
-    3. `LOCAL_MODE`: 是否为本地免登录模式 (布尔值)。
-  - **绝不提供兜底默认值** (Fail-Fast 原则)。所有依赖的环境变量必须在启动或打包前通过 `ENV_FILE_PATH` 指定的 `.env` 文件提供，缺少即报错。
-  - **绝不允许在业务代码（无论是前端还是后端）中直接使用 `process.env['XXX']`**。总是导入 `src/global/env.ts` 中的 `环境变量` 对象以获得类型提示和严格校验。前端打包时（Parcel），系统会通过 `src/web/mock/env-provider-mock.ts` 将环境变量在编译时静态注入。
+- `src/types/db.ts`
+- `src/interface/interface-list.ts`
+- `src/types/interface-type.ts`
+- `src/web/components/index.ts`
+- `src/web/local-api-list.ts`
+- `src/web/local-schema.ts`
+- `src/app/meta-info.ts`
 
-- **多环境路径解析**:
-  - **绝对禁止使用 `process.cwd()` 或简单的 `__dirname` 配合不断向上查找 `package.json` 的方式来获取项目根目录**。由于本项目包含多个构建目标，不同环境下运行的起始目录及打包后的产物结构（如 `.sea`）存在显著差异。
-  - **必须基于 `BUILD_TARGET` 和 `NODE_ENV` 进行静态路径计算**。获取绝对路径时，参考 `src/app/app.ts` 中的做法，通过 `switch (环境变量.BUILD_TARGET)` 结合 `NODE_ENV` 为每个特定的部署目标明确指定 `path.resolve` 逻辑。
+## 工程流程路牌
 
-4. **纯前端模式 (Pure Frontend Architecture)**
+### Taskfile
 
-本项目支持将后端逻辑和数据库完全打包到浏览器中独立运行，无需依赖任何真实服务端。当 `BUILD_TARGET='pure-frontend'` 时，系统采用三层架构运行：
+- 所有项目命令定义在 `scripts/task/taskfile.ts`，执行器位于 `scripts/task/`。
+- 使用 `npm run task` 搜索任务，`npm run task -- --list` 查看公共任务，`npm run task -- <任务名> --dry-run` 查看执行计划。
+- `package.json` 只保留高频薄别名。组合关系写在 Taskfile 的 `依赖` 和 `依赖方式` 中，不要在任务命令里再次调用 `npm run`、`pnpm run` 或组合任务。
+- 叶子任务只完成自己的动作。只有输出互不覆盖时才能并行。
+- `scripts/watch/watch.ts` 是通用监听执行器，不得与具体任务名或 Taskfile 机制耦合。
 
-- **Tier 1 (UI 主线程)**: 负责渲染页面UI。传统的 HTTP 请求会被 `src/web/global/manager/api-manager.ts` 自动拦截，转换为基于 `MessageChannel` 的 Web Worker 通信，转发给 API Worker。
-- **Tier 2 (API Worker)**: 位于 `src/web/pure-frontend-api-worker.ts`。在此处加载原本跑在后端的业务逻辑与接口代码。为了让 Node.js 代码能在浏览器运行，打包器会根据 `package.json` 中的 `alias` 配置，借助 `src/web/mock/` 目录将 `fs`、`crypto`、`express` 等核心库 Mock 掉。
-- **Tier 3 (DB Worker)**: 位于 `src/web/local-sqlite-worker.ts`。在独立的 Worker 中基于 WebAssembly (WASM) 运行 SQLite，并通过 IndexedDB 进行浏览器本地持久化。当前明确使用 `useIdbStorage`，不依赖 OPFS 的 `FileSystemSyncAccessHandle`，也不使用 SharedArrayBuffer。
-- **多标签页并发安全**: 为防止多个浏览器标签页同时操作本地 SQLite，UI 主线程会在每次本地 API 请求或数据库管理命令的完整执行期间，通过 Web Locks API (`navigator.locks.request('lsby-pure-frontend:local.db')`) 持有跨标签页排他锁。其他标签页的请求会等待当前请求释放锁；Worker 本身是每个标签页按需创建并长期存活的，不存在“只有一个标签页可以初始化 Worker”的限制。
-- **构建与生成**: 开发时必须使用 `运行纯前端开发套件`，因为它会独占性地启动 `_持续生成纯前端本地API列表` 这类专属任务；纯前端的构建命令同样需要严格配合专有的 `.env.xxx.pure-frontend` 配置文件使用。
+### 初始化
 
-5. **其他**
+| 场景                   | 入口                                                            |
+| ---------------------- | --------------------------------------------------------------- |
+| 首次安装向导           | `scripts/setup/preinstall.mjs`、`scripts/setup/postinstall.mjs` |
+| 重新进入向导           | `npm run setup:init`                                            |
+| 创建本地环境文件       | `scripts/setup/init-env.ts`                                     |
+| 分配端口               | `scripts/setup/init-ports.ts`                                   |
+| 重命名项目             | `scripts/setup/rename-project.ts`                               |
+| Electron GitHub Secret | `scripts/setup/github-electron-env.ts`                          |
 
-- 使用 pnpm 安装依赖
+`preinstall` 发生在项目依赖可用之前，只能依赖 Node.js 内置模块，不能调用包管理器。初始化流程必须幂等、保留已有本地配置，并在 CI 或非交互环境跳过。任何输出都不得泄露 Secret 内容。
 
-## 重要文件参考
+### 构建、纯前端与发布
 
-- `prisma/schema.prisma`: 数据库模型定义
-- `src/types/interface-type.ts`: 自动生成的后端接口类型
+- 构建、开发、测试和发布的组合关系以 `scripts/task/taskfile.ts` 为准；需要动态环境时使用 `--env <环境文件>`。
+- 纯前端开发必须运行完整的 `dev:pure-frontend` 套件。运行链路入口为 `src/web/pure-frontend-api-worker.ts`、`src/web/local-sqlite-worker.ts` 和 `src/web/global/manager/api-manager.ts`。
+- 纯前端数据存于浏览器本地，按 Origin 隔离，并通过 Web Locks 串行化多标签页数据库操作。登录、管理员和 JWT 不是服务端安全边界。
+- 发布入口位于 `scripts/public/`；版本发布入口是 `scripts/release/release.ts`。
+- 远程部署通用实现为 `scripts/public/release-docker-remote.ts`，服务器配置参考 `deploy/servers.example.json`。不要创建重复的项目专用部署框架。
+- Docker 构建通过 BuildKit Secret 读取实际环境文件，禁止将秘密 `COPY` 进镜像。
+- 远程 `redeploy` 会删除当前环境运行目录及其中的相对卷数据；`delete` 会删除整个远程项目目录。修改或执行相关流程前先确认数据生命周期和备份。
 
-## 代码风格
+## 测试路牌
 
-- 对于支持的语言, 变量名, 函数名, 类名, 方法名等, 都尽可能使用中文(没错, 是中文), 但文件名总是使用英文
-- 除非指定, 否则默认为ts代码
-- 对于变量名, 函数名, 类名, 方法名等, 都尽可能使用中文(没错, 是中文), 但文件名总是使用英文
-- 使用tsx直接运行ts代码, 而不是ts-node
-- 尽可能使用pnpm而不是npm或yarn
-- 禁止浮动的 Promise: no-floating-promises, 谨慎使用 void 忽略悬空的 promise
-- 必须写函数返回类型: explicit-function-return-type
-- 必须写类成员访问修饰符: explicit-member-accessibility
-- 禁止非空断言: ! → no-non-null-assertion
-- 永远使用 let, 拒绝 var 和 const
-- 条件里必须显式布尔值: strict-boolean-expressions
-- 禁止对非布尔值取反: no-negation
-- 总是考虑数组通过下标取项时可能出现的越界问题, 并做安全检查
-- 总是使用严格的条件判断, 不省略判断条件等于真, 空, null的情况
-- 尽可能不要使用简写
-- 尽可能使用style属性赋值, 而不是 cssText 文本或 textContent 文本
-- 不要删除已有的空值断言, 注释等
-- 如果中文变量名或函数名等能表达含义, 就不需要写同样含义的注释了
-- 在不影响逻辑的情况下, 将代码写的尽可能短, 尽量减少不必要的换行
-- 写出完整的类型, 尽可能不要使用 any
-- 写类型时, 尽可能写 type 而不是 interface
-- 尽可能不要用 addEventListener, 而是用 onxxx, 避免回调函数被一直持有造成内存泄漏
-- 避免使用 DOM 查询 (例如 `querySelector`)，而是将元素保存为类的 private 成员变量来持有对象引用，避免 DOM 结构变化导致代码失效。
-- 数据库里永远存UTC时间
-- 文件名总是使用英文, 并且使用短横线连接, 而不是用驼峰, 因为git对大小写不敏感
-- 谨慎的使用'as'强制类型转换, 优先考虑用 zod 进行类型类型校验和收窄
-- 极度谨慎的使用 'as Record<string, any>', 'as Record<string, unknown>', 'as any', 'as unknown' 等不安全的写法, 优先考虑用 zod 进行类型类型校验和收窄
-- 进行 zod 校验时，不要分两行(如声明临时变量 parsed)进行中转，而是总是直接在一行里组合调用, 例如: Schema.parse(JSON.parse(json))
-- 解析 JSON 或执行其他可能返回 `any` 的操作时，应尽可能将其直接内联到期望强类型的函数调用中，而不是先赋值给临时变量，以避免触发 'Unsafe assignment of an any value' 等校验报错。例如：`API管理器.请求postJson('/api/xxx', JSON.parse(jsonStr))`。
-- 旧代码兼容性：修改代码时，如果发现涉及到需要兼容旧有数据或旧代码逻辑（如保留带特定名称的旧角色、兼容旧格式等），不要默默地自行编写冗余的兼容性代码。遇到这种情况时，请务必先主动询问用户，由用户明确决定是否需要兼容。
-- 联合类型判断: 对于如 `obj.type` 等可枚举类型，请总是使用 `switch` 语句而不是连续的 `if`。这不仅是为了避免最后一条 `if` 因类型推断收窄而触发 `@typescript-eslint/no-unnecessary-condition` 报错，更是为了配合项目启用的 `@typescript-eslint/switch-exhaustiveness-check` 和 `@lsby/no-switch-default` 规则，利用 `switch` 的有穷性检查机制。这样当未来联合类型或枚举增加新成员时，如果没有补全对应分支，TypeScript 就会在编译期抛出错误，极大提升代码安全性。
-- 请勿使用 eslint-disable max-lines 来禁用行数检测
+除非用户明确要求，否则不要主动新增测试。需要测试时优先沿用：
 
-## 关于测试
+| 类型           | 示例与位置                                                    |
+| -------------- | ------------------------------------------------------------- |
+| 接口单元测试   | `src/interface/demo/base/add/t01.test.ts`                     |
+| 接口多分支测试 | `src/interface/demo/base/sub/t01.test.ts`、`t02.test.ts`      |
+| CRUD 测试      | `src/interface/demo/curd/user/*/t01.test.ts`                  |
+| 上传测试       | `src/interface/demo/file/upload-file/t01.test.ts`             |
+| 回滚测试       | `src/interface/demo/logic-advanced/rollback-test/t01.test.ts` |
+| 集成测试       | `test/integration/demo.ts`                                    |
+| 端到端测试     | `test/e2e/demo.spec.ts`                                       |
+| E2E 演示模式   | `test/e2e/tools/demo-mode.ts`                                 |
 
-- 除非用户要求, 否则不要主动写测试
-- 测试分单元测试, 集成测试和端到端测试
-  - 单元测试: 使用 Co-location 测试风格, 测试代码和接口代码在同一文件夹, 参考 `src/interface/demo/base/add/t01.test.ts`
-  - 集成测试: 借助接口两用性, 对多个接口进行集成测试, 写在 `test/integration` 文件夹中
-  - 端到端测试: 借助 playwright, 实际模拟用户操作来进行测试, 写在 `test/e2e` 文件夹中, 注意 `test/e2e/tools/demo-mode.ts` 提供了一种 demo 模式, 方便做演示, 但调试代码时, 总是使用非 demo 模式来快速开发
-    - `DEMO_MODE=true` 时会使用有头浏览器, 并开启演示说明浮层、操作动画和额外等待; `DEMO_MODE=false` 时会使用无头浏览器并跳过上述演示效果。该变量只控制展示方式和执行速度, 不改变测试操作、断言或测试数据
-- 测试流程
-  - 准备阶段, 需要彻底清空测试数据库, 并重新执行初始化脚本
-  - 运行前, 如果需要构造特定数据, 可以通过数据库句柄插入
-  - 运行中, 必须使用黑箱模式(只能通过接口两用性调用接口来操作), 严禁使用数据库句柄
-  - 运行后, 如果需要验证数据库的数据变更, 可以使用灰箱模式(可以通过数据库句柄直接查询数据库验证数据是否符合预期)
-  - 完成后, 无需再次清空测试数据库, 它会在下次运行测试前被清空
+- 单元测试与接口同目录；集成测试放在 `test/integration/`；端到端测试放在 `test/e2e/`。
+- 测试运行期间通过接口两用性进行黑箱操作；准备数据和运行后验证可以直接使用数据库句柄。
+- 测试数据库只应用已有迁移，不统一重置数据；每个测试负责自己的准备范围。
+- `DEMO_MODE` 只控制 E2E 展示方式和速度，不得改变测试操作、断言或数据。
+
+## 代码硬约束
+
+- 默认编写 TypeScript。变量、函数、类和方法尽可能使用中文；文件名始终使用英文短横线。
+- 始终使用 `let`，不使用 `var` 或 `const`；使用 `tsx`，不使用 `ts-node`；依赖安装优先使用 pnpm。
+- 遵守 `no-floating-promises`、`explicit-function-return-type`、`explicit-member-accessibility`、`no-non-null-assertion`、`strict-boolean-expressions` 和 `no-negation`。
+- 数组按下标访问时处理越界；条件显式比较 `true`、`false`、`null` 或 `undefined`。
+- 类型优先使用 `type`，完整表达类型，避免 `any`、`unknown` 中转和不安全断言。
+- Zod 校验和可能返回 `any` 的解析操作尽量直接内联到强类型调用中，不创建不安全的临时变量。
+- 有穷联合类型使用穷尽 `switch`，不要用连续 `if`，也不要添加掩盖遗漏分支的 `default`。
+- 不要用 `eslint-disable max-lines` 绕过行数检查，不要顺手删除已有注释、校验或断言。
+- 中文命名已经能表达含义时，不写重复注释；在不影响可读性和逻辑的前提下保持实现简洁。

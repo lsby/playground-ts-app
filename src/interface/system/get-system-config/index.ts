@@ -9,6 +9,7 @@ import {
 } from '@lsby/net-core'
 import { Left, Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
+import { 系统配置ID } from '../../../global/const'
 import { jwt插件, kysely插件 } from '../../../global/plugin'
 import { 检查管理员登录 } from '../../../interface-logic/check/check-login-jwt-admin'
 
@@ -22,7 +23,12 @@ let 接口逻辑实现 = 接口逻辑
     接口逻辑.构造([new JSON参数解析插件(z.object({}), {}), kysely插件], async (参数, 逻辑附加参数, 请求附加参数) => {
       let _log = 请求附加参数.log.extend(接口路径)
 
-      let 配置 = await 参数.kysely.获得句柄().selectFrom('system_config').selectAll().executeTakeFirst()
+      let 配置 = await 参数.kysely
+        .获得句柄()
+        .selectFrom('system_config')
+        .selectAll()
+        .where('id', '=', 系统配置ID)
+        .executeTakeFirst()
       if (配置 === undefined) return new Left('系统配置不存在' as const)
       return new Right({
         id: 配置.id,

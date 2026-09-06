@@ -3,7 +3,7 @@
 export let 初始建表SQL = `
 -- CreateTable
 CREATE TABLE "system_config" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'SYSTEM_DEFAULT',
     "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "is_initialized" BOOLEAN NOT NULL DEFAULT false,

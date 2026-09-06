@@ -10,6 +10,7 @@ let __当前文件名 = fileURLToPath(import.meta.url)
 let __当前目录名 = path.dirname(__当前文件名)
 let 项目根目录 = path.resolve(__当前目录名, '../../')
 let 相对发布目录 = 'release/electron'
+let 打包环境文件名 = '.env.production.electron'
 
 function 寻找内置Csc编译器(): string | null {
   let 框架目录组 = ['C:\\Windows\\Microsoft.NET\\Framework64', 'C:\\Windows\\Microsoft.NET\\Framework']
@@ -83,12 +84,11 @@ async function 执行构建(): Promise<void> {
   try {
     let 是否生成Zip = await 询问是否打包Zip()
 
-    console.log('正在执行前置准备工作 (db:push, check, build)...')
-    execSync('npm run db:push:prod:electron', { stdio: 'inherit', cwd: 项目根目录 })
-    execSync('dotenv -e ./.env/.env.production.electron -- npm run _check:all', { stdio: 'inherit', cwd: 项目根目录 })
-    execSync('dotenv -e ./.env/.env.production.electron -- npm run _build:all', { stdio: 'inherit', cwd: 项目根目录 })
-
-    let 环境源文件 = path.resolve(项目根目录, '.env/.env.production.electron')
+    let 环境源文件相对路径 = process.env['ENV_FILE_PATH']
+    if (环境源文件相对路径 === undefined || 环境源文件相对路径 === '') {
+      throw new Error('❌ 缺少 ENV_FILE_PATH，请通过 npm run task -- public:electron 运行发布流程。')
+    }
+    let 环境源文件 = path.resolve(项目根目录, 环境源文件相对路径)
     let 数据库源文件 = path.resolve(项目根目录, 'db/prod-electron.db')
 
     // 1. 提前检查
@@ -159,7 +159,7 @@ async function 执行构建(): Promise<void> {
       .replace(/^DB_BACKUP_PATH\s*=.*$/m, 'DB_BACKUP_PATH = "./data/backups"')
     for (let 目标目录 of 环境目标路径组) {
       确保目录存在(目标目录)
-      let 环境目标文件 = path.join(目标目录, '.env.production.electron')
+      let 环境目标文件 = path.join(目标目录, 打包环境文件名)
       fs.writeFileSync(环境目标文件, 环境内容, 'utf8')
       console.log(`✅ 已写入环境变量到 ${环境目标文件}`)
     }
@@ -228,11 +228,11 @@ async function 执行构建(): Promise<void> {
           'DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"',
           'APP_RESOURCES_DIR="$( cd "$DIR/../Resources/app" >/dev/null 2>&1 && pwd )"',
           'PORTABLE_ROOT="$( cd "$DIR/../../.." >/dev/null 2>&1 && pwd )"',
-          'if [ -f "$PORTABLE_ROOT/.env/.env.production.electron" ]; then',
-          '  export ENV_FILE_PATH="$PORTABLE_ROOT/.env/.env.production.electron"',
+          `if [ -f "$PORTABLE_ROOT/.env/${打包环境文件名}" ]; then`,
+          `  export ENV_FILE_PATH="$PORTABLE_ROOT/.env/${打包环境文件名}"`,
           '  cd "$PORTABLE_ROOT"',
-          'elif [ -f "$APP_RESOURCES_DIR/.env/.env.production.electron" ]; then',
-          '  export ENV_FILE_PATH="$APP_RESOURCES_DIR/.env/.env.production.electron"',
+          `elif [ -f "$APP_RESOURCES_DIR/.env/${打包环境文件名}" ]; then`,
+          `  export ENV_FILE_PATH="$APP_RESOURCES_DIR/.env/${打包环境文件名}"`,
           '  if [ -d "$PORTABLE_ROOT/data" ]; then',
           '    cd "$PORTABLE_ROOT"',
           '  else',

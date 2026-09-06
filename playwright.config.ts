@@ -1,15 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
-import { config } from 'dotenv'
-import path from 'path'
-import { fileURLToPath } from 'url'
-
-// Load test environment variables
-let 当前目录 = path.dirname(fileURLToPath(import.meta.url))
-config({ path: path.resolve(当前目录, '.env', '.env.test.web') })
 
 let port = process.env.APP_PORT
 if (port === undefined) {
-  throw new Error('运行测试失败：未在 .env.test.web 中找到 APP_PORT 环境变量！')
+  throw new Error('运行测试失败：缺少 APP_PORT，请通过 npm run task -- test:e2e 启动测试')
 }
 
 /**
@@ -47,7 +40,7 @@ export default defineConfig({
   /* 自动拉起测试服务器 */
   webServer: {
     // 启动前先构建一下前端，然后拉起以 test-web 环境变量运行的服务端进程 (端口 9000)
-    command: 'pnpm _build:web-test && pnpm run:service:test',
+    command: 'npm run task -- test:e2e:server',
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,

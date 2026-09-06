@@ -9,6 +9,7 @@ import {
 } from '@lsby/net-core'
 import { Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
+import { 系统配置ID } from '../../../global/const'
 import { jwt插件, kysely插件 } from '../../../global/plugin'
 import { 检查管理员登录 } from '../../../interface-logic/check/check-login-jwt-admin'
 
@@ -38,7 +39,7 @@ let 接口逻辑实现 = 接口逻辑
           更新数据.enable_get_interface_type = 参数.json.enable_get_interface_type === true ? 1 : 0
         }
 
-        await 参数.kysely.获得句柄().updateTable('system_config').set(更新数据).execute()
+        await 参数.kysely.获得句柄().updateTable('system_config').set(更新数据).where('id', '=', 系统配置ID).execute()
         return new Right({})
       },
     ),

@@ -6,9 +6,12 @@ export class 即时任务管理器类 {
   private log = new Log('即时任务管理器')
   private 任务映射表: Map<string, 即时任务抽象类<unknown>> = new Map()
   private 运行中任务集合: Set<string> = new Set()
+  private 运行中任务Promise集合: Set<Promise<void>> = new Set()
   private 最大并发数: number
   private 历史记录保留天数: number
   private 清理定时器: NodeJS.Timeout | null = null
+  private 是否已关闭 = false
+  private 关闭Promise: Promise<void> | null = null
 
   public constructor(参数: { 最大并发数: number; 历史记录保留天数: number }) {
     let { 最大并发数, 历史记录保留天数 } = 参数
@@ -29,6 +32,7 @@ export class 即时任务管理器类 {
   }
 
   private async 尝试执行下一个任务(): Promise<void> {
+    if (this.是否已关闭 === true) return
     if (this.运行中任务集合.size >= this.最大并发数) return
 
     // 获取所有等待中的任务
@@ -55,6 +59,7 @@ export class 即时任务管理器类 {
     return this.最大并发数
   }
   public 设置最大并发数(数量: number): void {
+    if (this.是否已关闭 === true) throw new Error('即时任务管理器已关闭')
     if (数量 <= 0) throw new Error('最大并发数必须大于0')
     this.最大并发数 = 数量
   }
@@ -63,6 +68,7 @@ export class 即时任务管理器类 {
     return this.历史记录保留天数
   }
   public 设置历史记录保留天数(天数: number): void {
+    if (this.是否已关闭 === true) throw new Error('即时任务管理器已关闭')
     if (天数 <= 0) throw new Error('历史记录保留天数必须大于0')
     this.历史记录保留天数 = 天数
 
@@ -79,6 +85,7 @@ export class 即时任务管理器类 {
   }
 
   public 提交任务<输出类型>(任务: 即时任务抽象类<输出类型>): string {
+    if (this.是否已关闭 === true) throw new Error('即时任务管理器已关闭')
     let 任务id = 任务.获得id()
     if (this.任务映射表.has(任务id) === true) throw new Error(`任务ID ${任务id} 已存在`)
 
@@ -93,12 +100,13 @@ export class 即时任务管理器类 {
 
     return 任务id
   }
-  public async 执行任务(任务id: string): Promise<void> {
+  private async 执行任务逻辑(任务id: string): Promise<void> {
     let 任务 = this.任务映射表.get(任务id)
 
     if (任务 === undefined) throw new Error(`任务ID ${任务id} 不存在`)
     if (任务.获得当前状态() === '运行中') throw new Error(`任务ID ${任务id} 正在运行中`)
     if (任务.获得当前状态() === '已完成') throw new Error(`任务ID ${任务id} 已经完成`)
+    if (任务.获得当前状态() === '已取消') throw new Error(`任务ID ${任务id} 已取消`)
 
     try {
       任务.设置当前状态('运行中')
@@ -134,33 +142,63 @@ export class 即时任务管理器类 {
       await 任务.执行失败钩子(错误对象)
 
       // 检查是否可以重试
-      if (任务.可以重试() === true) {
+      if (this.是否已关闭 === true) {
+        任务.设置错误信息(new Error('即时任务管理器已关闭，任务已取消', { cause: 错误对象 }))
+        任务.设置当前状态('已取消')
+        任务.设置结束时间(new Date())
+      } else if (任务.可以重试() === true) {
         任务.增加重试次数()
         任务.设置当前状态('等待中')
         任务.设置开始时间(new Date())
         任务.设置结束时间(new Date())
-
-        // 重新提交任务
-        this.尝试执行下一个任务().catch(async (重试错误: Error) => {
-          let log = this.log
-          await log.debug('重试任务失败:', 重试错误)
-        })
       } else {
         任务.设置当前状态('已失败')
         任务.设置结束时间(new Date())
       }
     } finally {
-      // 执行完成钩子
-      await 任务.执行完成钩子()
-
-      this.运行中任务集合.delete(任务id)
-
-      // 尝试执行下一个任务
-      this.尝试执行下一个任务().catch(async (错误: Error) => {
-        let log = this.log
-        await log.debug('启动下一个任务失败:', 错误)
-      })
+      try {
+        await 任务.执行完成钩子()
+      } finally {
+        this.运行中任务集合.delete(任务id)
+        this.尝试执行下一个任务().catch(async (错误: Error) => {
+          let log = this.log
+          await log.debug('启动下一个任务失败:', 错误)
+        })
+      }
     }
+  }
+
+  public async 执行任务(任务id: string): Promise<void> {
+    if (this.是否已关闭 === true) throw new Error('即时任务管理器已关闭')
+    let 运行Promise = this.执行任务逻辑(任务id)
+    this.运行中任务Promise集合.add(运行Promise)
+    try {
+      await 运行Promise
+    } finally {
+      this.运行中任务Promise集合.delete(运行Promise)
+    }
+  }
+
+  private async 执行关闭(): Promise<void> {
+    this.是否已关闭 = true
+    if (this.清理定时器 !== null) clearInterval(this.清理定时器)
+    this.清理定时器 = null
+    for (let 任务 of this.任务映射表.values()) {
+      if (任务.获得当前状态() !== '等待中') continue
+      任务.设置错误信息(new Error('即时任务管理器已关闭，任务已取消'))
+      任务.设置当前状态('已取消')
+      任务.设置结束时间(new Date())
+    }
+    let 关闭结果组 = await Promise.allSettled([...this.运行中任务Promise集合])
+    this.清理所有任务()
+    let 错误组: unknown[] = []
+    for (let 结果 of 关闭结果组) if (结果.status === 'rejected') 错误组.push(结果.reason)
+    if (错误组.length > 0) throw new AggregateError(错误组, '关闭即时任务管理器时有任务执行失败')
+  }
+
+  public async 关闭(): Promise<void> {
+    this.关闭Promise ??= this.执行关闭()
+    await this.关闭Promise
   }
 
   public 获得所有任务列表(): Array<即时任务抽象类<unknown>> {
@@ -196,7 +234,7 @@ export class 即时任务管理器类 {
       let 任务id = 条目[0]
       let 任务 = 条目[1]
       let 状态 = 任务.获得当前状态()
-      if (状态 === '已完成' || 状态 === '已失败') {
+      if (状态 === '已完成' || 状态 === '已失败' || 状态 === '已取消') {
         let 结束时间 = 任务.获得结束时间()
         if (结束时间 !== null && 结束时间 < 阈值时间) {
           this.任务映射表.delete(任务id)

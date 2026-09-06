@@ -3,6 +3,7 @@ import { Either, Left, Right } from '@lsby/ts-fp-data'
 import fs from 'fs/promises'
 import path from 'path'
 import { z } from 'zod'
+import { 系统配置ID } from '../../../global/const'
 import { 环境变量 } from '../../../global/env'
 import { kysely插件 } from '../../../global/plugin'
 
@@ -26,6 +27,7 @@ let 接口逻辑实现 = 接口逻辑.构造(
       .获得句柄()
       .selectFrom('system_config')
       .select('enable_get_interface_type')
+      .where('id', '=', 系统配置ID)
       .executeTakeFirst()
     if (配置 === undefined || 配置.enable_get_interface_type !== 1) {
       return new Left('该接口未开放' as const)

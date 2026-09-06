@@ -32,49 +32,46 @@ let proxyConfig = {
 writeFileSync('.proxyrc.json', JSON.stringify(proxyConfig, null, 2), 'utf-8')
 
 function 启动任务(): void {
-  let 子进程 = spawn('npm', ['run', '_clean:web'], { stdio: 'inherit', shell: true })
+  let webPort = process.env['WEB_PORT']
+  let hmrPort = process.env['WEB_HMR_PORT']
+  if (webPort === undefined || hmrPort === undefined) {
+    console.error('未在环境变量中提供 WEB_PORT 或 WEB_HMR_PORT！')
+    process.exit(1)
+  }
 
-  子进程.on('close', (代码: number | null) => {
-    if (代码 !== 0) {
-      console.error('清理脚本失败，退出码:', 代码)
-      重启()
-      return
-    }
+  let parcel进程 = spawn(
+    'parcel',
+    [
+      '--no-cache',
+      '--no-autoinstall',
+      '--dist-dir',
+      'dist/src/web',
+      '--watch-for-stdin',
+      '--port',
+      webPort,
+      '--hmr-port',
+      hmrPort,
+      ...getHtmlEntries('src/web/page'),
+      // '--lazy',
+    ],
+    { stdio: 'inherit', shell: true },
+  )
 
-    let webPort = process.env['WEB_PORT']
-    let hmrPort = process.env['WEB_HMR_PORT']
-    if (webPort === undefined || hmrPort === undefined) {
-      console.error('未在环境变量中提供 WEB_PORT 或 WEB_HMR_PORT！')
-      process.exit(1)
-    }
-
-    let parcel进程 = spawn(
-      'parcel',
-      [
-        '--no-cache',
-        '--no-autoinstall',
-        '--dist-dir',
-        'dist/src/web',
-        '--watch-for-stdin',
-        '--port',
-        webPort,
-        '--hmr-port',
-        hmrPort,
-        ...getHtmlEntries('src/web/page'),
-        // '--lazy',
-      ],
-      { stdio: 'inherit', shell: true },
-    )
-
-    parcel进程.on('close', () => {
-      console.log('崩了！重启！')
-      setTimeout(() => 重启(), 1000)
-    })
+  parcel进程.on('close', () => {
+    console.log('崩了！重启！')
+    setTimeout(() => 重启(), 1000)
   })
 }
 
 function 重启(): void {
-  启动任务()
+  let 清理进程 = spawn('tsx', ['scripts/clean/clean-web.ts'], { stdio: 'inherit', shell: true })
+  清理进程.on('close', (退出码) => {
+    if (退出码 === 0) 启动任务()
+    else {
+      console.error('清理 Web 构建产物失败，稍后重试，退出码:', 退出码)
+      setTimeout(() => 重启(), 1000)
+    }
+  })
 }
 
 启动任务()

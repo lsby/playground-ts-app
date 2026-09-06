@@ -18,7 +18,7 @@ generator kysely {
 
 // 系统配置
 model system_config {
-  id         String   @id
+  id         String   @id @default("SYSTEM_DEFAULT")
   created_at DateTime @default(now())
   updated_at DateTime @default(now()) @updatedAt
 
@@ -51,5 +51,5 @@ model user {
   pwd      String // 密码
   is_admin Boolean // 是管理员
 
-  user_config user_config[]
+  user_config user_config?
 }
