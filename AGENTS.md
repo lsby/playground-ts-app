@@ -171,6 +171,7 @@
 - 纯前端开发必须运行完整的 `dev:pure-frontend` 套件。运行链路入口为 `src/web/pure-frontend-api-worker.ts`、`src/web/local-sqlite-worker.ts` 和 `src/web/global/manager/api-manager.ts`。
 - 纯前端数据存于浏览器本地，按 Origin 隔离，并通过 Web Locks 串行化多标签页数据库操作。登录、管理员和 JWT 不是服务端安全边界。
 - 发布入口位于 `scripts/public/`；版本发布入口是 `scripts/release/release.ts`。
+- `package.json` 的 `private: true` 是防止模板被意外发布的安全开关；确需发布 NPM 包时由项目维护者显式修改。
 - 远程部署通用实现为 `scripts/public/release-docker-remote.ts`，服务器配置参考 `deploy/servers.example.json`。不要创建重复的项目专用部署框架。
 - Docker 构建通过 BuildKit Secret 读取实际环境文件，禁止将秘密 `COPY` 进镜像。
 - 远程 `redeploy` 会删除当前环境运行目录及其中的相对卷数据；`delete` 会删除整个远程项目目录。修改或执行相关流程前先确认数据生命周期和备份。

@@ -381,6 +381,8 @@ export let 任务表 = 定义任务({
     传递参数: true,
   },
 
+  'release:verify': { 说明: '发布前运行单元测试并完成构建', 依赖: ['test:unit:all', 'build:all'], 公开: false },
+
   'capacitor:init': { 说明: '初始化 Capacitor', 运行: 命令('cap', 'init'), 传递参数: true },
   'capacitor:add:android': { 说明: '添加 Android 平台', 运行: 命令('cap', 'add', 'android'), 传递参数: true },
   'capacitor:sync:android': { 说明: '同步 Android 平台', 运行: 命令('cap', 'sync', 'android'), 传递参数: true },
@@ -399,21 +401,21 @@ export let 任务表 = 定义任务({
   'public:electron': {
     说明: '构建 Electron 发布包',
     环境文件: Electron生产环境文件,
-    依赖: ['db:push:prod:electron', 'build:all'],
+    依赖: ['release:verify', 'db:push:prod:electron'],
     运行: 命令('tsx', 'scripts/public/release-electron.ts'),
     传递参数: true,
   },
   'public:npm': {
     说明: '构建并发布 NPM 包',
     环境文件: Web生产环境文件,
-    依赖: ['db:push:prod:web', 'build:all'],
+    依赖: ['release:verify', 'db:push:prod:web'],
     运行: 命令('tsx', 'scripts/public/release-npm.ts'),
     传递参数: true,
   },
   'public:sea': {
     说明: '构建 SEA 发布包',
     环境文件: Sea生产环境文件,
-    依赖: ['db:push:prod:sea', 'build:all'],
+    依赖: ['release:verify', 'db:push:prod:sea'],
     运行: 命令('tsx', 'scripts/public/release-sea.ts'),
     传递参数: true,
   },
@@ -432,7 +434,7 @@ export let 任务表 = 定义任务({
   release: {
     说明: '构建、提交、打标签并推送新版本',
     环境文件: Web生产环境文件,
-    依赖: ['release:version', 'build:all'],
+    依赖: ['release:version', 'release:verify'],
     运行: 命令('tsx', 'scripts/release/release.ts'),
   },
 })
