@@ -12,10 +12,8 @@
 | 纯前端   | 浏览器 Worker 与本地 WASM SQLite |
 | Electron | Electron 主进程与 Web UI         |
 | SEA      | Node.js 单文件可执行程序         |
-| Android  | Capacitor 容器                   |
+| 移动端   | Capacitor 容器                   |
 | CLI      | Node.js 命令行程序               |
-
-环境要求：Node.js 22、pnpm 9.5 和 Git。Electron、Android、Docker 与 SEA 还需要对应平台的工具链。
 
 ## 快速开始
 
@@ -63,5 +61,3 @@ npm run setup:init
 ## 开发指南
 
 项目只维护一份详细开发指南：[AGENTS.md](./AGENTS.md)。
-
-它同时面向开发者和 AI，以“任务 → 示例或源码入口”的方式整理前后端 demo、项目结构、数据库、环境变量、测试、构建和部署约束。开始修改项目之前，请先从那里找到最接近当前任务的示例。
