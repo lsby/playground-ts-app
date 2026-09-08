@@ -89,7 +89,7 @@ async function 执行本地命令(命令: string, 选项?: { 工作目录?: stri
   return new Promise((resolve, reject) => {
     let 终端 = process.platform === 'win32' ? 'cmd' : 'sh'
     let 终端参数 = process.platform === 'win32' ? '/c' : '-c'
-    let 进程 = spawn(终端, [终端参数, 命令], { cwd: 选项?.工作目录 ?? process.cwd() })
+    let 进程 = spawn(终端, [终端参数, 命令], { cwd: 选项?.工作目录 ?? 本地根目录 })
 
     if (选项?.打印输出 !== false) {
       进程.stdout.on('data', (数据) => process.stdout.write(数据))

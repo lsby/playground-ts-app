@@ -15,17 +15,9 @@ export class 演示ws组件 extends 组件基类<发出事件类型, 监听事�
 
   private 按钮 = new 主要按钮({
     文本: '开始测试',
-    点击处理函数: async (): Promise<void> => {
-      await API管理器.请求postJson并处理错误(
-        '/api/demo/ws/ws-test',
-        {},
-        async (data) => {
-          this.结果.textContent = data.data
-        },
-        async (发送消息, _ws) => {
-          this.发送消息函数 = 发送消息
-        },
-      )
+    自动加载: false,
+    点击处理函数: (): void => {
+      this.安全执行(async (): Promise<void> => await this.开始测试())
     },
   })
 
@@ -41,8 +33,23 @@ export class 演示ws组件 extends 组件基类<发出事件类型, 监听事�
   private 结果 = 创建元素('p')
 
   protected override async 当加载时(): Promise<void> {
-    this.shadow.append(this.按钮)
-    this.shadow.append(this.发送按钮)
-    this.shadow.append(this.结果)
+    let 按钮组 = 创建元素('div', {
+      style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--间距-2)' },
+    })
+    按钮组.append(this.按钮, this.发送按钮)
+    this.shadow.append(按钮组, this.结果)
+  }
+
+  private async 开始测试(): Promise<void> {
+    await API管理器.请求postJson并处理错误(
+      '/api/demo/ws/ws-test',
+      {},
+      async (data) => {
+        this.结果.textContent = data.data
+      },
+      async (发送消息, _ws) => {
+        this.发送消息函数 = 发送消息
+      },
+    )
   }
 }

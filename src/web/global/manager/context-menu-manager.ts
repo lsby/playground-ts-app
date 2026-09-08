@@ -1,148 +1,133 @@
-import { 创建元素, 应用样式 } from '../tools/create-element'
+import { 创建元素 } from '../tools/create-element'
+import { 浮层管理器, type 浮层句柄 } from './overlay-manager'
 
-export type 右键菜单项 = { 文本: string; 回调: () => Promise<void>; 图标?: string | HTMLElement } | '分隔符'
+export type 右键菜单项 =
+  | { 文本: string; 回调: () => void | Promise<void>; 图标?: Node; 快捷键?: string; 禁用?: boolean; 危险?: boolean }
+  | '分隔符'
 
 export class 右键菜单管理器 {
   private static 实例: 右键菜单管理器 | null = null
-
   public static 获得实例(): 右键菜单管理器 {
     if (this.实例 === null) this.实例 = new 右键菜单管理器()
     return this.实例
   }
-
-  private 当前菜单容器: HTMLDivElement | null = null
+  private 当前句柄: 浮层句柄 | null = null
   private 当前关闭回调: (() => void) | null = null
 
   private constructor() {}
 
   public 显示菜单(x: number, y: number, 菜单项列表: 右键菜单项[], 关闭回调?: () => void): void {
-    this.隐藏菜单()
+    void this.隐藏菜单()
     this.当前关闭回调 = 关闭回调 ?? null
-
-    // 创建菜单容器
-    let 菜单容器 = 创建元素('div', {
+    let 菜单 = 创建元素('div', {
+      role: 'menu',
+      tabIndex: -1,
       style: {
         position: 'fixed',
+        left: `${x}px`,
+        top: `${y}px`,
+        minWidth: '180px',
+        maxWidth: 'min(320px, calc(100vw - 16px))',
+        padding: 'var(--间距-1)',
         backgroundColor: 'var(--卡片背景颜色)',
+        color: 'var(--文字颜色)',
         border: '1px solid var(--边框颜色)',
-        borderRadius: '8px',
-        padding: '4px 0',
-        boxShadow: '0 8px 24px var(--深阴影颜色)',
-        zIndex: '10000',
-        minWidth: '130px',
-        overflow: 'hidden',
-        userSelect: 'none',
-        backdropFilter: 'blur(10px)',
+        borderRadius: 'var(--圆角-中)',
+        boxShadow: 'var(--深阴影)',
         boxSizing: 'border-box',
       },
     })
-
+    let 按钮们: HTMLButtonElement[] = []
     for (let 菜单项 of 菜单项列表) {
       if (菜单项 === '分隔符') {
-        let 分隔符 = 创建元素('div', {
-          style: { height: '1px', backgroundColor: 'var(--边框颜色)', margin: '4px 0', opacity: '0.5' },
-        })
-        菜单容器.appendChild(分隔符)
+        菜单.append(
+          创建元素('div', {
+            role: 'separator',
+            style: { height: '1px', margin: 'var(--间距-1) 0', backgroundColor: 'var(--边框颜色)' },
+          }),
+        )
         continue
       }
-
-      let 项元素 = 创建元素('div', {
-        className: 'context-menu-item',
+      let 按钮 = 创建元素('button', {
+        type: 'button',
+        role: 'menuitem',
+        disabled: 菜单项.禁用 ?? false,
         style: {
+          width: '100%',
+          minHeight: '34px',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          padding: '8px 14px',
-          fontSize: '13px',
-          color: 'var(--文字颜色)',
-          cursor: 'pointer',
-          transition: 'background-color 0.15s ease',
-        },
-        onmouseenter: (): void => {
-          应用样式(项元素, { backgroundColor: 'var(--悬浮背景颜色)' })
-        },
-        onmouseleave: (): void => {
-          应用样式(项元素, { backgroundColor: 'transparent' })
-        },
-        onclick: async (): Promise<void> => {
-          let 回调 = 菜单项.回调
-          this.隐藏菜单()
-          await 回调()
+          gap: 'var(--间距-2)',
+          padding: '0 var(--间距-2)',
+          border: '0',
+          borderRadius: 'var(--圆角-小)',
+          backgroundColor: 'transparent',
+          color: 菜单项.危险 === true ? 'var(--错误颜色)' : 'var(--文字颜色)',
+          textAlign: 'left',
+          cursor: 菜单项.禁用 === true ? 'not-allowed' : 'pointer',
         },
       })
-
-      if (菜单项.图标 !== undefined) {
-        let 图标容器 = 创建元素('span', { style: { display: 'inline-flex', alignItems: 'center', opacity: '0.8' } })
-        if (typeof 菜单项.图标 === 'string') {
-          图标容器.innerHTML = 菜单项.图标
-        } else {
-          图标容器.appendChild(菜单项.图标)
-        }
-        项元素.appendChild(图标容器)
+      if (菜单项.图标 !== undefined) 按钮.append(菜单项.图标)
+      按钮.append(创建元素('span', { textContent: 菜单项.文本, style: { flex: '1' } }))
+      if (菜单项.快捷键 !== undefined)
+        按钮.append(创建元素('kbd', { textContent: 菜单项.快捷键, style: { color: 'var(--次要文字颜色)' } }))
+      按钮.onmouseenter = (): void => {
+        if (按钮.disabled === false) 按钮.style.backgroundColor = 'var(--悬浮背景颜色)'
       }
-
-      let 文本标签 = 创建元素('span', { textContent: 菜单项.文本 })
-      项元素.appendChild(文本标签)
-      菜单容器.appendChild(项元素)
-    }
-
-    document.body.appendChild(菜单容器)
-    this.当前菜单容器 = 菜单容器
-
-    let 宽度 = 菜单容器.offsetWidth
-    let 高度 = 菜单容器.offsetHeight
-    let 视口宽度 = window.innerWidth
-    let 视口高度 = window.innerHeight
-
-    let 最终X = x
-    let 最终Y = y
-
-    if (最终X + 宽度 > 视口宽度) {
-      最终X = 视口宽度 - 宽度 - 4
-    }
-    if (最终Y + 高度 > 视口高度) {
-      最终Y = 视口高度 - 高度 - 4
-    }
-
-    if (最终X < 0) 最终X = 4
-    if (最终Y < 0) 最终Y = 4
-
-    菜单容器.style.left = `${最终X}px`
-    菜单容器.style.top = `${最终Y}px`
-
-    let 处理关闭 = (事件: Event): void => {
-      if (事件.target instanceof Node === false) throw new Error('目标不是 Node')
-      // 如果点击的是菜单容器内部，不关闭
-      if (菜单容器.contains(事件.target) === true) return
-      this.隐藏菜单()
-    }
-
-    // 使用 setTimeout 将监听器注册推迟到下一个事件循环
-    // 这样可以防止当前冒泡到 document 的 contextmenu/mousedown 事件立即触发关闭
-    setTimeout(() => {
-      document.onmousedown = (事件: MouseEvent): void => {
-        处理关闭(事件)
+      按钮.onmouseleave = (): void => {
+        按钮.style.backgroundColor = 'transparent'
       }
-
-      document.oncontextmenu = (事件: MouseEvent): void => {
-        处理关闭(事件)
+      按钮.onclick = (): void => {
+        if (按钮.disabled === true) return
+        void this.隐藏菜单().then(async (): Promise<void> => await 菜单项.回调())
       }
-    }, 0)
+      菜单.append(按钮)
+      if (按钮.disabled === false) 按钮们.push(按钮)
+    }
+    菜单.onkeydown = (event: KeyboardEvent): void => this.处理键盘(event, 按钮们)
+    let 句柄 = 浮层管理器.打开({
+      根元素: 菜单,
+      内容元素: 菜单,
+      外部关闭: '任意外部',
+      允许Escape关闭: true,
+      请求关闭: async (): Promise<void> => await this.隐藏菜单(),
+    })
+    this.当前句柄 = 句柄
+    this.调整位置(菜单, x, y)
+    queueMicrotask((): void => (按钮们[0] ?? 菜单).focus())
   }
 
-  public 隐藏菜单(): void {
-    if (this.当前菜单容器 !== null && document.body.contains(this.当前菜单容器) === true) {
-      document.body.removeChild(this.当前菜单容器)
-      this.当前菜单容器 = null
-    }
+  public async 隐藏菜单(): Promise<void> {
+    let 句柄 = this.当前句柄
+    let 回调 = this.当前关闭回调
+    this.当前句柄 = null
+    this.当前关闭回调 = null
+    if (句柄 !== null) await 句柄.关闭()
+    回调?.()
+  }
 
-    document.onmousedown = null
-    document.oncontextmenu = null
+  private 调整位置(菜单: HTMLElement, x: number, y: number): void {
+    let 边距 = 8
+    let 左 = Math.max(边距, Math.min(x, window.innerWidth - 菜单.offsetWidth - 边距))
+    let 上 = Math.max(边距, Math.min(y, window.innerHeight - 菜单.offsetHeight - 边距))
+    菜单.style.left = `${左}px`
+    菜单.style.top = `${上}px`
+  }
 
-    if (this.当前关闭回调 !== null) {
-      let 回调 = this.当前关闭回调
-      this.当前关闭回调 = null
-      回调()
+  private 处理键盘(event: KeyboardEvent, 按钮们: HTMLButtonElement[]): void {
+    if (按钮们.length === 0) return
+    let 当前索引 = 按钮们.findIndex((按钮) => 按钮 === document.activeElement)
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      let 方向 = event.key === 'ArrowDown' ? 1 : -1
+      let 下一索引 = (当前索引 + 方向 + 按钮们.length) % 按钮们.length
+      按钮们[下一索引]?.focus()
+    } else if (event.key === 'Home') {
+      event.preventDefault()
+      按钮们[0]?.focus()
+    } else if (event.key === 'End') {
+      event.preventDefault()
+      按钮们[按钮们.length - 1]?.focus()
     }
   }
 }

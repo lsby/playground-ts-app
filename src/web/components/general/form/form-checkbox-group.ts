@@ -2,7 +2,7 @@ import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
 import { 表单组件基类 } from './form'
 
-type 复选框组事件 = { 变化: string[] }
+type 复选框组事件 = { 变化: string[]; 失焦: void }
 
 type 监听复选框组事件 = {}
 
@@ -26,6 +26,7 @@ class 复选框组 extends 表单组件基类<复选框组事件, 监听复选�
   }
 
   protected async 当加载时(): Promise<void> {
+    this.复选框元素们 = []
     应用宿主样式(this.获得宿主样式(), this.配置.宿主样式)
 
     let 容器 = 创建元素('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } })
@@ -50,10 +51,14 @@ class 复选框组 extends 表单组件基类<复选框组事件, 监听复选�
 
         let 文本 = 创建元素('span', { textContent: 选项 })
 
-        复选框.onchange = async (): Promise<void> => {
+        复选框.onchange = (): void => {
           let 选中值列表 = this.获得选中值列表()
-          await this.配置.变化处理函数?.(选中值列表)
+          this.配置.选中值列表 = 选中值列表
+          this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(选中值列表))
           this.派发事件('变化', 选中值列表)
+        }
+        复选框.onblur = (): void => {
+          this.派发事件('失焦', undefined)
         }
 
         选项容器.appendChild(复选框)
@@ -107,6 +112,16 @@ class 复选框组 extends 表单组件基类<复选框组事件, 监听复选�
     for (let 复选框 of this.复选框元素们) {
       复选框.disabled = 值
     }
+  }
+
+  public 获得禁用(): boolean {
+    return this.配置.禁用 ?? false
+  }
+  public 聚焦(): void {
+    this.复选框元素们[0]?.focus()
+  }
+  public 设置可访问名称(名称: string): void {
+    this.setAttribute('aria-label', 名称)
   }
 }
 

@@ -1,5 +1,6 @@
 import { 组件基类 } from '../../../base/base'
 import { 创建元素 } from '../../../global/tools/create-element'
+import { 图标组件 } from '../base/icon'
 
 type 纵向tab配置 = { 路由键?: string | undefined }
 export type tabVertical发出事件类型 = { 切换: { 当前索引: number } }
@@ -162,18 +163,11 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         border: 'none',
         outline: 'none',
+        color: '#ffffff',
       },
     })
 
-    let 按钮SVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-    按钮SVG.setAttribute('viewBox', '0 0 24 24')
-    按钮SVG.style.width = '24px'
-    按钮SVG.style.height = '24px'
-    按钮SVG.style.fill = '#ffffff'
-    let 按钮Path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-    按钮Path.setAttribute('d', 'M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z')
-    按钮SVG.appendChild(按钮Path)
-    移动端菜单按钮.appendChild(按钮SVG)
+    移动端菜单按钮.appendChild(new 图标组件('menu', 24))
 
     let 打开移动端菜单 = (): void => {
       this.标签头容器.classList.add('open')

@@ -1,7 +1,8 @@
 import { 组件基类 } from '../../base/base'
+import { API管理器 } from '../../global/manager/api-manager'
 import { 成功提示, 错误提示 } from '../../global/manager/toast-manager'
 import { 创建元素 } from '../../global/tools/create-element'
-import { 主要按钮 } from '../general/base/base-button'
+import { 主要按钮, 普通按钮 } from '../general/base/base-button'
 
 type 发出事件类型 = {}
 type 监听事件类型 = {}
@@ -32,6 +33,20 @@ export class 演示接口类型组件 extends 组件基类<发出事件类型, �
   })
 
   private 状态标签 = 创建元素('span', { style: { marginLeft: '10px', fontWeight: 'bold' } })
+  private 接口类型已启用 = false
+  private 获取按钮 = new 主要按钮({
+    文本: '获取接口类型',
+    禁用: true,
+    点击处理函数: async (): Promise<void> => {
+      await this.获取数据()
+    },
+  })
+  private 切换按钮 = new 普通按钮({
+    文本: '启用接口类型获取',
+    点击处理函数: async (): Promise<void> => {
+      await this.切换功能状态()
+    },
+  })
 
   protected override async 当加载时(): Promise<void> {
     let 样式 = 创建元素('style', {
@@ -62,47 +77,42 @@ export class 演示接口类型组件 extends 组件基类<发出事件类型, �
     this.shadow.appendChild(样式)
 
     let 容器 = 创建元素('div', {
-      style: {
-        padding: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-        width: '100%',
-        boxSizing: 'border-box',
-      },
-    })
-
-    let 标题 = 创建元素('h2', {
-      textContent: '系统接口类型获取演示',
-      style: { marginBottom: '10px', color: 'var(--文本颜色)' },
-    })
-
-    let 描述 = 创建元素('p', {
-      textContent: '该组件通过调用 GET 接口 /api/system/get-interface-type 获取系统自动生成的接口类型。',
-      style: { color: 'var(--次要文字颜色)', fontSize: '14px' },
+      style: { display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', boxSizing: 'border-box' },
     })
 
     let 控制栏 = 创建元素('div', {
-      style: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px' },
+      style: { display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--间距-2)' },
     })
 
-    let 获取按钮 = new 主要按钮({
-      文本: '获取接口类型',
-      点击处理函数: async (): Promise<void> => {
-        await this.获取数据()
-      },
-    })
-
-    控制栏.appendChild(获取按钮)
+    控制栏.append(this.获取按钮, this.切换按钮)
     控制栏.appendChild(this.状态标签)
 
-    容器.appendChild(标题)
-    容器.appendChild(描述)
     容器.appendChild(控制栏)
     容器.appendChild(this.内容容器)
 
     this.shadow.appendChild(容器)
     this.内容容器.textContent = '暂无数据，请点击按钮获取。'
+    await this.同步功能状态()
+  }
+
+  private async 同步功能状态(): Promise<void> {
+    let 系统配置 = await API管理器.请求postJson并处理错误('/api/system/get-system-config', {})
+    this.设置功能状态(系统配置.enable_get_interface_type)
+  }
+
+  private async 切换功能状态(): Promise<void> {
+    let 新状态 = this.接口类型已启用 === false
+    await API管理器.请求postJson并处理错误('/api/system/update-system-config', { enable_get_interface_type: 新状态 })
+    this.设置功能状态(新状态)
+    成功提示(新状态 === true ? '接口类型获取已启用' : '接口类型获取已关闭')
+  }
+
+  private 设置功能状态(启用: boolean): void {
+    this.接口类型已启用 = 启用
+    this.获取按钮.设置禁用(启用 === false)
+    this.切换按钮.设置文本(启用 === true ? '关闭接口类型获取' : '启用接口类型获取')
+    this.状态标签.textContent = 启用 === true ? '功能已启用' : '功能已关闭'
+    this.状态标签.style.color = 启用 === true ? 'var(--成功颜色)' : 'var(--警告颜色)'
   }
 
   private async 获取数据(): Promise<void> {
@@ -110,26 +120,26 @@ export class 演示接口类型组件 extends 组件基类<发出事件类型, �
     this.状态标签.style.color = 'var(--文本颜色)'
     this.内容容器.textContent = '正在加载，请稍候...'
 
-    try {
-      let 响应 = await fetch('/api/system/get-interface-type')
-      if (响应.ok === true) {
-        let 文本 = await 响应.text()
-        this.内容容器.textContent = 文本
+    let 响应 = await API管理器.请求get文本('/api/system/get-interface-type')
+    switch (响应.status) {
+      case 'success':
+        this.内容容器.textContent = 响应.data
         this.状态标签.textContent = '获取成功'
         this.状态标签.style.color = 'var(--成功颜色)'
         成功提示('接口类型获取成功！')
-      } else {
-        let 错误文本 = await 响应.text()
-        this.内容容器.textContent = `请求失败：\n状态码：${响应.status.toString()}\n响应内容：${错误文本}`
+        break
+      case 'fail':
+        this.内容容器.textContent = `请求失败：\n响应内容：${响应.data}`
         this.状态标签.textContent = '获取失败'
         this.状态标签.style.color = 'var(--错误颜色)'
-        错误提示(`获取接口类型失败：${响应.status.toString()}`)
-      }
-    } catch (错误) {
-      this.内容容器.textContent = `发生异常：\n${String(错误)}`
-      this.状态标签.textContent = '发生异常'
-      this.状态标签.style.color = 'var(--错误颜色)'
-      错误提示('请求接口类型发生异常！')
+        错误提示(`获取接口类型失败：${响应.data}`)
+        break
+      case 'unexpected':
+        this.内容容器.textContent = `发生异常：\n${响应.data}`
+        this.状态标签.textContent = '发生异常'
+        this.状态标签.style.color = 'var(--错误颜色)'
+        错误提示('请求接口类型发生异常！')
+        break
     }
   }
 }

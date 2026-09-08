@@ -8,7 +8,10 @@ import path from 'path'
 type 迁移 = { 名称: string; SQL内容: string; 校验和: string }
 type 已完成迁移记录 = { 名称: string; 校验和: string }
 
+let 项目根目录 = path.resolve(import.meta.dirname, '../..')
 let 获得错误消息 = (错误: unknown): string => (错误 instanceof Error ? 错误.message : String(错误))
+
+let 获得项目路径 = (目标路径: string): string => path.resolve(项目根目录, 目标路径)
 
 let 获得环境文件参数 = (): string | null => {
   let 环境文件参数 = process.argv[2]
@@ -38,11 +41,11 @@ let 读取可空迁移时间 = (值: unknown, 字段名: string): string | numbe
 let 获得数据库路径 = (): string => {
   let 环境文件参数 = 获得环境文件参数()
   if (环境文件参数 !== null) {
-    dotenv.config({ path: 环境文件参数 })
+    dotenv.config({ path: 获得项目路径(环境文件参数) })
   } else {
     let 环境文件路径 = process.env['ENV_FILE_PATH']
     if (环境文件路径 !== undefined && 环境文件路径 !== '') {
-      dotenv.config({ path: 环境文件路径 })
+      dotenv.config({ path: 获得项目路径(环境文件路径) })
     }
   }
 
@@ -59,7 +62,7 @@ let 获得数据库路径 = (): string => {
     }
     数据库路径 = 数据库路径.replaceAll('${DB_PATH}', 数据库路径变量.replace(/^\.\//, ''))
   }
-  return path.resolve(process.cwd(), 数据库路径)
+  return 获得项目路径(数据库路径)
 }
 
 let 读取迁移组 = (迁移目录: string): 迁移[] => {
@@ -210,7 +213,7 @@ let 主函数 = (): void => {
   let 数据库路径 = 获得数据库路径()
   process.env['DB_PATH_PRISMA'] = `file:${数据库路径.replaceAll('\\', '/')}`
   let 参数组 = process.argv.slice(2)
-  let 迁移组 = 读取迁移组(path.join(process.cwd(), 'prisma', 'migrations'))
+  let 迁移组 = 读取迁移组(path.join(项目根目录, 'prisma', 'migrations'))
   let 是否生成类型 = 获得环境文件参数() !== null || 参数组.includes('--generate')
   if (迁移组.length === 0) {
     throw new Error(

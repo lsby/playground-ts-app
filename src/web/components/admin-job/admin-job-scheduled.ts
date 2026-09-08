@@ -31,6 +31,7 @@ export class 定时任务管理组件 extends 组件基类<发出事件类型, �
   public constructor() {
     super()
     this.数据表格组件 = new 表格组件({
+      行键: (数据项): string => 数据项.id,
       列配置: [
         { 字段名: '名称', 显示名: '任务名称', 可排序: true },
         { 字段名: '表达式', 显示名: 'Cron 表达式', 可排序: true },
@@ -70,7 +71,7 @@ export class 定时任务管理组件 extends 组件基类<发出事件类型, �
       let 数据 = this.所有任务数据
 
       // 应用筛选
-      if (参数.筛选条件 !== undefined) {
+      {
         for (let [key, value] of Object.entries(参数.筛选条件)) {
           if (value !== '') {
             数据 = 数据.filter((项) =>
@@ -83,7 +84,7 @@ export class 定时任务管理组件 extends 组件基类<发出事件类型, �
       }
 
       // 应用排序
-      if (参数.排序列表 !== undefined && 参数.排序列表.length > 0) {
+      if (参数.排序列表.length > 0) {
         let 排序项 = 参数.排序列表[0]
         if (排序项 !== undefined) {
           数据 = [...数据].sort((a, b) => {

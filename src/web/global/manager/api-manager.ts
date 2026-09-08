@@ -1,4 +1,5 @@
 import { web请求 } from '@lsby/ts-http-extend'
+import { z } from 'zod'
 import { 环境变量 } from '../../../global/env'
 import { 已审阅的any } from '../../../tools/types'
 import { InterfaceType } from '../../../types/interface-type'
@@ -11,6 +12,7 @@ export type 取接口<
 
 type 取JSON输入<I> = I extends { input: { json: infer 输入 } } ? 输入 : never
 type 取FORM输入<I> = I extends { input: { form: infer 输入 } } ? 输入 : never
+type 取QUERY输入<I> = I extends { input: { query: infer 输入 } } ? 输入 : never
 
 type 取http错误输出<I> = I extends { errorOutput: infer 输出 } ? 输出 : never
 type 取http正确输出<I> = I extends { successOutput: infer 输出 } ? 输出 : never
@@ -31,6 +33,14 @@ type 所有FORM路径 = InterfaceType extends readonly (infer Item)[]
     ? P
     : never
   : never
+type 所有GET文本路径 = InterfaceType extends readonly (infer Item)[]
+  ? Item extends { method: 'get'; path: infer P; errorOutput: string; successOutput: string }
+    ? P
+    : never
+  : never
+type GET查询参数组<接口路径 extends 所有GET文本路径> = [取QUERY输入<取接口<接口路径>>] extends [never]
+  ? []
+  : [参数: 取QUERY输入<取接口<接口路径>>]
 
 let API前缀 = ''
 let serviceWorkerReady: Promise<void> | undefined
@@ -53,6 +63,38 @@ export class API管理器类 {
   public 清除token(): void {
     this.token = null
     localStorage.removeItem(this.本地存储名称)
+  }
+
+  public async 请求get文本<接口路径 extends 所有GET文本路径>(
+    接口路径: 接口路径,
+    ...参数组: GET查询参数组<接口路径>
+  ): Promise<
+    | { status: 'success'; data: 取http正确输出<取接口<接口路径>> }
+    | { status: 'fail'; data: 取http错误输出<取接口<接口路径>> }
+    | { status: 'unexpected'; data: string }
+  > {
+    let 查询参数 = 参数组[0]
+    let 查询字符串 = 查询参数 === undefined ? '' : new URLSearchParams(查询参数 as 已审阅的any).toString()
+    let 完整路径 = 查询字符串 === '' ? 接口路径 : `${接口路径}?${查询字符串}`
+    let 头: Record<string, string> = {}
+    if (this.token !== null) 头['authorization'] = 'Bearer ' + this.token
+
+    try {
+      if (环境变量.BUILD_TARGET === 'pure-frontend') {
+        let 响应 = await withPureFrontendDatabaseLock(() =>
+          requestPureFrontendWorkerResponse({ path: 完整路径, headers: 头, method: 'GET', body: '' }),
+        )
+        let 数据 = z.string().parse(JSON.parse(响应.body))
+        return { status: 响应.status >= 200 && 响应.status < 300 ? 'success' : 'fail', data: 数据 } as 已审阅的any
+      }
+
+      if (serviceWorkerReady !== undefined) await serviceWorkerReady
+      let 响应 = await fetch(API前缀 + 完整路径, { method: 'GET', headers: 头 })
+      return { status: 响应.ok === true ? 'success' : 'fail', data: await 响应.text() } as 已审阅的any
+    } catch (e) {
+      console.error('GET 请求错误:\n路径: %o', 完整路径)
+      return { status: 'unexpected', data: String(e) }
+    }
   }
 
   public async 请求postJson<接口路径 extends 所有POST_JSON路径>(
@@ -232,7 +274,7 @@ if ('serviceWorker' in navigator && 环境变量.BUILD_TARGET === 'pure-frontend
   serviceWorkerReady = navigator.serviceWorker
     .register(new URL('../../sw.ts', import.meta.url), { type: 'module' })
     .then(() => {
-      console.log('✅ ServiceWorker 注册成功')
+      console.log('ServiceWorker 注册成功')
     })
 }
 
@@ -242,7 +284,7 @@ let pureFrontendWorker: Worker | undefined
 let pureFrontendRequestId = 0
 let pureFrontendPendingRequests = new Map<
   number,
-  { resolve: (value: object | { status: 'unexpected'; data: string }) => void; reject: (reason: unknown) => void }
+  { resolve: (value: PureFrontendWorkerResponse) => void; reject: (reason: unknown) => void }
 >()
 let pureFrontendDatabaseLockName = 'lsby-pure-frontend:local.db'
 
@@ -261,11 +303,7 @@ function getPureFrontendWorker(): Worker {
       let pending = pureFrontendPendingRequests.get(event.data.id)
       if (pending === undefined) return
       pureFrontendPendingRequests.delete(event.data.id)
-      try {
-        pending.resolve(JSON.parse(event.data.body) as object)
-      } catch (error: unknown) {
-        pending.reject(error)
-      }
+      pending.resolve(event.data)
     })
     pureFrontendWorker.addEventListener('error', (event) => {
       for (let pending of pureFrontendPendingRequests.values()) pending.reject(event.error)
@@ -376,9 +414,13 @@ function withPureFrontendDatabaseLock<T>(task: () => Promise<T>): Promise<T> {
   )
 }
 
-function requestPureFrontendWorker(
+async function requestPureFrontendWorker(
   message: PureFrontendWorkerRequest,
 ): Promise<object | { status: 'unexpected'; data: string }> {
+  return JSON.parse((await requestPureFrontendWorkerResponse(message)).body) as object
+}
+
+function requestPureFrontendWorkerResponse(message: PureFrontendWorkerRequest): Promise<PureFrontendWorkerResponse> {
   let id = ++pureFrontendRequestId
   return new Promise((resolve, reject) => {
     pureFrontendPendingRequests.set(id, { resolve, reject })

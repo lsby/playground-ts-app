@@ -5,7 +5,7 @@ import { 关闭模态框, 显示模态框 } from '../../global/manager/modal-man
 import { 警告提示 } from '../../global/manager/toast-manager'
 import { 创建元素 } from '../../global/tools/create-element'
 import { 主要按钮, 普通按钮 } from '../general/base/base-button'
-import { 表单, 表单项配置 } from '../general/form/form'
+import { 动态表单, 动态表单项配置 } from '../general/form/form'
 import { 数字输入框, 普通输入框 } from '../general/form/form-input'
 import { 表格组件 } from '../general/table/table'
 import { 数据表加载数据参数 } from '../general/table/types'
@@ -118,6 +118,10 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
 
     // 创建表格
     this.表格组件 = new 表格组件<数据项>({
+      行键: (数据项, 索引): string =>
+        this.主键列.length === 0
+          ? `${JSON.stringify(数据项)}-${索引}`
+          : this.主键列.map((列名) => String(数据项[列名])).join('::'),
       列配置: this.列列表.map((列) => ({ 字段名: 列.name, 显示名: 列.name, 可排序: true, 可筛选: true })),
       每页数量: 20,
       操作列表: [
@@ -153,7 +157,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
         try {
           // 构建排序语句
           let 排序语句 = ''
-          if (参数.排序列表 !== undefined && 参数.排序列表.length > 0) {
+          if (参数.排序列表.length > 0) {
             let 排序条件列表 = 参数.排序列表.map((排序) => `\`${String(排序.field)}\` ${排序.direction.toUpperCase()}`)
             排序语句 = ' ORDER BY ' + 排序条件列表.join(', ')
           }
@@ -161,7 +165,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
           // 构建筛选语句
           let 筛选语句 = ''
           let 筛选参数: (string | number)[] = []
-          if (参数.筛选条件 !== undefined && Object.keys(参数.筛选条件).length > 0) {
+          if (Object.keys(参数.筛选条件).length > 0) {
             let 筛选条件列表: string[] = []
             for (let [列名, 值] of Object.entries(参数.筛选条件)) {
               if (值 !== '') {
@@ -216,7 +220,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
     let 内容容器 = 创建元素('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } })
 
     // 创建表单项列表
-    let 表单项列表: 表单项配置[] = []
+    let 表单项列表: 动态表单项配置[] = []
 
     for (let 列 of this.列列表) {
       let 列名 = 列.name
@@ -230,7 +234,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
     }
 
     // 创建表单
-    let 表单实例 = new 表单<数据项>({ 项列表: 表单项列表 })
+    let 表单实例 = new 动态表单({ 项列表: 表单项列表 })
 
     内容容器.appendChild(表单实例)
 
@@ -273,7 +277,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
     let 内容容器 = 创建元素('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } })
 
     // 创建表单项列表
-    let 表单项列表: 表单项配置[] = []
+    let 表单项列表: 动态表单项配置[] = []
 
     for (let 列 of this.列列表) {
       let 列名 = 列.name
@@ -289,7 +293,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
     }
 
     // 创建表单
-    let 表单实例 = new 表单<数据项>({ 项列表: 表单项列表 })
+    let 表单实例 = new 动态表单({ 项列表: 表单项列表 })
 
     内容容器.appendChild(表单实例)
 
@@ -325,7 +329,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
     await 显示模态框({ 标题: '编辑数据', 可关闭: true, 宽度: '500px' }, 内容容器)
   }
 
-  private async 保存新行(表单实例: 表单<数据项>): Promise<void> {
+  private async 保存新行(表单实例: 动态表单): Promise<void> {
     let 表名 = this.表名值
     if (表名 === null) return
 
@@ -350,6 +354,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
 
       列列表.push(`\`${列名}\``)
       值列表.push('?')
+      if (typeof 值 !== 'string' && typeof 值 !== 'number') throw new Error(`列 ${列名} 不是可写入的基础值`)
       参数列表.push(值)
     }
 
@@ -367,7 +372,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
     }
   }
 
-  private async 保存编辑行(行数据: 数据项, 表单实例: 表单<数据项>): Promise<void> {
+  private async 保存编辑行(行数据: 数据项, 表单实例: 动态表单): Promise<void> {
     let 表名 = this.表名值
     if (表名 === null) return
 
@@ -384,6 +389,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
 
     for (let [列名, 值] of Object.entries(数据)) {
       设置条件列表.push(`\`${列名}\` = ?`)
+      if (typeof 值 !== 'string' && typeof 值 !== 'number') throw new Error(`列 ${列名} 不是可写入的基础值`)
       参数列表.push(值)
     }
 

@@ -13,7 +13,7 @@ import { 检查管理员登录 } from '../../../../../interface-logic/check/chec
 import { 查询逻辑 } from '../../../../../interface-logic/components/crud/read'
 import { 已审阅的any } from '../../../../../tools/types'
 
-let 接口路径 = '/api/demo/curd/user/read' as const
+let 接口路径 = '/api/demo/crud/user/read' as const
 let 接口方法 = 'post' as const
 
 let 接口逻辑实现 = 接口逻辑

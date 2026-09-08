@@ -32,16 +32,19 @@ export class 分页组件 extends 组件基类<发出事件类型, 监听事件�
 
   private 渲染(): void {
     let { 当前页码, 每页数量, 总数量 } = this.分页配置
-    let 总页数 = Math.ceil(总数量 / 每页数量)
+    let 总页数 = Math.max(1, Math.ceil(总数量 / 每页数量))
     let 禁用 = this.禁用
 
     let 分页容器 = 创建元素('div', {
       style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', padding: '16px 0' },
     })
+    分页容器.setAttribute('role', 'navigation')
+    分页容器.setAttribute('aria-label', '表格分页')
 
     // 上一页按钮
     let 上一页按钮 = new 普通按钮({
       文本: '上一页',
+      自动加载: false,
       禁用: 当前页码 <= 1 || 禁用,
       点击处理函数: async (): Promise<void> => {
         if (当前页码 > 1) {
@@ -63,6 +66,7 @@ export class 分页组件 extends 组件基类<发出事件类型, 监听事件�
     // 下一页按钮
     let 下一页按钮 = new 普通按钮({
       文本: '下一页',
+      自动加载: false,
       禁用: 当前页码 >= 总页数 || 禁用,
       点击处理函数: async (): Promise<void> => {
         if (当前页码 < 总页数) {
@@ -74,7 +78,7 @@ export class 分页组件 extends 组件基类<发出事件类型, 监听事件�
     })
     分页容器.appendChild(下一页按钮)
 
-    this.shadow.innerHTML = ''
+    this.清空影子dom()
     this.shadow.appendChild(分页容器)
   }
 

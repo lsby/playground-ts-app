@@ -2,7 +2,7 @@ import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
 import { 表单组件基类 } from './form'
 
-type 下拉框事件 = { 变化: string; 焦点: void; 失焦: string }
+type 下拉框事件 = { 变化: string; 焦点: void; 失焦: void }
 
 type 监听下拉框事件 = {}
 
@@ -14,6 +14,7 @@ type 下拉框配置 = {
   禁用?: boolean
   占位符?: string
   额外提示?: string
+  可访问名称?: string
   变化处理函数?: (值: string) => void | Promise<void>
   焦点处理函数?: () => void | Promise<void>
   失焦处理函数?: (值: string) => void | Promise<void>
@@ -43,6 +44,7 @@ abstract class 下拉框基类 extends 表单组件基类<下拉框事件, 监�
     }
 
     let 下拉框元素 = 创建元素('select', { style: 下拉框样式 })
+    if (this.配置.可访问名称 !== undefined) 下拉框元素.setAttribute('aria-label', this.配置.可访问名称)
 
     if (this.配置.占位符 !== undefined) {
       let 占位符选项 = 创建元素('option', { value: '', textContent: this.配置.占位符, disabled: true, selected: true })
@@ -64,19 +66,20 @@ abstract class 下拉框基类 extends 表单组件基类<下拉框事件, 监�
       下拉框元素.disabled = true
     }
 
-    下拉框元素.onchange = async (e: Event): Promise<void> => {
+    下拉框元素.onchange = (e: Event): void => {
       let 值 = (e.target as HTMLSelectElement).value
-      await this.配置.变化处理函数?.(值)
+      this.配置.值 = 值
+      this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(值))
       this.派发事件('变化', 值)
     }
-    下拉框元素.onfocus = async (): Promise<void> => {
-      await this.配置.焦点处理函数?.()
+    下拉框元素.onfocus = (): void => {
+      this.安全执行(async (): Promise<void> => await this.配置.焦点处理函数?.())
       this.派发事件('焦点', undefined)
     }
-    下拉框元素.onblur = async (): Promise<void> => {
+    下拉框元素.onblur = (): void => {
       let 值 = 下拉框元素.value
-      await this.配置.失焦处理函数?.(值)
-      this.派发事件('失焦', 值)
+      this.安全执行(async (): Promise<void> => await this.配置.失焦处理函数?.(值))
+      this.派发事件('失焦', undefined)
     }
 
     容器.appendChild(下拉框元素)
@@ -113,6 +116,15 @@ abstract class 下拉框基类 extends 表单组件基类<下拉框事件, 监�
 
   public 获得禁用(): boolean {
     return this.配置.禁用 ?? false
+  }
+
+  public 聚焦(): void {
+    this.下拉框元素?.focus()
+  }
+
+  public 设置可访问名称(名称: string): void {
+    this.配置.可访问名称 = 名称
+    this.下拉框元素?.setAttribute('aria-label', 名称)
   }
 
   public 设置选项列表(选项列表: 选项类型[]): void {

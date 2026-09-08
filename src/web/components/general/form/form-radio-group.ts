@@ -2,33 +2,39 @@ import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
 import { 表单组件基类 } from './form'
 
-type 单选框组事件 = { 变化: string }
+type 单选框组事件 = { 变化: string; 失焦: void }
 
 type 监听单选框组事件 = {}
 
-type 单选框组配置 = {
-  选项列表?: string[]
-  选项翻译?: Record<string, string>
-  值?: string
+type 单选框组配置<值类型 extends string> = {
+  选项列表?: 值类型[]
+  选项翻译?: Partial<Record<值类型, string>>
+  值?: 值类型
   禁用?: boolean
   额外提示?: string
-  变化处理函数?: (值: string) => void | Promise<void>
+  变化处理函数?: (值: 值类型) => void | Promise<void>
   宿主样式?: 增强样式类型
   元素样式?: 增强样式类型
   方向?: '横' | '竖'
   标签?: string
 }
 
-class 单选框组 extends 表单组件基类<单选框组事件, 监听单选框组事件, string> {
-  protected 配置: 单选框组配置
-  private 单选框元素们: HTMLInputElement[] = []
+let 单选框组序号 = 0
 
-  public constructor(配置: 单选框组配置 = {}) {
+class 单选框组<值类型 extends string = string> extends 表单组件基类<单选框组事件, 监听单选框组事件, 值类型> {
+  protected 配置: 单选框组配置<值类型>
+  private 单选框元素们: HTMLInputElement[] = []
+  private 组名: string
+
+  public constructor(配置: 单选框组配置<值类型> = {}) {
     super()
+    单选框组序号 += 1
+    this.组名 = `radio-group-${单选框组序号}`
     this.配置 = 配置
   }
 
   protected async 当加载时(): Promise<void> {
+    this.单选框元素们 = []
     应用宿主样式(this.获得宿主样式(), this.配置.宿主样式)
 
     if (this.配置.标签 !== undefined || this.配置.额外提示 !== undefined) {
@@ -66,7 +72,7 @@ class 单选框组 extends 表单组件基类<单选框组事件, 监听单选�
 
         let 单选框 = 创建元素('input', {
           type: 'radio',
-          name: 'radio-group',
+          name: this.组名,
           value: 选项,
           checked: this.配置.值 === 选项,
           disabled: this.配置.禁用 ?? false,
@@ -75,10 +81,14 @@ class 单选框组 extends 表单组件基类<单选框组事件, 监听单选�
 
         let 文本 = 创建元素('span', { textContent: this.配置.选项翻译?.[选项] ?? 选项 })
 
-        单选框.onchange = async (): Promise<void> => {
-          let 值 = 单选框.value
-          await this.配置.变化处理函数?.(值)
+        单选框.onchange = (): void => {
+          let 值 = 单选框.value as 值类型
+          this.配置.值 = 值
+          this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(值))
           this.派发事件('变化', 值)
+        }
+        单选框.onblur = (): void => {
+          this.派发事件('失焦', undefined)
         }
 
         选项容器.appendChild(单选框)
@@ -91,15 +101,15 @@ class 单选框组 extends 表单组件基类<单选框组事件, 监听单选�
     this.shadow.appendChild(容器)
   }
 
-  public 设置值(值: string): void {
+  public 设置值(值: 值类型): void {
     this.配置.值 = 值
     for (let 单选框 of this.单选框元素们) {
       单选框.checked = 单选框.value === 值
     }
   }
 
-  public 获得值(): string {
-    return this.单选框元素们.find((单选框) => 单选框.checked)?.value ?? ''
+  public 获得值(): 值类型 {
+    return (this.单选框元素们.find((单选框) => 单选框.checked)?.value ?? '') as 值类型
   }
 
   public 设置禁用(值: boolean): void {
@@ -107,6 +117,16 @@ class 单选框组 extends 表单组件基类<单选框组事件, 监听单选�
     for (let 单选框 of this.单选框元素们) {
       单选框.disabled = 值
     }
+  }
+
+  public 获得禁用(): boolean {
+    return this.配置.禁用 ?? false
+  }
+  public 聚焦(): void {
+    this.单选框元素们[0]?.focus()
+  }
+  public 设置可访问名称(名称: string): void {
+    this.setAttribute('aria-label', 名称)
   }
 }
 

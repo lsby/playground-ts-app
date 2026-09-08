@@ -6,7 +6,7 @@ import { 主题管理器 } from '../../../global/manager/theme-manager'
 import { 成功提示 } from '../../../global/manager/toast-manager'
 import { 创建元素 } from '../../../global/tools/create-element'
 import { 主要按钮, 危险按钮 } from '../../general/base/base-button'
-import { 表单, 表单项配置 } from '../../general/form/form'
+import { 表单 } from '../../general/form/form'
 import { 复选框 } from '../../general/form/form-checkbox'
 import { 单选框组 } from '../../general/form/form-radio-group'
 
@@ -20,11 +20,13 @@ type 系统配置数据 = {
   is_initialized: boolean
 }
 type 用户配置数据 = { id: string; theme: '系统' | '亮色' | '暗色' }
+type 系统配置表单数据 = Pick<系统配置数据, 'enable_register' | 'enable_get_interface_type'>
+type 用户配置表单数据 = Pick<用户配置数据, 'theme'>
 
 export class 用户设置组件 extends 组件基类<设置事件, 监听设置事件> {
   private 用户信息?: { id: string; name: string; is_admin: boolean }
-  private 系统配置表单?: 表单<系统配置数据>
-  private 用户配置表单?: 表单<用户配置数据>
+  private 系统配置表单?: 表单<系统配置表单数据>
+  private 用户配置表单?: 表单<用户配置表单数据>
 
   static {
     this.注册组件('lsby-settings', this)
@@ -189,23 +191,25 @@ export class 用户设置组件 extends 组件基类<设置事件, 监听设置�
     await this.加载数据()
   }
 
-  private 创建系统配置表单(): 表单<系统配置数据> {
-    let 项列表: 表单项配置[] = [
-      { 键: 'enable_register', 组件: new 复选框({ 标签: '启用注册' }), 宽度: 1 },
-      { 键: 'enable_get_interface_type', 组件: new 复选框({ 标签: '启用获取接口类型' }), 宽度: 1 },
-    ]
-
-    let 表单实例 = new 表单<系统配置数据>({ 项列表, 元素样式: { gridTemplateColumns: '1fr' } })
+  private 创建系统配置表单(): 表单<系统配置表单数据> {
+    let 表单实例 = new 表单<系统配置表单数据>({
+      项列表: [
+        { 键: 'enable_register', 组件: new 复选框({ 标签: '启用注册' }), 宽度: 1 },
+        { 键: 'enable_get_interface_type', 组件: new 复选框({ 标签: '启用获取接口类型' }), 宽度: 1 },
+      ],
+      元素样式: { gridTemplateColumns: '1fr' },
+    })
 
     return 表单实例
   }
 
-  private 创建用户配置表单(): 表单<用户配置数据> {
-    let 项列表: 表单项配置[] = [
-      { 键: 'theme', 组件: new 单选框组({ 选项列表: ['系统', '亮色', '暗色'], 方向: '横', 标签: '主题' }), 宽度: 1 },
-    ]
-
-    let 表单实例 = new 表单<用户配置数据>({ 项列表, 元素样式: { gridTemplateColumns: '1fr' } })
+  private 创建用户配置表单(): 表单<用户配置表单数据> {
+    let 表单实例 = new 表单<用户配置表单数据>({
+      项列表: [
+        { 键: 'theme', 组件: new 单选框组({ 选项列表: ['系统', '亮色', '暗色'], 方向: '横', 标签: '主题' }), 宽度: 1 },
+      ],
+      元素样式: { gridTemplateColumns: '1fr' },
+    })
 
     return 表单实例
   }

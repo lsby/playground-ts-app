@@ -12,13 +12,15 @@ import _src_interface_admin_sqlite_get_database_info_index_ts from './admin-sqli
 import _src_interface_admin_sqlite_get_table_schema_index_ts from './admin-sqlite/get-table-schema/index'
 import _src_interface_admin_sqlite_get_tables_index_ts from './admin-sqlite/get-tables/index'
 import _src_interface_admin_system_log_get_logs_index_ts from './admin-system-log/get-logs/index'
+import _src_interface_demo_auth_is_login_index_ts from './demo/auth/is-login/index'
+import _src_interface_demo_auth_login_index_ts from './demo/auth/login/index'
 import _src_interface_demo_base_add_index_ts from './demo/base/add/index'
 import _src_interface_demo_base_div_index_ts from './demo/base/div/index'
 import _src_interface_demo_base_sub_index_ts from './demo/base/sub/index'
-import _src_interface_demo_curd_user_create_index_ts from './demo/curd/user/create/index'
-import _src_interface_demo_curd_user_delete_index_ts from './demo/curd/user/delete/index'
-import _src_interface_demo_curd_user_read_index_ts from './demo/curd/user/read/index'
-import _src_interface_demo_curd_user_update_index_ts from './demo/curd/user/update/index'
+import _src_interface_demo_crud_user_create_index_ts from './demo/crud/user/create/index'
+import _src_interface_demo_crud_user_delete_index_ts from './demo/crud/user/delete/index'
+import _src_interface_demo_crud_user_read_index_ts from './demo/crud/user/read/index'
+import _src_interface_demo_crud_user_update_index_ts from './demo/crud/user/update/index'
 import _src_interface_demo_electron_dialog_index_ts from './demo/electron/dialog/index'
 import _src_interface_demo_electron_set_focus_index_ts from './demo/electron/set-focus/index'
 import _src_interface_demo_file_dynamic_file_index_ts from './demo/file/dynamic-file/index'
@@ -59,13 +61,15 @@ export let interfaceApiList: 任意接口[] = [
   _src_interface_admin_sqlite_get_table_schema_index_ts,
   _src_interface_admin_sqlite_get_tables_index_ts,
   _src_interface_admin_system_log_get_logs_index_ts,
+  _src_interface_demo_auth_is_login_index_ts,
+  _src_interface_demo_auth_login_index_ts,
   _src_interface_demo_base_add_index_ts,
   _src_interface_demo_base_div_index_ts,
   _src_interface_demo_base_sub_index_ts,
-  _src_interface_demo_curd_user_create_index_ts,
-  _src_interface_demo_curd_user_delete_index_ts,
-  _src_interface_demo_curd_user_read_index_ts,
-  _src_interface_demo_curd_user_update_index_ts,
+  _src_interface_demo_crud_user_create_index_ts,
+  _src_interface_demo_crud_user_delete_index_ts,
+  _src_interface_demo_crud_user_read_index_ts,
+  _src_interface_demo_crud_user_update_index_ts,
   _src_interface_demo_electron_dialog_index_ts,
   _src_interface_demo_electron_set_focus_index_ts,
   _src_interface_demo_file_dynamic_file_index_ts,

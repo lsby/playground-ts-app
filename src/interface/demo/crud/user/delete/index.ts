@@ -6,7 +6,7 @@ import { 检查JSON参数 } from '../../../../../interface-logic/check/check-jso
 import { 检查管理员登录 } from '../../../../../interface-logic/check/check-login-jwt-admin'
 import { 删除逻辑 } from '../../../../../interface-logic/components/crud/delete'
 
-let 接口路径 = '/api/demo/curd/user/delete' as const
+let 接口路径 = '/api/demo/crud/user/delete' as const
 let 接口方法 = 'post' as const
 
 let 接口逻辑实现 = 接口逻辑

@@ -27,7 +27,7 @@ export class 滚动容器 extends 组件基类<滚动容器发出事件类型, �
 
   protected override async 当加载时(): Promise<void> {
     let 宿主样式 = this.获得宿主样式()
-    宿主样式.display = 'block'
+    if (宿主样式.display !== 'none') 宿主样式.display = 'block'
     宿主样式.width = '100%'
     宿主样式.height = '100%'
     宿主样式.minWidth = '0'

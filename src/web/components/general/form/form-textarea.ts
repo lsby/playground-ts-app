@@ -16,6 +16,7 @@ type 配置类型 = {
   额外提示?: string
   提交处理函数?: (值: string) => void | Promise<void>
   宿主样式?: 增强样式类型
+  可访问名称?: string
 }
 
 export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监听事件类型, string> {
@@ -58,6 +59,7 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
         height: this.配置.自动伸缩 === true ? 'auto' : '100%',
       },
       oninput: (): void => {
+        if (this.文本框元素 !== undefined) this.配置.值 = this.文本框元素.value
         if (this.配置.自动伸缩 === true) {
           this.自适应高度()
         }
@@ -88,6 +90,8 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
         this.派发事件('失焦', undefined)
       },
     })
+    if (this.配置.可访问名称 !== undefined) this.文本框元素.setAttribute('aria-label', this.配置.可访问名称)
+    this.文本框元素.disabled = this.配置.禁用 ?? false
 
     if (this.配置.值 !== undefined) {
       this.文本框元素.value = this.配置.值
@@ -111,6 +115,7 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
         this.自适应高度()
       })
       observer.observe(this.文本框元素)
+      this.注册观察器(observer)
     }
   }
 
@@ -122,9 +127,10 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
     this.执行自适应高度(元素)
 
     // 在下一帧再次计算，确保浏览器已完成布局
-    requestAnimationFrame(() => {
+    let 动画帧 = requestAnimationFrame(() => {
       this.执行自适应高度(元素)
     })
+    this.注册清理((): void => cancelAnimationFrame(动画帧))
   }
 
   private 执行自适应高度(元素: HTMLTextAreaElement): void {
@@ -183,6 +189,15 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
       this.文本框元素.style.cursor = 禁用 ? 'not-allowed' : 'text'
       this.文本框元素.style.backgroundColor = 禁用 ? 'var(--禁用背景)' : 'var(--输入框背景)'
     }
+  }
+
+  public 获得禁用(): boolean {
+    return this.配置.禁用 ?? false
+  }
+
+  public 设置可访问名称(名称: string): void {
+    this.配置.可访问名称 = 名称
+    this.文本框元素?.setAttribute('aria-label', 名称)
   }
 
   public 聚焦(): void {

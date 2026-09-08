@@ -15,7 +15,8 @@ export async function cleanDB(db: Kysely<DB>): Promise<void> {
               `SELECT name`,
               `FROM sqlite_master`,
               `WHERE type = 'table'`,
-              `AND name NOT LIKE 'sqlite_%';`,
+              `AND name NOT LIKE 'sqlite_%'`,
+              `AND name <> '_prisma_migrations';`,
             ].join('\n'),
             [],
           ),
@@ -47,6 +48,7 @@ export async function cleanDB(db: Kysely<DB>): Promise<void> {
                 SELECT tablename
                 FROM pg_tables
                 WHERE schemaname = 'public'
+                AND tablename <> '_prisma_migrations'
               `,
               [],
             ),

@@ -10,14 +10,13 @@ async function 主函数(): Promise<void> {
   let 测试文件列表: string[] = []
 
   if (fs.existsSync(测试目录) === true) {
-    let 文件列表 = fs.readdirSync(测试目录)
-    测试文件列表 = 文件列表.filter((文件) => 文件.endsWith('.spec.ts'))
+    测试文件列表 = 扫描测试文件(测试目录).map((文件) => path.relative(测试目录, 文件))
   }
 
   // 2. 交互式问题
   let 选项列表 = [
     { name: '[全部运行]', value: 'all' },
-    ...测试文件列表.map((文件) => ({ name: 文件, value: path.posix.join('test/e2e', 文件) })),
+    ...测试文件列表.map((文件) => ({ name: 文件, value: path.join('test/e2e', 文件) })),
   ]
 
   let { 运行目标, 演示模式 } = (await inquirer.prompt([
@@ -57,6 +56,16 @@ async function 主函数(): Promise<void> {
   进程.on('close', (退出码) => {
     process.exit(退出码 ?? 1)
   })
+}
+
+function 扫描测试文件(目录: string): string[] {
+  let 结果: string[] = []
+  for (let 项 of fs.readdirSync(目录, { withFileTypes: true })) {
+    let 路径 = path.join(目录, 项.name)
+    if (项.isDirectory() === true) 结果.push(...扫描测试文件(路径))
+    else if (项.isFile() === true && 项.name.endsWith('.spec.ts') === true) 结果.push(路径)
+  }
+  return 结果.sort((左, 右) => 左.localeCompare(右))
 }
 
 主函数().catch((错误) => {

@@ -25,6 +25,7 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
   public constructor() {
     super()
     this.表格组件 = new 表格组件<数据项>({
+      行键: (数据项): string => 数据项.id,
       列配置: [
         { 字段名: 'id', 显示名: 'ID', 可排序: true, 可筛选: true },
         { 字段名: 'name', 显示名: '名称', 可排序: true, 可筛选: true },
@@ -48,7 +49,7 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
               警告提示('未输入数据')
               return
             }
-            await API管理器.请求postJson并处理错误('/api/demo/curd/user/update', { newName: name, userId: 数据项.id })
+            await API管理器.请求postJson并处理错误('/api/demo/crud/user/update', { newName: name, userId: 数据项.id })
           },
         },
         {
@@ -56,7 +57,7 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
           回调: async (数据项: 数据项): Promise<void> => {
             let 确认结果 = await 显示确认对话框('你确定要删除这条数据吗？')
             if (确认结果 === false) return
-            await API管理器.请求postJson并处理错误('/api/demo/curd/user/delete', { id: 数据项.id })
+            await API管理器.请求postJson并处理错误('/api/demo/crud/user/delete', { id: 数据项.id })
           },
         },
         {
@@ -67,11 +68,11 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
         },
       ],
       加载数据: async (参数: 数据表加载数据参数<数据项>): Promise<{ 数据: 数据项[]; 总数: number }> => {
-        let { data, total } = await API管理器.请求postJson并处理错误('/api/demo/curd/user/read', {
+        let { data, total } = await API管理器.请求postJson并处理错误('/api/demo/crud/user/read', {
           page: 参数.页码,
           size: 参数.每页数量,
-          ...(参数.排序列表 !== undefined && 参数.排序列表.length > 0 ? { orderBy: 参数.排序列表 } : {}),
-          ...(参数.筛选条件 !== undefined && Object.keys(参数.筛选条件).length > 0 ? { filter: 参数.筛选条件 } : {}),
+          ...(参数.排序列表.length > 0 ? { orderBy: 参数.排序列表 } : {}),
+          ...(Object.keys(参数.筛选条件).length > 0 ? { filter: 参数.筛选条件 } : {}),
         })
         return { 数据: data, 总数: total }
       },
@@ -138,7 +139,7 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
         }
 
         // 调用 API
-        await API管理器.请求postJson并处理错误('/api/demo/curd/user/create', {
+        await API管理器.请求postJson并处理错误('/api/demo/crud/user/create', {
           name: 表单数据.username,
           pwd: 表单数据.password,
         })

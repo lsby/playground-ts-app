@@ -1,6 +1,7 @@
 import { 组件基类 } from '../../base/base'
 import { 创建元素 } from '../../global/tools/create-element'
 import { 主要按钮, 文本按钮 } from '../general/base/base-button'
+import { 创建图标 } from '../general/base/icon'
 import { 普通输入框 } from '../general/form/form-input'
 
 type 发出事件类型 = {}
@@ -51,7 +52,8 @@ export class 演示todo组件 extends 组件基类<发出事件类型, 监听事
       })
 
       let 删除按钮 = new 文本按钮({
-        文本: '❌',
+        标题: '删除任务',
+        图标: 创建图标('close'),
         元素样式: { background: 'transparent', border: 'none', color: 'red', fontSize: '1.2em', cursor: 'pointer' },
         点击处理函数: (): void => {
           this.todo列表.splice(index, 1)

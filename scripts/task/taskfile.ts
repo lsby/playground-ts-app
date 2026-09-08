@@ -131,6 +131,18 @@ export let 任务表 = 定义任务({
     环境文件: Web开发环境文件,
     运行: 命令('tsx', 'scripts/db/push-dev.ts'),
   },
+  'db:migrate:create:dev:web': {
+    说明: '仅生成 Web 开发数据库 migration，供检查或手工调整 SQL',
+    环境文件: Web开发环境文件,
+    运行: 命令('prisma', 'migrate', 'dev', '--create-only'),
+    传递参数: true,
+  },
+  'db:migrate:deploy:dev:web': {
+    说明: '为 Web 开发数据库应用已有 migration',
+    环境文件: Web开发环境文件,
+    运行: 命令('prisma', 'migrate', 'deploy'),
+    公开: false,
+  },
   'db:push:prod:web': {
     说明: '更新 Web 生产数据库并生成数据库类型',
     环境文件: Web生产环境文件,
@@ -378,6 +390,34 @@ export let 任务表 = 定义任务({
     环境文件: 测试环境文件,
     环境变量: 测试调试环境,
     运行: 命令('tsx', 'scripts/test/run-e2e.ts'),
+    传递参数: true,
+  },
+  'test:e2e:all': {
+    说明: '非交互运行全部端到端测试',
+    环境文件: 测试环境文件,
+    环境变量: 测试调试环境,
+    运行: 命令('playwright', 'test'),
+    传递参数: true,
+  },
+  'test:requirement:coverage': {
+    说明: '校验业务需求、验收点与流程的覆盖关系',
+    环境文件: 测试环境文件,
+    运行: 命令('tsx', 'scripts/test/check-requirement-coverage.ts'),
+  },
+  'test:requirement': {
+    说明: '运行可展示的业务需求流程',
+    环境文件: 测试环境文件,
+    环境变量: { ...测试调试环境, DEMO_MODE: 'true' },
+    依赖: ['test:requirement:coverage'],
+    运行: 命令('playwright', 'test', '--config', 'playwright.requirement.config.ts', '--headed'),
+    传递参数: true,
+  },
+  'test:requirement:all': {
+    说明: '非交互运行全部业务需求流程',
+    环境文件: 测试环境文件,
+    环境变量: 测试调试环境,
+    依赖: ['test:requirement:coverage'],
+    运行: 命令('playwright', 'test', '--config', 'playwright.requirement.config.ts'),
     传递参数: true,
   },
 

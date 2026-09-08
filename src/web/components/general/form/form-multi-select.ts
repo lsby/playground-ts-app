@@ -5,7 +5,7 @@ import type { 表单元素 } from './form'
 
 export type 多选下拉框选项 = { 文字: string; value: string }
 
-type 多选下拉框事件 = { 变化: string[] }
+type 多选下拉框事件 = { 变化: string[]; 失焦: void }
 type 监听多选下拉框事件 = {}
 
 type 多选下拉框配置 = {
@@ -13,6 +13,9 @@ type 多选下拉框配置 = {
   打开处理函数?: () => void | Promise<void>
   变化处理函数?: (选中值列表: string[]) => void | Promise<void>
   宿主样式?: 增强样式类型
+  值?: string[]
+  禁用?: boolean
+  可访问名称?: string
 }
 
 export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听多选下拉框事件> implements 表单元素<string[]> {
@@ -50,6 +53,10 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
         boxSizing: 'border-box',
       },
     })
+    触发框.tabIndex = this.配置.禁用 === true ? -1 : 0
+    触发框.setAttribute('role', 'combobox')
+    触发框.setAttribute('aria-expanded', 'false')
+    if (this.配置.可访问名称 !== undefined) 触发框.setAttribute('aria-label', this.配置.可访问名称)
 
     this.显示文本 = 创建元素('span', { textContent: 占位符文字 })
     this.箭头 = 创建元素('span', { textContent: '▼', style: { fontSize: '10px', transition: 'transform 0.2s' } })
@@ -80,21 +87,28 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
     容器.tabIndex = -1
     this.容器元素 = 容器
 
-    触发框.onclick = async (): Promise<void> => {
+    触发框.onclick = (): void => {
+      if (this.配置.禁用 === true) return
       this.展开状态 = !this.展开状态
       if (this.展开状态 === true) {
-        await this.配置.打开处理函数?.()
+        this.安全执行(async (): Promise<void> => await this.配置.打开处理函数?.())
         if (this.浮动面板 !== undefined) this.浮动面板.style.display = 'block'
         if (this.箭头 !== undefined) this.箭头.style.transform = 'rotate(180deg)'
+        触发框.setAttribute('aria-expanded', 'true')
         容器.focus()
       } else {
         this.关闭面板()
       }
     }
 
-    容器.addEventListener('focusout', (e: FocusEvent): void => {
-      if (!容器.contains(e.relatedTarget as Node)) this.关闭面板()
-    })
+    let 失去焦点 = (e: FocusEvent): void => {
+      if (e.relatedTarget instanceof Node === false || 容器.contains(e.relatedTarget) === false) {
+        this.关闭面板()
+        this.派发事件('失焦', undefined)
+      }
+    }
+    容器.addEventListener('focusout', 失去焦点)
+    this.注册清理((): void => 容器.removeEventListener('focusout', 失去焦点))
 
     this.shadow.appendChild(容器)
   }
@@ -123,7 +137,7 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
         style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 10px', cursor: 'pointer' },
       })
       let input = 创建元素('input', { type: 'checkbox', value: 选项.value, style: { cursor: 'pointer' } })
-      if (之前选中.has(选项.value)) input.checked = true
+      if (之前选中.has(选项.value) || (this.配置.值 ?? []).includes(选项.value)) input.checked = true
       let text = 创建元素('span', { textContent: 选项.文字, style: { fontSize: '13px', color: 'var(--文字颜色)' } })
       行.appendChild(input)
       行.appendChild(text)
@@ -131,13 +145,15 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
         if (e.target !== input) input.checked = !input.checked
         this.更新显示文本()
         let 选中值 = this.获得值()
-        void this.配置.变化处理函数?.(选中值)
+        this.配置.值 = 选中值
+        this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(选中值))
         this.派发事件('变化', 选中值)
       }
       input.onchange = (): void => {
         this.更新显示文本()
         let 选中值 = this.获得值()
-        void this.配置.变化处理函数?.(选中值)
+        this.配置.值 = 选中值
+        this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(选中值))
         this.派发事件('变化', 选中值)
       }
       this.浮动面板.appendChild(行)
@@ -151,14 +167,31 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
   }
 
   public 获得值(): string[] {
+    if (this.当前输入列表.length === 0) return [...(this.配置.值 ?? [])]
     return this.获得选中输入列表().map((i) => i.value)
   }
 
   public 设置值(值: string[]): void {
+    this.配置.值 = [...值]
     for (let input of this.当前输入列表) {
       input.checked = 值.includes(input.value)
     }
     this.更新显示文本()
+  }
+
+  public 设置禁用(值: boolean): void {
+    this.配置.禁用 = 值
+    void this.刷新()
+  }
+  public 获得禁用(): boolean {
+    return this.配置.禁用 ?? false
+  }
+  public 聚焦(): void {
+    this.容器元素?.focus()
+  }
+  public 设置可访问名称(名称: string): void {
+    this.配置.可访问名称 = 名称
+    void this.刷新()
   }
 }
 

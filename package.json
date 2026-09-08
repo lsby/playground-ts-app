@@ -32,6 +32,10 @@
     "setup": "tsx scripts/task/index.ts setup",
     "setup:init": "tsx scripts/task/index.ts setup:init",
     "task": "tsx scripts/task/index.ts",
+    "test:e2e": "tsx scripts/task/index.ts test:e2e",
+    "test:e2e:all": "tsx scripts/task/index.ts test:e2e:all",
+    "test:requirement": "tsx scripts/task/index.ts test:requirement",
+    "test:requirement:all": "tsx scripts/task/index.ts test:requirement:all",
     "test:unit": "tsx scripts/task/index.ts test:unit",
     "test:unit:all": "tsx scripts/task/index.ts test:unit:all"
   },

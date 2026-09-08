@@ -13,7 +13,7 @@ export class 演示跳转组件 extends 组件基类<发出事件类型, 监听�
     let 按钮 = new 主要按钮({
       文本: '进入demo页',
       点击处理函数: async (): Promise<void> => {
-        window.open('/demo.html', '_blank')
+        window.open('/demo/index.html', '_blank')
       },
     })
     this.shadow.append(按钮)

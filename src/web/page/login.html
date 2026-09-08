@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,10 +9,9 @@
   </head>
 
   <body>
-    <set-theme 从数据库加载="false"></set-theme>
-    <lsby-set-debug 排除事件="mousemove,mouseenter,mouseleave,scroll"></lsby-set-debug>
-    <lsby-set-html-full></lsby-set-html-full>
-
-    <lsby-login></lsby-login>
+    <set-theme hidden 从数据库加载="false"></set-theme>
+    <main style="min-height: 100vh; display: grid; place-items: center; padding: 16px; box-sizing: border-box">
+      <lsby-login></lsby-login>
+    </main>
   </body>
 </html>

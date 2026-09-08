@@ -1,9 +1,11 @@
 import { globalWebLog } from '../global/manager/log-manager'
 import { 获得滚动条样式 } from '../global/style/scrollbar'
 
+type 清理函数 = () => void | Promise<void>
+
 export abstract class 组件基类<
-  发出事件类型 extends Record<string, any>,
-  监听事件类型 extends Record<string, any>,
+  发出事件类型 extends Record<string, unknown>,
+  监听事件类型 extends Record<string, unknown>,
 > extends HTMLElement {
   public static 注册组件(组件名称: string, 组件: CustomElementConstructor): void {
     if (customElements.get(组件名称) === undefined) customElements.define(组件名称, 组件)
@@ -11,53 +13,60 @@ export abstract class 组件基类<
   }
 
   protected log = globalWebLog.extend(this.constructor.name)
+  private 基础样式元素 = document.createElement('style')
   private 初始化完毕 = false
   private 初始化完成事件: Promise<void> | null = null
   private 初始化完成解析器: (() => void) | null = null
-  private 监听器列表: Array<{ type: string; handler: EventListener; options?: AddEventListenerOptions }> = []
+  private 渲染监听器列表: Array<{ type: string; handler: EventListener; options?: AddEventListenerOptions }> = []
+  private 清理函数列表: 清理函数[] = []
+  private 渲染队列: Promise<void> = Promise.resolve()
+  private 渲染代次 = 0
+  private 渲染控制器 = new AbortController()
+  private 正在执行加载生命周期 = false
   private _shadow = this.attachShadow({ mode: 'open' })
 
   public constructor() {
     super()
+    this.基础样式元素.dataset['componentBaseStyle'] = 'true'
+    this.基础样式元素.textContent = 获得滚动条样式(':host') + 获得滚动条样式('*')
+    this._shadow.appendChild(this.基础样式元素)
   }
 
   protected get shadow(): ShadowRoot {
     return this._shadow
   }
 
+  protected get 渲染信号(): AbortSignal {
+    return this.渲染控制器.signal
+  }
+
   public 获得宿主样式(): CSSStyleDeclaration {
     let host = this._shadow.host
-    if (host instanceof HTMLElement) {
-      return host.style
-    }
+    if (host instanceof HTMLElement) return host.style
     throw new Error('Shadow host is not HTMLElement')
   }
 
   public 清空dom(): void {
-    while (this.firstChild !== null) {
-      this.removeChild(this.firstChild)
-    }
+    this.replaceChildren()
   }
+
   public 清空影子dom(): void {
-    while (this._shadow.firstChild !== null) {
-      this._shadow.removeChild(this._shadow.firstChild)
+    for (let 节点 of [...this._shadow.childNodes]) {
+      if (节点 !== this.基础样式元素) 节点.remove()
     }
+    if (this.基础样式元素.parentNode !== this._shadow) this._shadow.prepend(this.基础样式元素)
   }
 
-  public async 刷新(): Promise<void> {
-    this.清理所有监听器()
-    this.清空影子dom()
-    await this.当加载时()
+  public 刷新(): Promise<void> {
+    return this.请求渲染()
   }
 
-  /**
-   * 注意, 只有在dom挂载后初始化才会完成.
-   */
+  /** 只有组件挂载并完成当前轮渲染后，该 Promise 才会完成。 */
   public 等待初始化(): Promise<void> {
-    if (this.初始化完毕) return Promise.resolve()
+    if (this.初始化完毕 === true) return Promise.resolve()
     if (this.初始化完成事件 === null) {
-      this.初始化完成事件 = new Promise<void>((res) => {
-        this.初始化完成解析器 = res
+      this.初始化完成事件 = new Promise<void>((resolve) => {
+        this.初始化完成解析器 = resolve
       })
     }
     return this.初始化完成事件
@@ -70,114 +79,139 @@ export abstract class 组件基类<
   ): boolean {
     void this.log.debug('派发事件: %o, 数据: %O', k, v)
     return this.dispatchEvent(
-      new CustomEvent(k.toString(), {
-        detail: v, // 附加数据
-        bubbles: true, // 是否冒泡
-        cancelable: true, // 是否可取消
-        composed: true, // 是否可以穿越影子dom
-        ...o,
-      }),
+      new CustomEvent(k.toString(), { detail: v, bubbles: true, cancelable: true, composed: true, ...o }),
     )
   }
-  /**
-   * 监听从其他地方冒泡上来的事件 (捕获从子组件或外部冒泡的事件)
-   */
+
   public 监听冒泡事件<K extends keyof 监听事件类型>(
     k: K,
-    f: (e: CustomEvent<监听事件类型[K]>) => Promise<void>,
+    f: (e: CustomEvent<监听事件类型[K]>) => void | Promise<void>,
     o?: AddEventListenerOptions,
   ): void {
-    let handler = (event: Event): void => {
-      // 有意让 Promise 浮动，因为事件监听器无法等待异步回调
-      void f(event as CustomEvent<监听事件类型[K]>)
-    }
-    let options = {
-      capture: false, // 是否在捕获阶段响应, true: 在捕获阶段响应, false: 在冒泡阶段响应
-      once: false, // 是否只触发一次
-      passive: false, // 是否阻止默认行为
-      // signal: _, // 触发控制器, 可以用 new AbortController 创建
-      ...o,
-    }
-    this.addEventListener(k.toString(), handler, options)
-    this.监听器列表.push({ type: k.toString(), handler, options })
+    this.注册事件监听(k.toString(), f as (e: CustomEvent<unknown>) => void | Promise<void>, o)
   }
-  /**
-   * 监听这个组件发出的事件 (外部监听组件派发的事件)
-   */
+
   public 监听发出事件<K extends keyof 发出事件类型>(
     k: K,
-    f: (e: CustomEvent<发出事件类型[K]>) => Promise<void>,
+    f: (e: CustomEvent<发出事件类型[K]>) => void | Promise<void>,
     o?: AddEventListenerOptions,
   ): void {
-    let handler = (event: Event): void => {
-      // 有意让 Promise 浮动，因为事件监听器无法等待异步回调
-      void f(event as CustomEvent<发出事件类型[K]>)
-    }
-    let options = {
-      capture: false,
-      once: false,
-      passive: false,
-      // signal: _, // 触发控制器, 可以用 new AbortController 创建
-      ...o,
-    }
-    this.addEventListener(k.toString(), handler, options)
-    this.监听器列表.push({ type: k.toString(), handler, options })
+    this.注册事件监听(k.toString(), f as (e: CustomEvent<unknown>) => void | Promise<void>, o)
   }
 
-  private 清理所有监听器(): void {
-    for (let listener of this.监听器列表) {
-      this.removeEventListener(listener.type, listener.handler, listener.options)
-    }
-    this.监听器列表 = []
+  protected 注册清理(函数: 清理函数): void {
+    this.清理函数列表.push(函数)
   }
 
-  protected abstract 当加载时(): Promise<void>
-  protected 当卸载时?(): Promise<void>
-  protected 当转移时?(): Promise<void>
-  private async connectedCallback(): Promise<void> {
+  protected 注册观察器(观察器: ResizeObserver | MutationObserver | IntersectionObserver): void {
+    this.注册清理((): void => {
+      观察器.disconnect()
+    })
+  }
+
+  protected 安全执行(函数: () => void | Promise<void>): void {
+    try {
+      let 结果 = 函数()
+      if (结果 instanceof Promise) {
+        void 结果.catch((错误: unknown): void => {
+          this.报告错误(错误)
+        })
+      }
+    } catch (错误) {
+      this.报告错误(错误)
+    }
+  }
+
+  protected abstract 当加载时(): void | Promise<void>
+  protected 当卸载时?(): void | Promise<void>
+  protected 当转移时?(): void | Promise<void>
+
+  private connectedCallback(): void {
     void this.log.debug('connectedCallback, 对象: %O', this)
+    void this.请求渲染().catch((错误: unknown): void => {
+      this.报告错误(错误)
+    })
+  }
 
-    // 备份初始样式
-    let 宿主样式 = this.获得宿主样式()
-    let 宿主初始样式: { [key: string]: string } = {}
-    for (let i = 0; i < 宿主样式.length; i++) {
-      let 样式名 = 宿主样式[i]
-      if (样式名 === undefined) continue
-      宿主初始样式[样式名] = 宿主样式.getPropertyValue(样式名)
+  private disconnectedCallback(): void {
+    void this.log.debug('disconnectedCallback, 对象: %O', this)
+    this.渲染代次 += 1
+    this.渲染控制器.abort()
+    this.重置初始化事件()
+    void this.执行清理()
+      .then(async (): Promise<void> => await this.当卸载时?.())
+      .catch((错误: unknown): void => {
+        this.报告错误(错误)
+      })
+  }
+
+  private adoptedCallback(): void {
+    if (this.当转移时 === undefined) return
+    this.安全执行(async (): Promise<void> => await this.当转移时?.())
+  }
+
+  private 请求渲染(): Promise<void> {
+    this.重置初始化事件()
+    this.渲染代次 += 1
+    let 本次代次 = this.渲染代次
+    this.渲染控制器.abort()
+    this.渲染控制器 = new AbortController()
+    let 任务 = this.渲染队列
+      .catch((): void => {})
+      .then(async (): Promise<void> => {
+        if (this.isConnected === false || 本次代次 !== this.渲染代次) return
+        await this.执行清理()
+        this.清空影子dom()
+        this.正在执行加载生命周期 = true
+        try {
+          await this.当加载时()
+        } finally {
+          this.正在执行加载生命周期 = false
+        }
+        if (本次代次 !== this.渲染代次) return
+        this.初始化完毕 = true
+        this.初始化完成解析器?.()
+        this.初始化完成解析器 = null
+      })
+    this.渲染队列 = 任务
+    return 任务
+  }
+
+  private 注册事件监听(
+    类型: string,
+    函数: (e: CustomEvent<unknown>) => void | Promise<void>,
+    选项?: AddEventListenerOptions,
+  ): void {
+    let 处理器 = (event: Event): void => {
+      if (event instanceof CustomEvent === false) return
+      this.安全执行(async (): Promise<void> => await 函数(event))
     }
+    let 最终选项: AddEventListenerOptions = { capture: false, once: false, passive: false, ...选项 }
+    this.addEventListener(类型, 处理器, 最终选项)
+    if (this.正在执行加载生命周期 === true) this.渲染监听器列表.push({ type: 类型, handler: 处理器, options: 最终选项 })
+  }
 
-    // 清空影子dom, 避免重复挂载, 因为connectedCallback可能会执行多次
-    this.清空影子dom()
-
-    // 应用默认样式
-    this._应用默认样式()
-
-    // 执行子类的过程
-    await this.当加载时()
-
-    // 标记初始化完成
-    this.初始化完毕 = true
-    this.初始化完成解析器?.()
-
-    // 还原初始样式
-    for (let 样式名 in 宿主初始样式) {
-      let 初始样式 = 宿主初始样式[样式名]
-      if (初始样式 === undefined || 宿主样式.getPropertyValue(样式名) === 初始样式) continue
-      宿主样式.setProperty(样式名, 初始样式)
+  private async 执行清理(): Promise<void> {
+    for (let 监听器 of this.渲染监听器列表) {
+      this.removeEventListener(监听器.type, 监听器.handler, 监听器.options)
     }
+    this.渲染监听器列表 = []
+    let 待清理列表 = this.清理函数列表
+    this.清理函数列表 = []
+    for (let 清理 of 待清理列表.reverse()) await 清理()
   }
-  private async disconnectedCallback(): Promise<void> {
-    if (this.当卸载时 !== undefined) void this.log.debug('disconnectedCallback, 对象: %O', this)
-    this.清理所有监听器()
-    await this.当卸载时?.()
+
+  private 重置初始化事件(): void {
+    this.初始化完毕 = false
+    if (this.初始化完成解析器 !== null) return
+    this.初始化完成事件 = new Promise<void>((resolve) => {
+      this.初始化完成解析器 = resolve
+    })
   }
-  private async adoptedCallback(): Promise<void> {
-    if (this.当转移时 !== undefined) void this.log.debug('adoptedCallback, 对象: %O', this)
-    await this.当转移时?.()
-  }
-  private _应用默认样式(): void {
-    let 样式 = document.createElement('style')
-    样式.textContent = 获得滚动条样式(':host') + 获得滚动条样式('*')
-    this._shadow.appendChild(样式)
+
+  private 报告错误(错误: unknown): void {
+    void this.log.error('组件执行失败: %O', 错误)
+    let 标准错误 = 错误 instanceof Error ? 错误 : new Error(String(错误))
+    this.dispatchEvent(new ErrorEvent('error', { error: 标准错误, message: 标准错误.message }))
   }
 }

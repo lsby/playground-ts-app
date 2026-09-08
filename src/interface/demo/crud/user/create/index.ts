@@ -15,7 +15,7 @@ import { jwt插件, kysely插件 } from '../../../../../global/plugin'
 import { 检查管理员登录 } from '../../../../../interface-logic/check/check-login-jwt-admin'
 import { 新增逻辑 } from '../../../../../interface-logic/components/crud/create'
 
-let 接口路径 = '/api/demo/curd/user/create' as const
+let 接口路径 = '/api/demo/crud/user/create' as const
 let 接口方法 = 'post' as const
 
 let 接口逻辑实现 = 接口逻辑

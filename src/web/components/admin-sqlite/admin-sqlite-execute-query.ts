@@ -2,6 +2,7 @@ import { 组件基类 } from '../../base/base'
 import { API管理器 } from '../../global/manager/api-manager'
 import { 创建元素 } from '../../global/tools/create-element'
 import { 普通按钮 } from '../general/base/base-button'
+import { 创建图标 } from '../general/base/icon'
 import { 表格组件 } from '../general/table/table'
 import { 数据表加载数据参数 } from '../general/table/types'
 
@@ -22,7 +23,9 @@ export class 数据库执行查询组件 extends 组件基类<发出事件类型
   private 选项卡头容器: HTMLDivElement = 创建元素('div')
   private 内容容器: HTMLDivElement = 创建元素('div')
   private 添加选项卡按钮: 普通按钮 = new 普通按钮({
-    文本: '➕',
+    文本: '添加',
+    标题: '添加查询选项卡',
+    图标: 创建图标('plus'),
     点击处理函数: () => this.添加选项卡(),
     宿主样式: { display: 'flex' },
   })
@@ -305,6 +308,7 @@ export class 数据库执行查询组件 extends 组件基类<发出事件类型
 
     // 每次都重新创建表格以确保数据更新
     内容.表格组件 = new 表格组件<Record<string, any>>({
+      行键: (数据项, 索引): string => `${JSON.stringify(数据项)}-${索引}`,
       列配置,
       每页数量: 20,
       加载数据: async (

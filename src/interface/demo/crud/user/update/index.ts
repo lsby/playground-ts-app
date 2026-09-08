@@ -12,7 +12,7 @@ import { 检查JSON参数 } from '../../../../../interface-logic/check/check-jso
 import { 检查管理员登录 } from '../../../../../interface-logic/check/check-login-jwt-admin'
 import { 更新逻辑 } from '../../../../../interface-logic/components/crud/update'
 
-let 接口路径 = '/api/demo/curd/user/update' as const
+let 接口路径 = '/api/demo/crud/user/update' as const
 let 接口方法 = 'post' as const
 
 let 接口逻辑实现 = 接口逻辑

@@ -13,13 +13,14 @@ export class 演示吐司消息组件 extends 组件基类<发出事件类型, �
 
   protected override async 当加载时(): Promise<void> {
     let 容器 = 创建元素('div', {
-      style: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '400px' },
+      style: { display: 'flex', flexDirection: 'column', gap: 'var(--间距-4)', width: '100%' },
     })
-
-    let 标题 = 创建元素('h2', { textContent: '吐司消息演示', style: { marginBottom: '10px' } })
+    let 消息类型按钮组 = this.创建按钮组('消息类型')
+    let 组合场景按钮组 = this.创建按钮组('组合场景')
 
     let 成功按钮实例 = new 成功按钮({
       文本: '显示成功消息',
+      宿主样式: { width: '100%' },
       点击处理函数: async (): Promise<void> => {
         成功提示('操作成功完成!')
       },
@@ -27,6 +28,7 @@ export class 演示吐司消息组件 extends 组件基类<发出事件类型, �
 
     let 错误按钮实例 = new 危险按钮({
       文本: '显示错误消息',
+      宿主样式: { width: '100%' },
       点击处理函数: async (): Promise<void> => {
         错误提示('发生了一个错误!')
       },
@@ -34,6 +36,7 @@ export class 演示吐司消息组件 extends 组件基类<发出事件类型, �
 
     let 警告按钮实例 = new 警告按钮({
       文本: '显示警告消息',
+      宿主样式: { width: '100%' },
       点击处理函数: async (): Promise<void> => {
         警告提示('这是一个警告提示!')
       },
@@ -41,6 +44,7 @@ export class 演示吐司消息组件 extends 组件基类<发出事件类型, �
 
     let 信息按钮实例 = new 普通按钮({
       文本: '显示信息消息',
+      宿主样式: { width: '100%' },
       点击处理函数: async (): Promise<void> => {
         信息提示('这是一条普通信息')
       },
@@ -48,6 +52,7 @@ export class 演示吐司消息组件 extends 组件基类<发出事件类型, �
 
     let 长文本按钮实例 = new 普通按钮({
       文本: '显示长文本消息',
+      宿主样式: { width: '100%' },
       点击处理函数: async (): Promise<void> => {
         信息提示('这是一条很长很长的消息,用来测试吐司组件在处理长文本时的表现是否正常,看看会不会换行或者溢出。')
       },
@@ -55,6 +60,7 @@ export class 演示吐司消息组件 extends 组件基类<发出事件类型, �
 
     let 自定义时长按钮实例 = new 主要按钮({
       文本: '显示自定义时长消息(5秒)',
+      宿主样式: { width: '100%' },
       点击处理函数: async (): Promise<void> => {
         成功提示('这条消息会显示5秒钟', 5000)
       },
@@ -62,6 +68,7 @@ export class 演示吐司消息组件 extends 组件基类<发出事件类型, �
 
     let 多个吐司按钮实例 = new 主要按钮({
       文本: '连续显示多个吐司',
+      宿主样式: { width: '100%' },
       点击处理函数: async (): Promise<void> => {
         成功提示('第一条消息')
         警告提示('第二条消息')
@@ -70,15 +77,23 @@ export class 演示吐司消息组件 extends 组件基类<发出事件类型, �
       },
     })
 
-    容器.appendChild(标题)
-    容器.appendChild(成功按钮实例)
-    容器.appendChild(错误按钮实例)
-    容器.appendChild(警告按钮实例)
-    容器.appendChild(信息按钮实例)
-    容器.appendChild(长文本按钮实例)
-    容器.appendChild(自定义时长按钮实例)
-    容器.appendChild(多个吐司按钮实例)
+    消息类型按钮组.按钮区.append(成功按钮实例, 错误按钮实例, 警告按钮实例, 信息按钮实例)
+    组合场景按钮组.按钮区.append(长文本按钮实例, 自定义时长按钮实例, 多个吐司按钮实例)
+    容器.append(消息类型按钮组.容器, 组合场景按钮组.容器)
 
     this.shadow.appendChild(容器)
+  }
+
+  private 创建按钮组(标题: string): { 容器: HTMLElement; 按钮区: HTMLDivElement } {
+    let 容器 = 创建元素('section', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--间距-2)' } })
+    let 按钮区 = 创建元素('div', {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))',
+        gap: 'var(--间距-2)',
+      },
+    })
+    容器.append(创建元素('h3', { textContent: 标题, style: { margin: '0', fontSize: 'var(--字号-正文)' } }), 按钮区)
+    return { 容器, 按钮区 }
   }
 }
