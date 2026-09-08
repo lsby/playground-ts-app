@@ -209,7 +209,7 @@
   - 端到端测试的测试过程应该是黑盒的，禁止通过 API 接口、数据库句柄伪造初始状态
   - 端到端测试的验证过程应该是灰盒的，可以通过数据库句柄等手段验证数据库内的数据
 - 需求测试:
-  - 需求测试以业务需求和验收点为中心，不限制具体测试技术，模型与使用说明见 `src/model/requirement-test/README.md`。
+  - 需求测试以业务需求和验收点为中心，不限制具体测试技术，模型与使用说明见 `src/model/requirement/README.md`。
   - 项目需求定义和可运行流程放在 `test/requirement/`，每个业务需求拥有一个独立的子目录，内部包含对应的 `xxx-model.ts` 和 `xxx.spec.ts`，参考 `test/requirement/demo/demo-model.ts` 和 `test/requirement/demo/demo.spec.ts`。
   - `scripts/test/check-requirement-coverage.ts` 会递归扫描 `test/requirement/` 下的所有 `*-model.ts` 文件并统计覆盖率，新增需求模型后无需手动注册。
   - 相关目录、文件、任务和配置统一使用 `requirement` 命名，不建立平行测试体系。

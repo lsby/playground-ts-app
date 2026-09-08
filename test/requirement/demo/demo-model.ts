@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 
-import { 流程, 测试模型, 状态, 行为, 观察, 需求, 验收点, type 流程上下文 } from '../../../src/model/requirement-test'
+import { 流程, 测试模型, 状态, 行为, 观察, 需求, 验收点, type 流程上下文 } from '../../../src/model/requirement'
 
 export enum 演示需求依赖 {
   浏览器 = '浏览器',

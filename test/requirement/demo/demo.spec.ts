@@ -1,6 +1,6 @@
 import { test } from '@playwright/test'
 
-import { 选择结果 } from '../../../src/model/requirement-test'
+import { 选择结果 } from '../../../src/model/requirement'
 import { 演示_说明 } from '../../e2e/tools/demo-mode'
 import { 演示业务需求模型, 演示需求依赖, 管理员新增用户流程 } from './demo-model'
 
