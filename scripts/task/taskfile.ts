@@ -34,6 +34,7 @@ let 生成本地API列表命令 = 命令('tsx', 'scripts/gen/gen-local-api-list.
 let 生成本地Schema命令 = 命令('tsx', 'scripts/gen/gen-local-schema.ts')
 
 export let 任务表 = 定义任务({
+  // 生成
   'generate:db-type': {
     说明: '生成 Kysely 数据库类型',
     运行: 命令('prisma', 'generate'),
@@ -46,7 +47,7 @@ export let 任务表 = 定义任务({
   'generate:local-api-list': { 说明: '生成纯前端本地 API 列表', 运行: 生成本地API列表命令, 公开: false },
   'generate:local-schema': { 说明: '生成纯前端本地数据库 Schema', 运行: 生成本地Schema命令, 公开: false },
   'generate:meta': { 说明: '生成应用元信息', 运行: 命令('tsx', 'scripts/gen/gen-meta-info.ts'), 公开: false },
-  generate: {
+  'generate:all': {
     说明: '生成全部派生文件',
     依赖: [
       'generate:db-type',
@@ -58,21 +59,31 @@ export let 任务表 = 定义任务({
       'generate:meta',
     ],
   },
+
+  // 检查
   'check:format': { 说明: '检查代码格式', 运行: 命令('prettier', '--check', '.'), 公开: false },
   'check:lint': { 说明: '运行 ESLint', 运行: 命令('eslint', '.'), 公开: false },
   'check:type': { 说明: '运行 TypeScript 类型检查', 运行: 命令('tsc', '--noEmit'), 公开: false },
-  check: { 说明: '运行全部静态检查', 依赖: ['check:format', 'check:lint', 'check:type'] },
+  'check:all': { 说明: '运行全部静态检查', 依赖: ['check:format', 'check:lint', 'check:type'] },
+
+  // 修复
   'fix:format': { 说明: '写入代码格式', 运行: 命令('prettier', '--write', '.'), 公开: false },
   'fix:lint': { 说明: '应用 ESLint 自动修复', 运行: 命令('eslint', '.', '--fix'), 公开: false },
-  fix: { 说明: '修复并格式化代码', 依赖: ['fix:lint', 'fix:format'] },
+  'fix:all': { 说明: '修复并格式化代码', 依赖: ['fix:lint', 'fix:format'] },
+
+  // 清理
   'clean:all': { 说明: '清理全部构建产物和缓存', 运行: 命令('tsx', 'scripts/clean/clean-all.ts') },
   'clean:web': { 说明: '清理 Web 构建产物和缓存', 运行: 命令('tsx', 'scripts/clean/clean-web.ts') },
   'clean:web-test': { 说明: '清理 Web 测试构建产物', 运行: 命令('tsx', 'scripts/clean/clean-web-test.ts') },
+
+  // 编译
   'compile:service': {
     说明: '编译服务端 TypeScript',
     运行: [命令('tsc', '--project', './tsconfig.build.json'), 命令('tsc-alias', '-p', './tsconfig.build.json', '-f')],
     公开: false,
   },
+
+  // 打包
   'bundle:web': {
     说明: '打包普通 Web 前端',
     运行: 命令('parcel', ...Parcel基础参数, '--dist-dir', 'dist/src/web'),
@@ -88,34 +99,37 @@ export let 任务表 = 定义任务({
     运行: 命令('parcel', ...Parcel基础参数, '--dist-dir', 'test-outputs/web-test'),
     公开: false,
   },
-  'post-build': { 说明: '执行构建后处理', 运行: 命令('tsx', 'scripts/post-build/index.ts'), 公开: false },
+
+  // 构建
+  'build:post': { 说明: '执行构建后处理', 运行: 命令('tsx', 'scripts/post-build/index.ts'), 公开: false },
   'build:all': {
     说明: '生成、检查并构建服务端和 Web',
-    依赖: ['generate', 'check', 'clean:all', 'compile:service', 'bundle:web', 'post-build'],
+    依赖: ['generate:all', 'check:all', 'clean:all', 'compile:service', 'bundle:web', 'build:post'],
     需要环境文件: true,
   },
   'build:web': {
     说明: '生成、检查并构建普通 Web',
-    依赖: ['generate', 'check', 'clean:web', 'bundle:web'],
+    依赖: ['generate:all', 'check:all', 'clean:web', 'bundle:web'],
     需要环境文件: true,
   },
   'build:web:no-scope-hoist': {
     说明: '生成、检查并构建禁用 Scope Hoisting 的 Web',
-    依赖: ['generate', 'check', 'clean:web', 'bundle:web-no-scope-hoist'],
+    依赖: ['generate:all', 'check:all', 'clean:web', 'bundle:web-no-scope-hoist'],
     需要环境文件: true,
   },
   'build:web:pure-frontend': {
     说明: '生成、检查并构建纯前端版本',
-    依赖: ['generate', 'check', 'clean:web', 'bundle:web-no-scope-hoist'],
+    依赖: ['generate:all', 'check:all', 'clean:web', 'bundle:web-no-scope-hoist'],
     需要环境文件: true,
   },
   'build:web:test': {
     说明: '生成并构建端到端测试前端',
     环境文件: 测试环境文件,
-    依赖: ['generate', 'clean:web-test', 'bundle:web-test'],
+    依赖: ['generate:all', 'clean:web-test', 'bundle:web-test'],
   },
 
-  setup: { 说明: '初始化本地配置并分配端口', 依赖: ['setup:env', 'setup:ports'] },
+  // 初始化
+  'setup:all': { 说明: '初始化本地配置并分配端口', 依赖: ['setup:env', 'setup:ports'] },
   'setup:init': { 说明: '重新运行项目初始化向导', 运行: 命令('node', 'scripts/setup/preinstall.mjs', '--force') },
   'setup:env': { 说明: '从示例初始化本地配置', 运行: 命令('tsx', 'scripts/setup/init-env.ts'), 传递参数: true },
   'setup:ports': { 说明: '扫描并分配本地端口', 运行: 命令('tsx', 'scripts/setup/init-ports.ts'), 传递参数: true },
@@ -126,6 +140,7 @@ export let 任务表 = 定义任务({
   },
   'setup:rename': { 说明: '重命名项目', 运行: 命令('tsx', 'scripts/setup/rename-project.ts') },
 
+  // 数据库
   'db:push:dev:web': {
     说明: '初始化或迁移 Web 开发数据库并生成类型',
     环境文件: Web开发环境文件,
@@ -170,6 +185,7 @@ export let 任务表 = 定义任务({
     公开: false,
   },
 
+  // 运行
   'run:service:dev': {
     说明: '启动 Web 开发服务端',
     环境文件: Web开发环境文件,
@@ -243,6 +259,7 @@ export let 任务表 = 定义任务({
     运行: 命令('electron', '-r', 'tsx', 'dist/src/electron.js'),
   },
 
+  // 监视
   'watch:type': { 说明: '持续运行 TypeScript 类型检查', 运行: 命令('tsc', '--noEmit', '-w'), 公开: false },
   'watch:lint': {
     说明: '持续运行 ESLint 检查',
@@ -307,6 +324,8 @@ export let 任务表 = 定义任务({
     运行: 命令('tsx', 'scripts/watch/watch.ts', './prisma/', '--', 生成本地Schema命令.程序, ...生成本地Schema命令.参数),
     公开: false,
   },
+
+  // 开发
   'dev:web:watch': {
     说明: '并行运行 Web 开发服务与监听任务',
     依赖方式: '并行',
@@ -321,7 +340,7 @@ export let 任务表 = 定义任务({
     ],
     公开: false,
   },
-  'dev:web': { 说明: '生成派生文件后启动 Web 开发套件', 依赖: ['generate', 'dev:web:watch'] },
+  'dev:web': { 说明: '生成派生文件后启动 Web 开发套件', 依赖: ['generate:all', 'dev:web:watch'] },
   'dev:electron:watch': {
     说明: '并行运行 Electron 开发服务与监听任务',
     依赖方式: '并行',
@@ -336,7 +355,7 @@ export let 任务表 = 定义任务({
     ],
     公开: false,
   },
-  'dev:electron': { 说明: '生成派生文件后启动 Electron 开发套件', 依赖: ['generate', 'dev:electron:watch'] },
+  'dev:electron': { 说明: '生成派生文件后启动 Electron 开发套件', 依赖: ['generate:all', 'dev:electron:watch'] },
   'dev:pure-frontend:watch': {
     说明: '并行运行纯前端开发服务与监听任务',
     依赖方式: '并行',
@@ -352,8 +371,9 @@ export let 任务表 = 定义任务({
     ],
     公开: false,
   },
-  'dev:pure-frontend': { 说明: '生成派生文件后启动纯前端开发套件', 依赖: ['generate', 'dev:pure-frontend:watch'] },
+  'dev:pure-frontend': { 说明: '生成派生文件后启动纯前端开发套件', 依赖: ['generate:all', 'dev:pure-frontend:watch'] },
 
+  // 测试
   'test:unit': {
     说明: '交互式运行单元测试',
     环境文件: 测试环境文件,
@@ -421,13 +441,13 @@ export let 任务表 = 定义任务({
     传递参数: true,
   },
 
-  'release:verify': { 说明: '发布前运行单元测试并完成构建', 依赖: ['test:unit:all', 'build:all'], 公开: false },
-
+  // capacitor
   'capacitor:init': { 说明: '初始化 Capacitor', 运行: 命令('cap', 'init'), 传递参数: true },
   'capacitor:add:android': { 说明: '添加 Android 平台', 运行: 命令('cap', 'add', 'android'), 传递参数: true },
   'capacitor:sync:android': { 说明: '同步 Android 平台', 运行: 命令('cap', 'sync', 'android'), 传递参数: true },
   'capacitor:open:android': { 说明: '打开 Android 工程', 运行: 命令('cap', 'open', 'android'), 传递参数: true },
 
+  // 发布
   'public:docker:local': {
     说明: '执行本地 Docker 发布',
     运行: 命令('tsx', 'scripts/public/release-docker-local.ts'),
@@ -466,12 +486,15 @@ export let 任务表 = 定义任务({
     运行: 命令('tsx', 'scripts/public/release-pure-frontend.ts'),
     传递参数: true,
   },
+
+  // 发布
+  'release:verify': { 说明: '发布前运行单元测试并完成构建', 依赖: ['test:unit:all', 'build:all'], 公开: false },
   'release:version': {
     说明: '交互式选择新版本号',
     运行: 命令('bumpp', '--no-commit', '--no-tag', '--no-push'),
     公开: false,
   },
-  release: {
+  'release:all': {
     说明: '构建、提交、打标签并推送新版本',
     环境文件: Web生产环境文件,
     依赖: ['release:version', 'release:verify'],
