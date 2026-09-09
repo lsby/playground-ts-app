@@ -10,5 +10,5 @@ export let 创建sqlite数据库适配器 = (path: string): WaSqliteWorkerDialec
   new WaSqliteWorkerDialect({
     fileName: path.split(/[/\\]/).pop() ?? 'local.db',
     preferOPFS: false,
-    worker: new Worker(new URL('../local-sqlite-worker.ts', import.meta.url), { type: 'module' }),
+    worker: new Worker(new URL('../pure-frontend/local-sqlite-worker.ts', import.meta.url), { type: 'module' }),
   })

@@ -62,17 +62,19 @@ function 检查是否支持纯前端(文件路径: string): boolean {
 let 接口目录 = 'src/interface'
 let 所有文件相对路径 = 获取目录下所有TS文件(接口目录)
 
-let 支持纯前端的接口 = 所有文件相对路径.filter((相对路径) => {
-  let 绝对路径 = path.join(接口目录, 相对路径 + '.ts')
-  return 检查是否支持纯前端(绝对路径)
-})
+let 支持纯前端的接口 = 所有文件相对路径
+  .filter((相对路径) => {
+    let 绝对路径 = path.join(接口目录, 相对路径 + '.ts')
+    return 检查是否支持纯前端(绝对路径)
+  })
+  .sort()
 
 // 生成本地接口列表
 let 代码列表 = 支持纯前端的接口.map((a) => {
   let 逻辑相对路径 = a
   let 完整相对路径 = `src/interface/${逻辑相对路径}`
   let 变量名 = '_' + 完整相对路径.replace(/[^a-zA-Z0-9]/g, '_')
-  return `import ${变量名} from '../interface/${逻辑相对路径}'`
+  return `import ${变量名} from '../../interface/${逻辑相对路径}'`
 })
 let 导出列表 = 支持纯前端的接口.map((a) => {
   let 逻辑相对路径 = a
@@ -92,7 +94,7 @@ let 新内容 = [
   '',
 ].join('\n')
 
-let 目标文件 = 'src/web/local-api-list.ts'
+let 目标文件 = 'src/web/pure-frontend/local-api-list.ts'
 let 已有内容 = ''
 try {
   已有内容 = fs.readFileSync(目标文件, 'utf-8')

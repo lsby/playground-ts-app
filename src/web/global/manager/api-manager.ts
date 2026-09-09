@@ -272,7 +272,7 @@ export let API管理器 = new API管理器类()
 
 if ('serviceWorker' in navigator && 环境变量.BUILD_TARGET === 'pure-frontend') {
   serviceWorkerReady = navigator.serviceWorker
-    .register(new URL('../../sw.ts', import.meta.url), { type: 'module' })
+    .register(new URL('../../pure-frontend/sw.ts', import.meta.url), { type: 'module' })
     .then(() => {
       console.log('ServiceWorker 注册成功')
     })
@@ -295,7 +295,7 @@ type PureFrontendWorkerRequest =
 
 function getPureFrontendWorker(): Worker {
   if (pureFrontendWorker === undefined) {
-    pureFrontendWorker = new Worker(new URL('../../pure-frontend-api-worker.ts', import.meta.url), {
+    pureFrontendWorker = new Worker(new URL('../../pure-frontend/pure-frontend-api-worker.ts', import.meta.url), {
       type: 'module',
       name: 'lsby-pure-frontend-sqlite',
     })

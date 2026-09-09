@@ -14,7 +14,7 @@ try {
     .join('\n')
     .trim()
 
-  let 目标文件 = 'src/web/local-schema.ts'
+  let 目标文件 = 'src/web/pure-frontend/local-schema.ts'
 
   let 新内容 = [
     `// 该文件由脚本自动生成, 请勿修改.`,

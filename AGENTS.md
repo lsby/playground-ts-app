@@ -130,11 +130,11 @@
 
 - 核心组件：
   - UI 层面的请求转发以及处理跨标签页锁均由 `src/web/global/manager/api-manager.ts` 负责。
-  - 后端业务逻辑以 API Worker 的形式运行在 `src/web/pure-frontend-api-worker.ts` 中。
-  - 底层数据存储依赖 SQLite Worker 并依托 IndexedDB 持久化，相关实现在 `src/web/local-sqlite-worker.ts`。
+  - 后端业务逻辑以 API Worker 的形式运行在 `src/web/pure-frontend/pure-frontend-api-worker.ts` 中。
+  - 底层数据存储依赖 SQLite Worker 并依托 IndexedDB 持久化，相关实现在 `src/web/pure-frontend/local-sqlite-worker.ts`。
   - 对 Node 运行时的模拟实现在 `src/web/mock/` 目录中，并通过 `package.json` 的 `browser` 与 `alias` 字段进行替换配置。
 - 生成与配置：
-  - 构建系统会派生出纯前端专用的可用接口列表 `src/web/local-api-list.ts` 和本地数据库 Schema `src/web/local-schema.ts`。
+  - 构建系统会派生出纯前端专用的可用接口列表 `src/web/pure-frontend/local-api-list.ts` 和本地数据库 Schema `src/web/pure-frontend/local-schema.ts`。
   - 并不是所有接口都自动进入前端环境，只有明确带有 `{ 支持纯前端模式: true }` 声明的接口才会被生成器收录。
     - 可以参考 `src/interface/demo/auth/is-login/index.ts`。
 - 运行与并发：
@@ -176,7 +176,7 @@
   - 运行 `npm run generate` 即可触发全量代码生成。
   - 所有派生文件都交由生成器覆盖维护。任何手动修改都会在下次生成时被冲掉，正确做法是去修改源头定义然后重新生成。这些派生文件包含：
     - 数据库与接口层面的 `src/types/db.ts`、`src/interface/interface-list.ts` 以及 `src/types/interface-type.ts`。
-    - 前端相关与本地数据库层面的 `src/web/components/index.ts`、`src/web/local-api-list.ts` 和 `src/web/local-schema.ts`。
+    - 前端相关与本地数据库层面的 `src/web/components/index.ts`、`src/web/pure-frontend/local-api-list.ts` 和 `src/web/pure-frontend/local-schema.ts`。
     - 此外还包括注入到应用里的元信息文件 `src/app/meta-info.ts`。
 
 ## Docker 远程部署
