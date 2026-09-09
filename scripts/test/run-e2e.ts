@@ -42,7 +42,7 @@ async function 主函数(): Promise<void> {
     参数列表.push('--headed')
   }
 
-  // 支持透传额外的参数 (例如 npm run task -- test:e2e -- --ui)
+  // 支持透传额外的参数 (例如 npm run task -- test:e2e:interactive -- --ui)
   let 附加参数 = process.argv.slice(2)
   if (附加参数.length > 0) {
     参数列表.push(...附加参数)

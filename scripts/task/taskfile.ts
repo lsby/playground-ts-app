@@ -374,7 +374,7 @@ export let 任务表 = 定义任务({
   'dev:pure-frontend': { 说明: '生成派生文件后启动纯前端开发套件', 依赖: ['generate:all', 'dev:pure-frontend:watch'] },
 
   // 测试
-  'test:unit': {
+  'test:unit:interactive': {
     说明: '交互式运行单元测试',
     环境文件: 测试环境文件,
     环境变量: 测试调试环境,
@@ -390,12 +390,20 @@ export let 任务表 = 定义任务({
     运行: [命令('lsby-net-core-gen-test', ...获得单元测试生成参数()), 命令('vitest', 'run')],
     传递参数: true,
   },
-  'test:integration': {
+  'test:integration:interactive': {
     说明: '交互式运行集成测试',
     环境文件: 测试环境文件,
     环境变量: 测试调试环境,
     依赖: ['db:ensure:test:web'],
     运行: 命令('tsx', 'scripts/test/run-integration.ts'),
+    传递参数: true,
+  },
+  'test:integration:all': {
+    说明: '非交互运行全部集成测试',
+    环境文件: 测试环境文件,
+    环境变量: 测试调试环境,
+    依赖: ['db:ensure:test:web'],
+    运行: 命令('tsx', 'scripts/test/run-integration.ts', '--all'),
     传递参数: true,
   },
   'test:e2e:server': {
@@ -405,7 +413,7 @@ export let 任务表 = 定义任务({
     运行: 命令('tsx', './src/server.ts'),
     公开: false,
   },
-  'test:e2e': {
+  'test:e2e:interactive': {
     说明: '交互式运行端到端测试',
     环境文件: 测试环境文件,
     环境变量: 测试调试环境,
@@ -424,7 +432,7 @@ export let 任务表 = 定义任务({
     环境文件: 测试环境文件,
     运行: 命令('tsx', 'scripts/test/check-requirement-coverage.ts'),
   },
-  'test:requirement': {
+  'test:requirement:demo': {
     说明: '运行可展示的业务需求流程',
     环境文件: 测试环境文件,
     环境变量: { ...测试调试环境, DEMO_MODE: 'true' },

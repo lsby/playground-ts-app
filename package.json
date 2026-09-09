@@ -36,12 +36,14 @@
     "setup:all": "tsx scripts/task/index.ts setup:all",
     "setup:init": "tsx scripts/task/index.ts setup:init",
     "task": "tsx scripts/task/index.ts",
-    "test:e2e": "tsx scripts/task/index.ts test:e2e",
     "test:e2e:all": "tsx scripts/task/index.ts test:e2e:all",
-    "test:requirement": "tsx scripts/task/index.ts test:requirement",
+    "test:e2e:interactive": "tsx scripts/task/index.ts test:e2e:interactive",
+    "test:integration:all": "tsx scripts/task/index.ts test:integration:all",
+    "test:integration:interactive": "tsx scripts/task/index.ts test:integration:interactive",
     "test:requirement:all": "tsx scripts/task/index.ts test:requirement:all",
-    "test:unit": "tsx scripts/task/index.ts test:unit",
-    "test:unit:all": "tsx scripts/task/index.ts test:unit:all"
+    "test:requirement:demo": "tsx scripts/task/index.ts test:requirement:demo",
+    "test:unit:all": "tsx scripts/task/index.ts test:unit:all",
+    "test:unit:interactive": "tsx scripts/task/index.ts test:unit:interactive"
   },
   "lint-staged": {
     "*.{ts,js,json,css,html}": [

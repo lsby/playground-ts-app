@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 let port = process.env.APP_PORT
 if (port === undefined) {
-  throw new Error('运行测试失败：缺少 APP_PORT，请通过 npm run task -- test:e2e 启动测试')
+  throw new Error('运行测试失败：缺少 APP_PORT，请通过 npm run task -- test:e2e:interactive 或 test:e2e:all 启动测试')
 }
 
 /**
