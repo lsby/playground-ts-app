@@ -1,8 +1,3 @@
-import { afterAll } from 'vitest'
-import { 应用单例 } from '../../src/app/app'
+import { init } from '../../src/init/init'
 
-await 应用单例.run()
-
-afterAll(async (): Promise<void> => {
-  await 应用单例.close()
-})
+await init()

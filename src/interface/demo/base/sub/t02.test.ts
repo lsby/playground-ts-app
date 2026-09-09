@@ -1,16 +1,15 @@
-import { 接口测试 } from '@lsby/net-core'
+import { 接口逻辑测试, 默认请求附加参数 } from '@lsby/net-core'
 import assert from 'assert'
-import { POST_JSON请求用例 } from '../../../../tools/request'
+import { kysely管理器 } from '../../../../global/global'
 import 接口 from './index'
 
-export default new 接口测试(
-  接口,
-  '失败',
+export default new 接口逻辑测试(
   async (): Promise<void> => {},
-  async (): Promise<object> => {
-    return POST_JSON请求用例(接口, { a: 2, b: 1 })
-  },
-  async (解析结果): Promise<void> => {
-    assert.equal(解析结果.data, '未登录')
+  async (): Promise<void> => {
+    let 结果 = await 接口
+      .获得接口逻辑()
+      .调用({ userId: undefined, kysely: kysely管理器, json: { a: 2, b: 1 } }, {}, 默认请求附加参数)
+    assert.strictEqual(结果.isLeft(), true)
+    assert.strictEqual(结果.assertLeft().getLeft(), '未登录')
   },
 )

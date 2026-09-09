@@ -1,25 +1,26 @@
-import { 接口测试 } from '@lsby/net-core'
+import { 接口逻辑测试, 默认请求附加参数 } from '@lsby/net-core'
+import assert from 'assert'
 import { cleanDB } from '../../../../../scripts/db/clean-db'
 import { kysely管理器 } from '../../../../global/global'
-import { POST_JSON请求用例 } from '../../../../tools/request'
 import 接口 from './index'
 
 let name = 'newUser'
 let pwd = '123456'
 
-export default new 接口测试(
-  接口,
-  '失败',
+export default new 接口逻辑测试(
   async (): Promise<void> => {
     let db = kysely管理器.获得句柄()
     await cleanDB(db)
   },
-  async (): Promise<object> => {
-    return POST_JSON请求用例(接口, { name: name, pwd: pwd })
-  },
-  async (_解析结果): Promise<void> => {
+  async (): Promise<void> => {
+    let 结果 = await 接口
+      .获得接口逻辑()
+      .调用({ kysely: kysely管理器, json: { name: name, pwd: pwd } }, {}, 默认请求附加参数)
+    assert.strictEqual(结果.isLeft(), true)
+    assert.strictEqual(结果.assertLeft().getLeft(), '就要失败')
+
     let db = kysely管理器.获得句柄()
     let userRow = await db.selectFrom('user').select('id').where('name', '=', name).executeTakeFirst()
-    if (userRow !== undefined) throw new Error('不应该插入成功')
+    assert.strictEqual(userRow === undefined, true)
   },
 )

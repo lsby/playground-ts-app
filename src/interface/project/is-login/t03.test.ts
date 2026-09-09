@@ -1,4 +1,4 @@
-import { 接口测试 } from '@lsby/net-core'
+import { 接口逻辑测试, 默认请求附加参数 } from '@lsby/net-core'
 import assert from 'assert'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
@@ -9,9 +9,7 @@ import 接口 from './index'
 
 let name = 'admin'
 let pwd = '123456'
-export default new 接口测试(
-  接口,
-  '成功',
+export default new 接口逻辑测试(
   async (): Promise<void> => {
     let db = kysely管理器.获得句柄()
     await cleanDB(db)
@@ -24,18 +22,11 @@ export default new 接口测试(
       .values({ id: randomUUID(), name: name, pwd: await bcrypt.hash(pwd, 环境变量.BCRYPT_ROUNDS), is_admin: 0 })
       .execute()
   },
-  async (): Promise<object> => {
-    let urlPath = 接口.获得路径()
-    let url = `http://127.0.0.1:${环境变量.APP_PORT}${urlPath}`
-
-    let response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', authorization: '' },
-      body: JSON.stringify({}),
-    })
-    return await response.json()
-  },
-  async (解析结果): Promise<void> => {
-    assert.equal(解析结果.data.isLogin, false)
+  async (): Promise<void> => {
+    let 结果 = await 接口
+      .获得接口逻辑()
+      .调用({ userId: '00000000-0000-0000-0000-000000000000', kysely: kysely管理器, json: {} }, {}, 默认请求附加参数)
+    assert.strictEqual(结果.isRight(), true)
+    assert.strictEqual(结果.assertRight().getRight().isLogin, false)
   },
 )
