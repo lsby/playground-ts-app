@@ -189,15 +189,18 @@
 - 策略与理念:
   - 除非用户在交互中明确要求, 否则禁止擅自去补齐或新增测试代码, 并不是所有修改都有写测试的价值, 可以询问用户, 但应该让用户决定
   - 测试分单元测试, 集成测试, 端到端测试和需求测试
+  - 所有测试默认均会生成格式化测试报告，统一输出在 `test-outputs/` 目录下，并在运行结束时在控制台输出可直接点击的报告链接
 - 单元测试:
   - 单元测试指只测试某一个单独的模块, 例如单个接口
   - 单元测试采用与目标代码同目录 (Co-location) 的存放方式, 例如 `src/interface/demo/base/add/t01.test.ts`
-  - 通过命令 `test:unit` 运行, 支持交互选择或通过参数控制: `--all` 全量执行, `--filter <正则>` (或直接传正则参数) 筛选接口, `--coverage` / `--no-coverage` 控制覆盖率
+  - 通过命令 `test:unit` 运行, 支持交互选择或通过参数控制: `--all` 全量执行, `--filter <正则>` (或直接传正则参数) 筛选接口, `--no-coverage` 跳过覆盖率生成, `--open` 自动打开报告
+  - 默认无需额外参数即自动生成代码覆盖率与测试报告至 `test-outputs/coverage/index.html`
 - 集成测试:
   - 集成测试指测试一系列单元的组合运行的情况
   - 集成级别的测试应当放在 `test/integration/` 下
   - 借助接口两用性, 可以在不构造服务器环境的情况下, 对接口逻辑进行直接调用, 可以参考 `test/integration/demo.ts`
-  - 通过命令 `test:integration` 运行, 支持交互选择, `--all` 全量执行或直接指定文件名 (如 `demo.ts`)
+  - 通过命令 `test:integration` 运行, 支持交互选择, `--all` 全量执行, 直接指定文件名 (如 `demo.ts`), 或通过 `--open` 自动打开报告
+  - 默认无需额外参数即自动收集用例执行日志与状态，生成 HTML 与 JSON 测试报告至 `test-outputs/integration-report/index.html`
 - 端到端测试:
   - 端到端测试指模拟用户实际操作来测试
   - 端到端测试的用例放在 `test/e2e/` 下
@@ -210,6 +213,7 @@
   - 端到端测试的测试过程应该是黑盒的, 禁止通过 API 接口, 数据库句柄伪造初始状态
   - 端到端测试的验证过程应该是灰盒的, 可以通过数据库句柄等手段验证数据库内的数据
   - 通过命令 `test:e2e` 运行, 支持交互选择, `--all` 全量执行, 指定测试文件名, 以及 `--auto` (无头模式) / `--demo` (演示模式)
+  - 默认无需额外参数即自动生成 Playwright HTML 测试报告至 `test-outputs/playwright-report/index.html`
 - 需求测试:
   - 需求测试以业务需求和验收点为中心, 不限制具体测试技术, 模型与使用说明见 `src/model/test-requirement/README.md`
   - 项目需求定义和可运行流程放在 `test/requirement/`, 每个业务需求拥有一个独立的子目录, 内部包含对应的 `xxx-model.ts` 和 `xxx.spec.ts`, 参考 `test/requirement/demo/demo-model.ts` 和 `test/requirement/demo/demo.spec.ts`
@@ -218,6 +222,7 @@
   - 初始化可以直接准备数据, 业务行为和观察必须通过真实业务入口完成, 并返回符合项目证据策略的证据
   - 演示模式只控制展示和速度, 不得改变流程, 断言, 证据或测试数据
   - 修改需求模型后运行 `npm run task -- test:requirement:coverage`, 执行测试使用 `npm run test:requirement` (支持交互选择流程, 或通过 `--all` 全量执行, `--scenario=<流程名>`, `--requirement=<需求名>` 及 `--auto` / `--demo` 参数指定). 各测试在非 TTY 环境下均会自动静默全量运行
+  - 默认无需额外参数即自动生成 Playwright HTML 测试报告与业务需求证据附件至 `test-outputs/requirement-report/index.html`
 
 ### 修改完成后的验证
 

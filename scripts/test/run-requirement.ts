@@ -1,5 +1,6 @@
 import { spawn } from 'child_process'
 import inquirer from 'inquirer'
+import * as fsSync from 'node:fs'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { emitKeypressEvents } from 'node:readline'
@@ -303,6 +304,13 @@ async function 主函数(): Promise<void> {
   await new Promise<void>((完成, 失败) => {
     子进程.on('error', 失败)
     子进程.on('close', (退出码) => {
+      let 报告文件 = path.join(根目录, 'test-outputs/requirement-report/index.html')
+      if (fsSync.existsSync(报告文件) === true) {
+        let 报告链接 = pathToFileURL(报告文件).href
+        console.log(`\n==========================================`)
+        console.log(`📊 业务需求测试报告已生成: ${报告链接}`)
+        console.log(`==========================================\n`)
+      }
       if (退出码 === 0) 完成()
       else 失败(new Error(`测试流程执行结束，退出码: ${String(退出码)}`))
     })

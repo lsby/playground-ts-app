@@ -23,27 +23,13 @@
 pnpm install
 ```
 
-首次交互式安装会启动初始化向导，用于选择运行目标、创建本地配置、分配端口和重命名项目。选择初始化开发数据库后，安装完成时会自动执行 `db:push:dev:web`；跳过向导、选择不初始化、CI 或非交互安装均不会执行。
+首次交互式安装会启动初始化向导。
 
-推荐在 VS Code 中按 `F1`，选择“运行任务”，然后启动：
+依赖安装完成后，推荐在 VS Code 中按 `F1`，选择“运行任务”，然后启动：
 
 - `运行web开发套件`
 - `运行electron开发套件`
 - `运行纯前端开发套件`
-
-也可以直接运行：
-
-```powershell
-npm run dev:web
-npm run dev:electron
-npm run dev:pure-frontend
-```
-
-重新进入初始化向导：
-
-```powershell
-npm run setup:all
-```
 
 ## 开发指南
 

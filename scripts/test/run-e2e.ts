@@ -2,6 +2,7 @@ import { spawn } from 'child_process'
 import * as fs from 'fs'
 import inquirer from 'inquirer'
 import * as path from 'path'
+import { pathToFileURL } from 'url'
 
 async function 主函数(): Promise<void> {
   // 1. 扫描 test/e2e 目录下的所有 .spec.ts 文件
@@ -120,6 +121,13 @@ async function 主函数(): Promise<void> {
   })
 
   进程.on('close', (退出码) => {
+    let 报告文件 = path.join(根目录, 'test-outputs/playwright-report/index.html')
+    if (fs.existsSync(报告文件) === true) {
+      let 报告链接 = pathToFileURL(报告文件).href
+      console.log(`\n==========================================`)
+      console.log(`📊 端到端测试报告已生成: ${报告链接}`)
+      console.log(`==========================================\n`)
+    }
     process.exit(退出码 ?? 1)
   })
 }
