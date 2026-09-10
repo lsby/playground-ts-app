@@ -57,6 +57,9 @@ export let 任务表 = 定义任务({
   'fix:lint': { 说明: '应用 ESLint 自动修复', 运行: 命令('eslint', '.', '--fix'), 公开: false },
   'fix:all': { 说明: '修复并格式化代码', 依赖: ['fix:lint', 'fix:format'] },
 
+  // 整理
+  'tidy:all': { 说明: '生成派生文件、自动修复并执行静态检查', 依赖: ['generate:all', 'fix:all', 'check:all'] },
+
   // 清理
   'clean:all': { 说明: '清理全部构建产物和缓存', 运行: 命令('tsx', 'scripts/clean/clean-all.ts') },
   'clean:web': { 说明: '清理 Web 构建产物和缓存', 运行: 命令('tsx', 'scripts/clean/clean-web.ts') },

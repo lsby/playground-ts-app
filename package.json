@@ -24,8 +24,6 @@
     "db:push:dev:web": "tsx scripts/task/index.ts db:push:dev:web",
     "db:push:prod:web": "tsx scripts/task/index.ts db:push:prod:web",
     "db:push:test:web": "tsx scripts/task/index.ts db:push:test:web",
-    "fix:all": "tsx scripts/task/index.ts fix:all",
-    "generate:all": "tsx scripts/task/index.ts generate:all",
     "preinstall": "node scripts/setup/preinstall.mjs",
     "postinstall": "node scripts/setup/postinstall.mjs",
     "prepare": "husky",
@@ -35,7 +33,8 @@
     "test:e2e:all": "tsx scripts/task/index.ts test:e2e:all",
     "test:integration:all": "tsx scripts/task/index.ts test:integration:all",
     "test:requirement:all": "tsx scripts/task/index.ts test:requirement:all",
-    "test:unit:all": "tsx scripts/task/index.ts test:unit:all"
+    "test:unit:all": "tsx scripts/task/index.ts test:unit:all",
+    "tidy:all": "tsx scripts/task/index.ts tidy:all"
   },
   "lint-staged": {
     "*.{ts,js,json,css,html}": [
