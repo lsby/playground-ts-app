@@ -9,7 +9,9 @@ import {
 } from './task-runner'
 import { 任务表 } from './taskfile'
 
-type 任务选项 = { name: string; value: string; description: string }
+import { 保存上次任务, 模糊过滤并排序任务, 读取上次任务, type 候选任务项 } from './task-search'
+
+type 任务选项 = 候选任务项
 
 function 打印帮助(): void {
   console.log(`用法:
@@ -33,13 +35,18 @@ async function 选择任务(): Promise<string> {
   if (process.stdin.isTTY !== true)
     throw new Error('非交互环境必须明确指定任务名称，运行 npm run task -- --list 查看可用任务')
   let 可执行任务表: 任务表类型 = 任务表
-  let 候选任务组 = Object.entries(可执行任务表)
+  let 上次任务 = await 读取上次任务()
+  let 候选任务组: 任务选项[] = Object.entries(可执行任务表)
     .filter(([, 任务]) => 任务.公开 !== false)
-    .map(([任务名称, 任务]) => ({
-      name: `${任务名称}:${任务.说明}`,
-      value: 任务名称,
-      description: 获得详细说明(任务名称, 任务),
-    }))
+    .map(([任务名称, 任务]) => {
+      let 是上次任务 = 上次任务 !== undefined && 任务名称 === 上次任务
+      return {
+        name: 是上次任务 ? `${任务名称}:${任务.说明} (上次运行)` : `${任务名称}:${任务.说明}`,
+        value: 任务名称,
+        description: 获得详细说明(任务名称, 任务),
+        说明: 任务.说明,
+      }
+    })
   try {
     let { 任务名称 } = await inquirer.prompt<{ 任务名称: string }>([
       {
@@ -48,15 +55,7 @@ async function 选择任务(): Promise<string> {
         message: '选择要执行的任务',
         pageSize: 15,
         source: (输入: string | undefined): 任务选项[] => {
-          let 关键词组 = (输入 ?? '')
-            .trim()
-            .toLowerCase()
-            .split(/\s+/)
-            .filter((关键词) => 关键词 !== '')
-          return 候选任务组.filter((任务) => {
-            let 搜索文本 = `${任务.name} ${任务.description}`.toLowerCase()
-            return 关键词组.every((关键词) => 搜索文本.includes(关键词))
-          })
+          return 模糊过滤并排序任务({ 候选任务列表: 候选任务组, 输入, 上次任务 })
         },
       },
     ])
@@ -101,6 +100,7 @@ if (执行器参数.includes('--help') === true || 执行器参数.includes('-h'
     任务名称 = 参数
   }
   任务名称 ??= await 选择任务()
+  await 保存上次任务(任务名称)
 
   let 退出状态: { 处理Promise: Promise<void> | null; 信号: 'SIGINT' | 'SIGTERM' | null } = {
     处理Promise: null,

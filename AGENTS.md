@@ -192,7 +192,7 @@
 - 单元测试:
   - 单元测试指只测试某一个单独的模块，例如单个接口
   - 单元测试采用与目标代码同目录 (Co-location) 的存放方式，例如 `src/interface/demo/base/add/t01.test.ts`。
-  - 通过命令 `test:unit:interactive` 或 `test:unit:all`，脚本将自动搜集所有Co-location测试文件，生成测试聚合文件
+  - 通过命令 `test:unit:auto`，脚本将自动搜集所有Co-location测试文件，生成测试聚合文件并支持全量或按正则筛选运行
 - 集成测试:
   - 集成测试指测试一系列单元的组合运行的情况
   - 集成级别的测试应当放在 `test/integration/` 下。
@@ -215,7 +215,7 @@
   - 相关目录、文件、任务和配置统一使用 `requirement` 命名，不建立平行测试体系。
   - 初始化可以直接准备数据，业务行为和观察必须通过真实业务入口完成，并返回符合项目证据策略的证据。
   - 演示模式只控制展示和速度，不得改变流程、断言、证据或测试数据。
-  - 修改需求模型后运行 `npm run task -- test:requirement:coverage`，演示运行使用 `npm run test:requirement:demo`，无头运行全部流程使用 `npm run test:requirement:all`。
+  - 修改需求模型后运行 `npm run task -- test:requirement:coverage`，演示运行使用 `npm run test:requirement:demo`，全自动运行使用 `npm run test:requirement:auto`。
 
 ### 修改完成后的验证
 

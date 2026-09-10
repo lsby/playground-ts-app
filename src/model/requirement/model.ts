@@ -5,6 +5,8 @@
  * TypeScript 对象引用建立关系，名称只用于日志和持久化快照的可读定位。
  */
 
+import type { 选择结果 } from './choice'
+
 export type 验收手段 = '自动' | '人工'
 
 /** 外层为“或”，每个内层方案中的依赖为“且”；空数组表示没有依赖。 */
@@ -141,17 +143,71 @@ export class 状态<上下文> {
   }
 }
 
+export type 流程标签字典 = Readonly<Record<string, string>>
+
+export type 标签选项参数 =
+  | string
+  | { 值: string; 标签?: string | undefined; 说明?: string | undefined; 是通配?: boolean | undefined }
+
+export class 标签选项 {
+  public readonly 值: string
+  public readonly 标签: string
+  public readonly 说明?: string | undefined
+  public readonly 是通配: boolean
+
+  public constructor(参数: 标签选项参数) {
+    if (typeof 参数 === 'string') {
+      this.值 = 检查非空文本('标签选项值', 参数)
+      this.标签 = this.值
+      this.说明 = undefined
+      this.是通配 = false
+    } else {
+      this.值 = 检查非空文本('标签选项值', 参数.值)
+      this.标签 = 参数.标签 !== undefined ? 检查非空文本('标签选项标签', 参数.标签) : this.值
+      this.说明 = 参数.说明
+      this.是通配 = 参数.是通配 === true
+    }
+  }
+}
+
+export function 通配选项(标签: string = '不限', 说明?: string | undefined): 标签选项 {
+  return new 标签选项({ 值: `__WILDCARD__:${标签}`, 标签, 说明, 是通配: true })
+}
+
+export class 标签维度 {
+  public readonly 名称: string
+  public readonly 选项们: readonly 标签选项[]
+  public readonly 说明?: string | undefined
+
+  public constructor(参数: { 名称: string; 选项们: readonly (标签选项 | 标签选项参数)[]; 说明?: string | undefined }) {
+    this.名称 = 检查非空文本('标签维度名称', 参数.名称)
+    let 解析选项们 = 参数.选项们.map((项) => (项 instanceof 标签选项 ? 项 : new 标签选项(项)))
+    if (解析选项们.length === 0) throw new Error(`标签维度“${this.名称}”至少需要一个选项`)
+    let 标签集合 = new Set<string>()
+    for (let 选项 of 解析选项们) {
+      if (标签集合.has(选项.标签)) throw new Error(`标签维度“${this.名称}”包含重复选项标签“${选项.标签}”`)
+      标签集合.add(选项.标签)
+    }
+    this.选项们 = 解析选项们
+    this.说明 = 参数.说明
+  }
+}
+
 export class 流程<上下文, 依赖条件> {
   public readonly 名称: string
   public readonly 给定状态: 状态<上下文>
   public readonly 步骤们: readonly 流程步骤<上下文>[]
   public readonly 覆盖验收点们: readonly 验收点<依赖条件>[]
+  public readonly 选择结果?: 选择结果 | undefined
+  public readonly 标签字典?: 流程标签字典 | undefined
 
   public constructor(参数: {
     名称: string
     给定状态: 状态<上下文>
     步骤们: readonly 流程步骤<上下文>[]
     覆盖验收点们: readonly 验收点<依赖条件>[]
+    选择结果?: 选择结果 | undefined
+    标签字典?: 流程标签字典 | undefined
   }) {
     this.名称 = 检查非空文本('流程名称', 参数.名称)
     if (参数.步骤们.length === 0) throw new Error(`流程“${this.名称}”至少需要一个步骤`)
@@ -163,6 +219,8 @@ export class 流程<上下文, 依赖条件> {
     this.给定状态 = 参数.给定状态
     this.步骤们 = [...参数.步骤们]
     this.覆盖验收点们 = [...参数.覆盖验收点们]
+    this.选择结果 = 参数.选择结果
+    this.标签字典 = 参数.标签字典
   }
 }
 

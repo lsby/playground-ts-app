@@ -22,6 +22,7 @@
     "build:all": "tsx scripts/task/index.ts build:all",
     "check": "tsx scripts/task/index.ts check:all",
     "check:all": "tsx scripts/task/index.ts check:all",
+    "db:push:dev:web": "tsx scripts/task/index.ts db:push:dev:web",
     "dev:electron": "tsx scripts/task/index.ts dev:electron",
     "dev:pure-frontend": "tsx scripts/task/index.ts dev:pure-frontend",
     "dev:web": "tsx scripts/task/index.ts dev:web",
@@ -36,14 +37,12 @@
     "setup:all": "tsx scripts/task/index.ts setup:all",
     "setup:init": "tsx scripts/task/index.ts setup:init",
     "task": "tsx scripts/task/index.ts",
-    "test:e2e:all": "tsx scripts/task/index.ts test:e2e:all",
-    "test:e2e:interactive": "tsx scripts/task/index.ts test:e2e:interactive",
-    "test:integration:all": "tsx scripts/task/index.ts test:integration:all",
-    "test:integration:interactive": "tsx scripts/task/index.ts test:integration:interactive",
-    "test:requirement:all": "tsx scripts/task/index.ts test:requirement:all",
+    "test:e2e:auto": "tsx scripts/task/index.ts test:e2e:auto",
+    "test:e2e:demo": "tsx scripts/task/index.ts test:e2e:demo",
+    "test:integration:auto": "tsx scripts/task/index.ts test:integration:auto",
+    "test:requirement:auto": "tsx scripts/task/index.ts test:requirement:auto",
     "test:requirement:demo": "tsx scripts/task/index.ts test:requirement:demo",
-    "test:unit:all": "tsx scripts/task/index.ts test:unit:all",
-    "test:unit:interactive": "tsx scripts/task/index.ts test:unit:interactive"
+    "test:unit:auto": "tsx scripts/task/index.ts test:unit:auto"
   },
   "lint-staged": {
     "*.{ts,js,json,css,html}": [

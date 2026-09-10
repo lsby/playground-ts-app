@@ -47,16 +47,14 @@ npm run setup:init
 
 ## 常用命令
 
-| 命令                              | 用途                           |
-| --------------------------------- | ------------------------------ |
-| `npm run task`                    | 交互式搜索任务                 |
-| `npm run task -- --list`          | 查看公开任务                   |
-| `npm run generate`                | 更新全部派生源码               |
-| `npm run check`                   | 检查格式、ESLint 和 TypeScript |
-| `npm run fix`                     | 自动修复并格式化               |
-| `npm run task -- db:push:dev:web` | 创建或迁移开发数据库           |
-| `npm run test:unit:interactive`   | 交互式运行接口测试             |
-| `npm run test:unit:all`           | 非交互运行全部接口测试         |
+| 命令                      | 用途                           |
+| ------------------------- | ------------------------------ |
+| `npm run task`            | 交互式搜索任务                 |
+| `npm run task -- --list`  | 查看公开任务                   |
+| `npm run generate`        | 更新全部派生源码               |
+| `npm run check`           | 检查格式、ESLint 和 TypeScript |
+| `npm run fix`             | 自动修复并格式化               |
+| `npm run db:push:dev:web` | 创建或迁移开发数据库           |
 
 ## 开发指南
 

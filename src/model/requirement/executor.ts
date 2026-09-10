@@ -9,7 +9,7 @@ import {
   type 选择结果,
   type 选择读取器,
 } from './choice'
-import { 依赖已满足, 流程, 状态, 观察, type 观察结果, type 证据, type 需求, type 验收点 } from './model'
+import { 依赖已满足, 流程, 状态, 观察, type 标签维度, type 观察结果, type 证据, type 需求, type 验收点 } from './model'
 import { 快照管理器, type 快照清单, type 快照配置 } from './snapshot'
 
 export class 依赖条件集<依赖条件> {
@@ -49,6 +49,7 @@ export type 项目测试元数据<系统上下文, 依赖条件> = {
   依赖条件们: readonly 依赖条件[]
   选择们: readonly 任意选择[]
   选择约束们: readonly 选择约束[]
+  标签维度们?: readonly 标签维度[] | undefined
   /** 不声明时接受任意证据手段；具体项目可借此建立黑盒证据边界。 */
   证据策略?: { 允许手段们: readonly string[] }
   快照?: 快照配置<流程上下文<系统上下文, 依赖条件>>
@@ -91,6 +92,7 @@ export class 测试模型<系统上下文 extends object, 依赖条件> {
     this.元数据 = 参数.元数据
     this.需求们 = [...参数.需求们]
     this.流程们 = [...参数.流程们]
+    this.检查()
   }
 
   public 检查(): void {
@@ -123,6 +125,12 @@ export class 测试模型<系统上下文 extends object, 依赖条件> {
       错误们.push(错误 instanceof Error ? 错误.message : String(错误))
     }
 
+    let 维度映射 = new Map<string, 标签维度>()
+    for (let 维度 of this.元数据.标签维度们 ?? []) {
+      if (维度映射.has(维度.名称)) 错误们.push(`项目元数据中的标签维度名称“${维度.名称}”重复`)
+      维度映射.set(维度.名称, 维度)
+    }
+
     let 验收点集 = new Set<验收点<依赖条件>>()
     let 需求集 = new Set<需求<依赖条件>>()
     if (this.需求们.length === 0) 错误们.push('测试模型至少需要一个需求')
@@ -150,6 +158,29 @@ export class 测试模型<系统上下文 extends object, 依赖条件> {
         错误们.push(`流程“${当前流程.名称}”不是从项目元数据的初始状态“${this.元数据.初始状态.名称}”派生的`)
       for (let 当前验收点 of 当前流程.覆盖验收点们)
         if (!验收点集.has(当前验收点)) 错误们.push(`流程“${当前流程.名称}”引用了未登记的验收点“${当前验收点.描述}”`)
+      if (当前流程.标签字典 !== undefined) {
+        for (let [维度名, 标签值] of Object.entries(当前流程.标签字典)) {
+          let 匹配维度 = 维度映射.get(维度名)
+          if (匹配维度 === undefined) {
+            let 已登记维度 = [...维度映射.keys()].map((名) => `"${名}"`).join('、')
+            let 登记提示 = 已登记维度 === '' ? '（当前模型未配置任何标签维度）' : `，已登记维度为：[${已登记维度}]`
+            错误们.push(`流程“${当前流程.名称}”声明了未在元数据中登记的标签维度“${维度名}”${登记提示}`)
+          } else {
+            let 命中选项 = 匹配维度.选项们.find(
+              (选项) => 选项.是通配 === false && (选项.值 === 标签值 || 选项.标签 === 标签值),
+            )
+            if (命中选项 === undefined) {
+              let 可选列表 = 匹配维度.选项们
+                .filter((项) => 项.是通配 === false)
+                .map((项) => `"${项.标签}"`)
+                .join('、')
+              错误们.push(
+                `流程“${当前流程.名称}”的标签“${维度名}”指定了未在枚举中的选项值“${标签值}”，有效枚举选项为：[${可选列表}]`,
+              )
+            }
+          }
+        }
+      }
       try {
         当前流程.给定状态.展开行为们()
       } catch (错误) {

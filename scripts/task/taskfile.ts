@@ -1,37 +1,23 @@
-import path from 'path'
-import { 获得环境文件 } from '../setup/env-files-core.mjs'
-import { 获得单元测试生成参数 } from '../test/unit-test-config'
+import {
+  Electron开发环境文件,
+  Electron生产环境文件,
+  Parcel基础参数,
+  Sea生产环境文件,
+  Web开发环境文件,
+  Web生产环境文件,
+  完整调试环境,
+  测试环境文件,
+  生成API列表命令,
+  生成API类型命令,
+  生成Web索引命令,
+  生成本地API列表命令,
+  生成本地Schema命令,
+  生成调试环境,
+  纯前端开发环境文件,
+  纯前端生产环境文件,
+} from './task-common'
 import { 命令, 定义任务 } from './task-runner'
-
-let 项目根目录 = path.resolve(import.meta.dirname, '../..')
-let 完整调试环境 = { DEBUG: '@lsby:*,@lsby:playground-ts-app:*,-@lsby:ts-env*' }
-let 生成调试环境 = { DEBUG: '@lsby:*' }
-let 测试调试环境 = { DEBUG: '@lsby:*,-@lsby:ts-env*,-*:trace' }
-let Web开发环境文件 = 获得环境文件(项目根目录, { NODE_ENV: 'development', BUILD_TARGET: 'web' })
-let Electron开发环境文件 = 获得环境文件(项目根目录, { NODE_ENV: 'development', BUILD_TARGET: 'electron' })
-let 纯前端开发环境文件 = 获得环境文件(项目根目录, { NODE_ENV: 'development', BUILD_TARGET: 'pure-frontend' })
-let Web生产环境文件 = 获得环境文件(项目根目录, { NODE_ENV: 'production', BUILD_TARGET: 'web' })
-let Electron生产环境文件 = 获得环境文件(项目根目录, { NODE_ENV: 'production', BUILD_TARGET: 'electron' })
-let Sea生产环境文件 = 获得环境文件(项目根目录, { NODE_ENV: 'production', BUILD_TARGET: 'sea' })
-let 纯前端生产环境文件 = 获得环境文件(项目根目录, { NODE_ENV: 'production', BUILD_TARGET: 'pure-frontend' })
-let 测试环境文件 = 获得环境文件(项目根目录, { NODE_ENV: 'test', BUILD_TARGET: 'web' })
-let Web入口 = 'src/web/page/**/*.html'
-let Parcel基础参数 = ['build', '--no-autoinstall', '--no-cache', '--no-source-maps', Web入口]
-let 生成API列表命令 = 命令(
-  'lsby-net-core-gen-api-list',
-  './tsconfig.json',
-  './src/interface',
-  './src/interface/interface-list.ts',
-)
-let 生成API类型命令 = 命令(
-  'lsby-net-core-gen-api-type',
-  './tsconfig.json',
-  './src/interface',
-  './src/types/interface-type.ts',
-)
-let 生成Web索引命令 = 命令('tsx', 'scripts/gen/gen-web-index.ts')
-let 生成本地API列表命令 = 命令('tsx', 'scripts/gen/gen-local-api-list.ts')
-let 生成本地Schema命令 = 命令('tsx', 'scripts/gen/gen-local-schema.ts')
+import { 测试任务表 } from './taskfile-test'
 
 export let 任务表 = 定义任务({
   // 生成
@@ -374,80 +360,7 @@ export let 任务表 = 定义任务({
   'dev:pure-frontend': { 说明: '生成派生文件后启动纯前端开发套件', 依赖: ['generate:all', 'dev:pure-frontend:watch'] },
 
   // 测试
-  'test:unit:interactive': {
-    说明: '交互式运行单元测试',
-    环境文件: 测试环境文件,
-    环境变量: 测试调试环境,
-    依赖: ['db:ensure:test:web'],
-    运行: 命令('tsx', 'scripts/test/run-test.ts'),
-    传递参数: true,
-  },
-  'test:unit:all': {
-    说明: '非交互运行全部单元测试',
-    环境文件: 测试环境文件,
-    环境变量: 测试调试环境,
-    依赖: ['db:ensure:test:web'],
-    运行: [命令('lsby-net-core-gen-test', ...获得单元测试生成参数()), 命令('vitest', 'run')],
-    传递参数: true,
-  },
-  'test:integration:interactive': {
-    说明: '交互式运行集成测试',
-    环境文件: 测试环境文件,
-    环境变量: 测试调试环境,
-    依赖: ['db:ensure:test:web'],
-    运行: 命令('tsx', 'scripts/test/run-integration.ts'),
-    传递参数: true,
-  },
-  'test:integration:all': {
-    说明: '非交互运行全部集成测试',
-    环境文件: 测试环境文件,
-    环境变量: 测试调试环境,
-    依赖: ['db:ensure:test:web'],
-    运行: 命令('tsx', 'scripts/test/run-integration.ts', '--all'),
-    传递参数: true,
-  },
-  'test:e2e:server': {
-    说明: '构建并启动端到端测试服务',
-    环境文件: 测试环境文件,
-    依赖: ['db:ensure:test:web', 'build:web:test'],
-    运行: 命令('tsx', './src/server.ts'),
-    公开: false,
-  },
-  'test:e2e:interactive': {
-    说明: '交互式运行端到端测试',
-    环境文件: 测试环境文件,
-    环境变量: 测试调试环境,
-    运行: 命令('tsx', 'scripts/test/run-e2e.ts'),
-    传递参数: true,
-  },
-  'test:e2e:all': {
-    说明: '非交互运行全部端到端测试',
-    环境文件: 测试环境文件,
-    环境变量: 测试调试环境,
-    运行: 命令('playwright', 'test'),
-    传递参数: true,
-  },
-  'test:requirement:coverage': {
-    说明: '校验业务需求、验收点与流程的覆盖关系',
-    环境文件: 测试环境文件,
-    运行: 命令('tsx', 'scripts/test/check-requirement-coverage.ts'),
-  },
-  'test:requirement:demo': {
-    说明: '运行可展示的业务需求流程',
-    环境文件: 测试环境文件,
-    环境变量: { ...测试调试环境, DEMO_MODE: 'true' },
-    依赖: ['test:requirement:coverage'],
-    运行: 命令('playwright', 'test', '--config', 'playwright.requirement.config.ts', '--headed'),
-    传递参数: true,
-  },
-  'test:requirement:all': {
-    说明: '非交互运行全部业务需求流程',
-    环境文件: 测试环境文件,
-    环境变量: 测试调试环境,
-    依赖: ['test:requirement:coverage'],
-    运行: 命令('playwright', 'test', '--config', 'playwright.requirement.config.ts'),
-    传递参数: true,
-  },
+  ...测试任务表,
 
   // capacitor
   'capacitor:init': { 说明: '初始化 Capacitor', 运行: 命令('cap', 'init'), 传递参数: true },
@@ -496,7 +409,7 @@ export let 任务表 = 定义任务({
   },
 
   // 发布
-  'release:verify': { 说明: '发布前运行单元测试并完成构建', 依赖: ['test:unit:all', 'build:all'], 公开: false },
+  'release:verify': { 说明: '发布前运行单元测试并完成构建', 依赖: ['test:unit:auto', 'build:all'], 公开: false },
   'release:version': {
     说明: '交互式选择新版本号',
     运行: 命令('bumpp', '--no-commit', '--no-tag', '--no-push'),
