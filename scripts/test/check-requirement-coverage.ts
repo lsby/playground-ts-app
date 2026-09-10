@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { 流程, 测试模型, 需求, 验收点 } from '../../src/model/requirement'
+import { 流程, 测试模型, 需求, 验收点 } from '../../src/model/test-requirement'
 import type { 已审阅的any } from '../../src/tools/types'
 
 let __dirname = path.dirname(fileURLToPath(import.meta.url))

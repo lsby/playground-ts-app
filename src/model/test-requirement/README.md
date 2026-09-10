@@ -16,7 +16,7 @@
 
 ## 分层边界
 
-`src/model/requirement` 只包含与具体项目无关的框架：
+`src/model/test-requirement` 只包含与具体项目无关的框架：
 
 - `model.ts`：需求、验收点、状态、行为、观察和流程。
 - `choice.ts`：选择、约束、合法方案枚举和可达图分析。

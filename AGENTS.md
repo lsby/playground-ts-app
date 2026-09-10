@@ -192,11 +192,12 @@
 - 单元测试:
   - 单元测试指只测试某一个单独的模块，例如单个接口
   - 单元测试采用与目标代码同目录 (Co-location) 的存放方式，例如 `src/interface/demo/base/add/t01.test.ts`。
-  - 通过命令 `test:unit:all`，脚本将自动搜集所有Co-location测试文件，生成测试聚合文件并支持全量或按正则筛选运行
+  - 通过命令 `test:unit` 运行，支持交互选择或通过参数控制：`--all` 全量执行、`--filter <正则>`（或直接传正则参数）筛选接口、`--coverage` / `--no-coverage` 控制覆盖率
 - 集成测试:
   - 集成测试指测试一系列单元的组合运行的情况
   - 集成级别的测试应当放在 `test/integration/` 下。
   - 借助接口两用性，可以在不构造服务器环境的情况下，对接口逻辑进行直接调用，可以参考 `test/integration/demo.ts`
+  - 通过命令 `test:integration` 运行，支持交互选择、`--all` 全量执行或直接指定文件名（如 `demo.ts`）
 - 端到端测试:
   - 端到端测试指模拟用户实际操作来测试
   - 端到端测试的用例放在 `test/e2e/` 下。
@@ -204,18 +205,19 @@
   - 端到端测试支持一个变种: 演示模式, 在该模式下, 遇到特定的函数将暂停并弹出提示让用户确认, 用户点击按钮后继续
     - 演示模式的变量应该仅仅用来控制浏览器界面的可见性、视觉反馈效果以及减慢等待时间。
     - 不应该因为演示模式的开启而改变核心业务操作、断言逻辑或者测试数据，以确保演示效果跟在无头环境下跑测试的行为完全一致。
-    - 可以参考 E2E 演示工具 `test/e2e/tools/demo-mode.ts`。
+    - 可以参考演示交互模型 `src/model/test-interactive/`。
     - 调试代码时，总是使用非演示模式来快速测试
   - 端到端测试的测试过程应该是黑盒的，禁止通过 API 接口、数据库句柄伪造初始状态
   - 端到端测试的验证过程应该是灰盒的，可以通过数据库句柄等手段验证数据库内的数据
+  - 通过命令 `test:e2e` 运行，支持交互选择、`--all` 全量执行、指定测试文件名，以及 `--auto`（无头模式）/ `--demo`（演示模式）
 - 需求测试:
-  - 需求测试以业务需求和验收点为中心，不限制具体测试技术，模型与使用说明见 `src/model/requirement/README.md`。
+  - 需求测试以业务需求和验收点为中心，不限制具体测试技术，模型与使用说明见 `src/model/test-requirement/README.md`。
   - 项目需求定义和可运行流程放在 `test/requirement/`，每个业务需求拥有一个独立的子目录，内部包含对应的 `xxx-model.ts` 和 `xxx.spec.ts`，参考 `test/requirement/demo/demo-model.ts` 和 `test/requirement/demo/demo.spec.ts`。
   - `scripts/test/check-requirement-coverage.ts` 会递归扫描 `test/requirement/` 下的所有 `*-model.ts` 文件并统计覆盖率，新增需求模型后无需手动注册。
   - 相关目录、文件、任务和配置统一使用 `requirement` 命名，不建立平行测试体系。
   - 初始化可以直接准备数据，业务行为和观察必须通过真实业务入口完成，并返回符合项目证据策略的证据。
   - 演示模式只控制展示和速度，不得改变流程、断言、证据或测试数据。
-  - 修改需求模型后运行 `npm run task -- test:requirement:coverage`，执行测试使用 `npm run test:requirement:all`（支持交互选择流程及演示/自动模式，或通过 `--demo` 参数指定）。
+  - 修改需求模型后运行 `npm run task -- test:requirement:coverage`，执行测试使用 `npm run test:requirement`（支持交互选择流程，或通过 `--all` 全量执行、`--scenario=<流程名>`、`--requirement=<需求名>` 及 `--auto` / `--demo` 参数指定）。各测试在非 TTY 环境下均会自动静默全量运行。
 
 ### 修改完成后的验证
 

@@ -37,11 +37,21 @@ export interface 快照入口 {
   保存(说明?: string): void
 }
 
+export type 步骤元信息 = {
+  阶段: '准备初始状态' | '准备给定状态' | '恢复快照' | '流程步骤'
+  /** 自定义演示粒度。框架不会解析或推断其含义。 */
+  演示粒度?: string
+}
+
+export type 命名步骤执行器 = <结果>(描述: string, 执行: () => Promise<结果>, 元信息?: 步骤元信息) => Promise<结果>
+
 export type 流程上下文<系统上下文, 依赖条件> = {
   readonly 系统: 系统上下文
   readonly 依赖: 依赖条件集<依赖条件>
   readonly 选择: 选择读取器
   readonly 快照: 快照入口
+  /** 当前步骤所处的自定义演示粒度 */
+  演示粒度?: string
 }
 
 export type 项目测试元数据<系统上下文, 依赖条件> = {
@@ -66,8 +76,6 @@ export type 流程执行报告<依赖条件> = {
   执行步骤数量: number
   跳过步骤数量: number
 }
-
-export type 命名步骤执行器 = <结果>(描述: string, 执行: () => Promise<结果>) => Promise<结果>
 
 export class 观察失败错误 extends Error {
   public readonly 证据们: readonly 证据[]
@@ -254,7 +262,7 @@ export class 流程执行器<系统上下文 extends object, 依赖条件> {
 
   public async 执行(
     当前流程: 流程<流程上下文<系统上下文, 依赖条件>, 依赖条件>,
-    参数: { 从快照恢复?: string } = {},
+    参数: { 从快照恢复?: string | undefined; 演示粒度?: string | undefined } = {},
   ): Promise<流程执行报告<依赖条件>> {
     if (!this.模型.流程们.includes(当前流程)) throw new Error(`流程“${当前流程.名称}”不属于当前测试模型`)
     let 不可执行验收点们 = 当前流程.覆盖验收点们.filter(
@@ -271,35 +279,52 @@ export class 流程执行器<系统上下文 extends object, 依赖条件> {
       if (this.快照管理器 === undefined) throw new Error('当前项目没有配置快照恢复行为')
       let { 清单 } = await this.快照管理器.读取(参数.从快照恢复)
       this.检查恢复兼容性(当前流程, 清单)
+      this.上下文.演示粒度 = '恢复快照'
       await this.执行命名步骤(
         `恢复项目初始状态：${this.模型.元数据.初始状态.名称}`,
         async () => await this.模型.元数据.初始状态.准备初始状态(this.上下文),
+        { 阶段: '恢复快照', 演示粒度: '恢复快照' },
       )
       从快照恢复 = await this.快照管理器.恢复(参数.从快照恢复)
       开始步骤下标 = 从快照恢复.运行位置.下一个步骤下标
       this.日志(`已从快照 ${从快照恢复.uuid} 恢复，将跳过前 ${开始步骤下标} 个流程步骤`)
     } else {
       let 初始状态 = this.模型.元数据.初始状态
-      await this.执行命名步骤(`准备初始状态：${初始状态.名称}`, async () => await 初始状态.准备初始状态(this.上下文))
-      for (let 状态行为 of 当前流程.给定状态.展开行为们())
-        await this.执行命名步骤(`准备给定状态：${状态行为.描述}`, async () => await 状态行为.执行(this.上下文))
+      this.上下文.演示粒度 = '准备初始状态'
+      await this.执行命名步骤(`准备初始状态：${初始状态.名称}`, async () => await 初始状态.准备初始状态(this.上下文), {
+        阶段: '准备初始状态',
+        演示粒度: '准备初始状态',
+      })
+      for (let 状态行为 of 当前流程.给定状态.展开行为们()) {
+        this.上下文.演示粒度 = '准备给定状态'
+        await this.执行命名步骤(`准备给定状态：${状态行为.描述}`, async () => await 状态行为.执行(this.上下文), {
+          阶段: '准备给定状态',
+          演示粒度: '准备给定状态',
+        })
+      }
     }
 
     let 观察记录们: 观察记录[] = []
     let 创建快照们: 快照清单[] = []
+    let 流程演示粒度 = 参数.演示粒度 ?? '流程步骤'
     for (let 下标 = 开始步骤下标; 下标 < 当前流程.步骤们.length; 下标 += 1) {
       let 步骤 = 当前流程.步骤们[下标]
       if (步骤 === undefined) throw new Error(`流程“${当前流程.名称}”的步骤下标越界`)
       this.允许请求快照 = true
+      this.上下文.演示粒度 = 流程演示粒度
       try {
-        await this.执行命名步骤(步骤.描述, async (): Promise<void> => {
-          if (步骤 instanceof 观察) {
-            let 结果 = await 步骤.执行(this.上下文)
-            this.检查证据策略(步骤.描述, 结果)
-            观察记录们.push({ 观察描述: 步骤.描述, 结果 })
-            if (!结果.通过) throw new 观察失败错误(步骤.描述, 结果)
-          } else await 步骤.执行(this.上下文)
-        })
+        await this.执行命名步骤(
+          步骤.描述,
+          async (): Promise<void> => {
+            if (步骤 instanceof 观察) {
+              let 结果 = await 步骤.执行(this.上下文)
+              this.检查证据策略(步骤.描述, 结果)
+              观察记录们.push({ 观察描述: 步骤.描述, 结果 })
+              if (!结果.通过) throw new 观察失败错误(步骤.描述, 结果)
+            } else await 步骤.执行(this.上下文)
+          },
+          { 阶段: '流程步骤', 演示粒度: 流程演示粒度 },
+        )
       } catch (错误) {
         this.待保存快照说明们.splice(0)
         throw 错误

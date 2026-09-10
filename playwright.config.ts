@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 let port = process.env.APP_PORT
 if (port === undefined) {
-  throw new Error('运行测试失败：缺少 APP_PORT，请通过 npm run task -- test:e2e:all 启动测试')
+  throw new Error('运行测试失败：缺少 APP_PORT，请通过 npm run task -- test:e2e 启动测试')
 }
 
 /**
@@ -21,7 +21,7 @@ export default defineConfig({
   /* Opt out of parallel tests */
   workers: 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: [['html', { outputFolder: './test-outputs/playwright-report' }]],
+  reporter: [['list'], ['html', { outputFolder: './test-outputs/playwright-report' }]],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */

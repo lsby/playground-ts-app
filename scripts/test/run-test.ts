@@ -1,30 +1,53 @@
 import crossSpawn from 'cross-spawn'
 import inquirer from 'inquirer'
-import { z } from 'zod'
 import { 获得单元测试生成参数 } from './unit-test-config'
 
-type 测试选项 = { 过滤器?: string; 生成覆盖率?: boolean }
+type 测试选项 = { 过滤器?: string; 生成覆盖率?: boolean; 全部?: boolean }
 
 function 解析参数(): 测试选项 {
   let 结果: 测试选项 = {}
   let 参数组 = process.argv.slice(2)
   for (let 索引 = 0; 索引 < 参数组.length; 索引 += 1) {
-    let 参数 = z.enum(['--filter', '--coverage', '--no-coverage']).parse(参数组[索引])
-    switch (参数) {
-      case '--filter': {
-        let 过滤器 = 参数组[索引 + 1]
-        if (过滤器 === undefined || 过滤器.startsWith('--') === true) throw new Error('--filter 后必须提供正则表达式')
-        结果.过滤器 = 过滤器
-        索引 += 1
-        break
-      }
-      case '--coverage':
-        结果.生成覆盖率 = true
-        break
-      case '--no-coverage':
-        结果.生成覆盖率 = false
-        break
+    let 原始参数 = 参数组[索引]
+    if (原始参数 === undefined) continue
+
+    if (原始参数 === '--all') {
+      结果.全部 = true
+      结果.过滤器 ??= '.*'
+      结果.生成覆盖率 ??= false
+      continue
     }
+
+    if (原始参数 === '--filter') {
+      let 过滤器 = 参数组[索引 + 1]
+      if (过滤器 === undefined || 过滤器.startsWith('--') === true) throw new Error('--filter 后必须提供正则表达式')
+      结果.过滤器 = 过滤器
+      索引 += 1
+      continue
+    }
+
+    if (原始参数.startsWith('--filter=') === true) {
+      结果.过滤器 = 原始参数.slice('--filter='.length)
+      continue
+    }
+
+    if (原始参数 === '--coverage') {
+      结果.生成覆盖率 = true
+      continue
+    }
+
+    if (原始参数 === '--no-coverage') {
+      结果.生成覆盖率 = false
+      continue
+    }
+
+    // 未指定过滤器且非 -- 开头时，作为接口路径过滤正则
+    if (原始参数.startsWith('--') === false && 结果.过滤器 === undefined) {
+      结果.过滤器 = 原始参数
+      continue
+    }
+
+    throw new Error(`未知参数: ${原始参数}，支持的参数: --all, --filter <正则>, --coverage, --no-coverage`)
   }
   return 结果
 }

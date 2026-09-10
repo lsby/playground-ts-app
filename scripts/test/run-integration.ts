@@ -15,13 +15,31 @@ async function 主函数(): Promise<void> {
   })
 
   let 原始参数 = process.argv.slice(2)
-  let 是否全部运行 = 原始参数.includes('--all')
-  let 附加参数组 = 原始参数.filter((参数) => 参数 !== '--all')
+  let 是否全部运行 = false
+  let 指定目标文件: string | undefined
+  let 附加参数组: string[] = []
+
+  for (let 参数 of 原始参数) {
+    if (参数 === '--all') {
+      是否全部运行 = true
+      continue
+    }
+    let 规范化 = 参数.replaceAll('\\', '/')
+    let 基础文件名 = path.basename(规范化)
+    let 匹配的文件 = 源代码文件列表.find((文件) => 文件 === 基础文件名 || 文件 === `${基础文件名}.ts`)
+    if (匹配的文件 !== undefined && 指定目标文件 === undefined) {
+      指定目标文件 = 匹配的文件
+      continue
+    }
+    附加参数组.push(参数)
+  }
 
   let 运行目标: string
   if (是否全部运行 === true) {
     运行目标 = 'all'
-  } else {
+  } else if (指定目标文件 !== undefined) {
+    运行目标 = 指定目标文件
+  } else if (process.stdin.isTTY === true) {
     // 交互式问题
     let 选项列表 = [
       { name: '[全部运行]', value: 'all' },
@@ -32,6 +50,8 @@ async function 主函数(): Promise<void> {
       { type: 'list', name: '运行目标', message: '请选择要运行的集成测试文件:', choices: 选项列表, default: 'all' },
     ] as any)) as { 运行目标: string }
     运行目标 = 回答.运行目标
+  } else {
+    运行目标 = 'all'
   }
 
   let 需要运行的文件列表 = 运行目标 === 'all' ? 源代码文件列表 : [运行目标]

@@ -30,10 +30,10 @@
     "release:all": "tsx scripts/task/index.ts release:all",
     "setup:all": "tsx scripts/task/index.ts setup:all",
     "task": "tsx scripts/task/index.ts",
-    "test:e2e:all": "tsx scripts/task/index.ts test:e2e:all",
-    "test:integration:all": "tsx scripts/task/index.ts test:integration:all",
-    "test:requirement:all": "tsx scripts/task/index.ts test:requirement:all",
-    "test:unit:all": "tsx scripts/task/index.ts test:unit:all",
+    "test:e2e": "tsx scripts/task/index.ts test:e2e --",
+    "test:integration": "tsx scripts/task/index.ts test:integration --",
+    "test:requirement": "tsx scripts/task/index.ts test:requirement --",
+    "test:unit": "tsx scripts/task/index.ts test:unit --",
     "tidy:all": "tsx scripts/task/index.ts tidy:all"
   },
   "lint-staged": {

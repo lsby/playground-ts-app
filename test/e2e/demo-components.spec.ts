@@ -2,17 +2,31 @@ import { expect, Page, test } from '@playwright/test'
 import { cleanDB } from '../../scripts/db/clean-db'
 import { kysely管理器 } from '../../src/global/global'
 import { init } from '../../src/init/init'
+import {
+  演示_作用域,
+  演示_勾选,
+  演示_完成,
+  演示_开场,
+  演示_点击,
+  演示_说明_右下角,
+  演示_输入,
+  演示_选择,
+} from '../../src/model/test-interactive'
 
 async function 登录演示页(page: Page): Promise<void> {
-  await page.goto('/demo/login.html')
-  await page.getByRole('textbox', { name: '用户名' }).fill('admin')
-  await page.getByRole('textbox', { name: '密码' }).fill('123456')
-  await page.getByRole('button', { name: '登录演示系统' }).click()
+  if (page.url().includes('/demo/login.html') === false) {
+    await page.goto('/demo/login.html')
+  }
+  await 演示_说明_右下角(page, '正在进入演示系统登录页，准备执行自动登录')
+  await 演示_输入(page.getByRole('textbox', { name: '用户名' }), 'admin')
+  await 演示_输入(page.getByRole('textbox', { name: '密码' }), '123456')
+  await 演示_点击(page.getByRole('button', { name: '登录演示系统' }))
   await page.waitForURL('**/demo/index.html')
 }
 
 async function 切换演示标签(page: Page, 标签: string): Promise<void> {
-  await page.getByRole('button', { name: 标签, exact: true }).click()
+  await 演示_说明_右下角(page, `切换演示标签页至：“${标签}”`)
+  await 演示_点击(page.getByRole('button', { name: 标签, exact: true }))
 }
 
 test.describe('演示组件 E2E', (): void => {
@@ -21,60 +35,109 @@ test.describe('演示组件 E2E', (): void => {
     await init()
   })
 
-  test('演示登录不依赖项目登录页', async ({ page }): Promise<void> => {
+  // 登录与核心组件概览（整合登录、默认标签展示、动态接口类型获取）
+  test('演示系统登录与核心组件概览', async ({ page }): Promise<void> => {
+    await page.goto('/demo/login.html')
+    await 演示_开场(
+      page,
+      '【测试用例】系统登录与核心组件概览\n演示系统的独立运行能力、系统登录流程、默认基础组件展示以及数据通信层动态接口类型的获取与关闭。',
+    )
     await 登录演示页(page)
+
+    // 1. 验证登录后主页及默认标签
     await expect(page.getByRole('heading', { name: '可运行的组件示例' })).toBeVisible()
     await expect(page).toHaveURL(/\/demo\/index\.html$/)
-  })
-
-  test('首次进入只显示默认标签内容', async ({ page }): Promise<void> => {
-    await 登录演示页(page)
     await expect(page.getByRole('heading', { name: '按钮', exact: true })).toBeVisible()
+
     let 非默认标签标题列表 = ['强类型表单', '接口调用：加法', '浮层与反馈', '用户管理业务示例', 'Electron 能力']
     for (let 标题 of 非默认标签标题列表) {
       await expect(page.getByRole('heading', { name: 标题, exact: true })).toBeHidden()
     }
-  })
 
-  test('接口类型功能可以在演示中启用、获取和关闭', async ({ page }): Promise<void> => {
-    await 登录演示页(page)
+    // 2. 切换到数据与通信标签，验证接口类型导出功能
     await 切换演示标签(page, '数据与通信')
     await expect(page.getByRole('heading', { name: '接口类型导出', exact: true })).toHaveCount(1)
     await expect(page.getByRole('heading', { name: '系统接口类型获取演示', exact: true })).toHaveCount(0)
+
     let 获取按钮 = page.getByRole('button', { name: '获取接口类型', exact: true })
     await expect(获取按钮).toBeDisabled()
-    await page.getByRole('button', { name: '启用接口类型获取', exact: true }).click()
+
+    await 演示_说明_右下角(page, '点击“启用接口类型获取”按钮以激活获取功能')
+    await 演示_点击(page.getByRole('button', { name: '启用接口类型获取', exact: true }))
     await expect(page.getByRole('button', { name: '关闭接口类型获取', exact: true })).toBeVisible()
     await expect(获取按钮).toBeEnabled()
-    await 获取按钮.click()
+
+    await 演示_说明_右下角(page, '点击“获取接口类型”，从服务端实时拉取 TypeScript 接口定义')
+    await 演示_点击(获取按钮)
     await expect(page.getByText('获取成功', { exact: true })).toBeVisible()
     await expect(page.getByText(/export type InterfaceType/)).toBeVisible()
-    await page.getByRole('button', { name: '关闭接口类型获取', exact: true }).click()
+
+    await 演示_说明_右下角(page, '点击“关闭接口类型获取”，验证按钮状态重置为禁用')
+    await 演示_点击(page.getByRole('button', { name: '关闭接口类型获取', exact: true }))
     await expect(page.getByRole('button', { name: '启用接口类型获取', exact: true })).toBeVisible()
     await expect(获取按钮).toBeDisabled()
+
+    await 演示_完成(
+      page,
+      '系统登录与核心组件概览演示完成！\n已成功验证演示系统登录、默认基础视图渲染以及服务端接口类型实时获取机制。',
+    )
   })
 
-  test('强类型表单显示校验并完成提交', async ({ page }): Promise<void> => {
+  // 强类型表单校验与多控件数据提交
+  test('强类型表单校验与多控件数据提交', async ({ page }): Promise<void> => {
     await page.addInitScript((): void => {
       Reflect.defineProperty(globalThis.crypto, 'randomUUID', { value: undefined })
     })
-    await 登录演示页(page)
-    await 切换演示标签(page, '表单组件')
-    await page.getByRole('button', { name: '验证并提交' }).click()
+    await page.goto('/demo/login.html')
+
+    // 1. 核心原则：开场在测试第一秒立刻居中出现
+    await 演示_开场(
+      page,
+      '【测试用例】强类型表单校验与多控件数据提交\n展示表单前端非空校验反馈，并依次操作单选、复选、下拉选择、多选、开关及自动伸缩多行文本，最终完成结构化数据提交。',
+    )
+
+    // 2. 前置准备：仅显示一次进入说明，内部登录与切页不再重复展示说明和动画
+    await 演示_作用域(
+      {
+        page,
+        粒度: '表单现场准备',
+        进入说明: '前置准备：自动登录演示系统并切换至表单组件现场',
+        跳过步骤说明: true,
+        跳过操作动画: true,
+      },
+      async () => {
+        await 登录演示页(page)
+        await 切换演示标签(page, '表单组件')
+      },
+    )
+
+    // 3. 核心业务演示：到达现场后，恢复细致步骤引导
+    // 1. 空表单校验
+    await 演示_说明_右下角(page, '未填写必填项时直接点击“验证并提交”，验证前端表单校验拦截')
+    await 演示_点击(page.getByRole('button', { name: '验证并提交' }))
     await expect(page.getByRole('alert').filter({ hasText: '普通文本演示为必填项' })).toBeVisible()
-    await page.getByRole('textbox', { name: '普通文本演示' }).fill('示例资料')
-    await page.getByRole('spinbutton', { name: '数字输入演示' }).fill('3')
-    await page.getByRole('combobox', { name: '下拉选择演示' }).selectOption('business')
-    await page.getByRole('radio', { name: '紧凑' }).check()
-    await page.getByRole('checkbox', { name: '复选框演示' }).check()
-    await page.getByRole('checkbox', { name: '表格' }).check()
+
+    // 2. 依次填入各项控件数据
+    await 演示_说明_右下角(page, '依次录入普通文本、数字、下拉选择、单选、复选、多选下拉与开关等控件')
+    await 演示_输入(page.getByRole('textbox', { name: '普通文本演示' }), '示例资料')
+    await 演示_输入(page.getByRole('spinbutton', { name: '数字输入演示' }), '3')
+    await 演示_选择(page.getByRole('combobox', { name: '下拉选择演示' }), 'business')
+    await 演示_勾选(page.getByRole('radio', { name: '紧凑' }))
+    await 演示_勾选(page.getByRole('checkbox', { name: '复选框演示' }))
+    await 演示_勾选(page.getByRole('checkbox', { name: '表格' }))
+
     let 多选下拉 = page.getByRole('combobox', { name: '多选下拉演示' })
-    await 多选下拉.click()
-    await page.getByText('前端', { exact: true }).click()
+    await 演示_点击(多选下拉)
+    await 演示_点击(page.getByText('前端', { exact: true }))
     await expect(多选下拉).toContainText('已选 1 项')
-    await page.getByRole('switch', { name: '布尔开关演示' }).check()
-    await page.getByRole('textbox', { name: '自动伸缩文本框演示' }).fill('多行文本示例')
-    await page.getByRole('button', { name: '验证并提交' }).click()
+
+    await 演示_勾选(page.getByRole('switch', { name: '布尔开关演示' }))
+    await 演示_输入(page.getByRole('textbox', { name: '自动伸缩文本框演示' }), '多行文本示例')
+
+    // 3. 提交并展示数据模态框
+    await 演示_说明_右下角(page, '表单填写完毕，点击“验证并提交”查看解析后的强类型结构化数据')
+    await 演示_点击(page.getByRole('button', { name: '验证并提交' }))
+
     let 数据模态框 = page.getByRole('dialog', { name: '表单提交数据' })
     await expect(数据模态框).toBeVisible()
     await expect(数据模态框).toContainText('"name": "示例资料"')
@@ -85,19 +148,52 @@ test.describe('演示组件 E2E', (): void => {
     await expect(数据模态框).toContainText('"frontend"')
     await expect(数据模态框).toContainText('"description": "多行文本示例"')
     await expect(数据模态框).toContainText('"switchDemo": true')
-    await page.getByRole('button', { name: '关闭' }).click()
+
+    await 演示_说明_右下角(page, '数据验证正确，点击关闭数据弹窗')
+    await 演示_点击(page.getByRole('button', { name: '关闭' }))
     await expect(数据模态框).toBeHidden()
+
+    await 演示_完成(
+      page,
+      '表单校验与数据提交演示完成！\n已成功验证表单控件数据收集、强类型 Zod 模式校验与前端弹窗数据回显。',
+    )
   })
 
-  test('模态框可以最大化、还原和关闭', async ({ page }): Promise<void> => {
-    await 登录演示页(page)
-    await 切换演示标签(page, '浮层反馈')
-    await page.getByRole('button', { name: '打开模态框' }).click()
+  // 浮层模态框响应式布局与业务表格多维排序
+  test('浮层模态框响应式布局与业务表格多维排序', async ({ page }): Promise<void> => {
+    await page.goto('/demo/login.html')
+
+    // 1. 核心原则：开场在测试第一秒立刻居中出现
+    await 演示_开场(
+      page,
+      '【测试用例】浮层模态框响应式布局与业务表格多维排序\n展示模态框的全屏最大化、还原与自适应尺寸，以及高交互业务表格的表头多列多重排序（方向与优先级）能力。',
+    )
+
+    // 2. 前置准备：仅显示一次进入说明，随后快速就绪现场
+    await 演示_作用域(
+      {
+        page,
+        粒度: '浮层现场准备',
+        进入说明: '前置准备：自动登录演示系统并切换至浮层反馈现场',
+        跳过步骤说明: true,
+        跳过操作动画: true,
+      },
+      async () => {
+        await 登录演示页(page)
+        await 切换演示标签(page, '浮层反馈')
+      },
+    )
+
+    // 3. 核心业务演示：到达现场后，恢复细致步骤引导
+    // 1. 浮层反馈：模态框最大化与还原
+    await 演示_说明_右下角(page, '点击“打开模态框”，验证模态框弹出与堆叠')
+    await 演示_点击(page.getByRole('button', { name: '打开模态框' }))
     let 模态框 = page.getByRole('dialog').filter({ hasText: '模态框支持堆叠' })
     await expect(模态框).toBeVisible()
 
     let 原边界 = await 模态框.boundingBox()
-    await page.getByRole('button', { name: '最大化' }).click()
+    await 演示_说明_右下角(page, '点击“最大化”按钮，使模态框铺满当前浏览器视口')
+    await 演示_点击(page.getByRole('button', { name: '最大化' }))
     await expect(page.getByRole('button', { name: '还原' })).toBeVisible()
     let 最大化边界 = await 模态框.boundingBox()
     let 视口 = page.viewportSize()
@@ -108,7 +204,8 @@ test.describe('演示组件 E2E', (): void => {
     expect(最大化边界.width).toBeCloseTo(视口.width, 0)
     expect(最大化边界.height).toBeCloseTo(视口.height, 0)
 
-    await page.getByRole('button', { name: '还原' }).click()
+    await 演示_说明_右下角(page, '点击“还原”按钮，恢复模态框原本的尺寸')
+    await 演示_点击(page.getByRole('button', { name: '还原' }))
     await expect(page.getByRole('button', { name: '最大化' })).toBeVisible()
     let 还原边界 = await 模态框.boundingBox()
     expect(还原边界).not.toBeNull()
@@ -116,39 +213,45 @@ test.describe('演示组件 E2E', (): void => {
     expect(还原边界.width).toBeCloseTo(原边界.width, 0)
     expect(还原边界.height).toBeCloseTo(原边界.height, 0)
 
-    await page.getByRole('button', { name: '关闭' }).click()
+    await 演示_说明_右下角(page, '点击“关闭”按钮关闭模态框')
+    await 演示_点击(page.getByRole('button', { name: '关闭' }))
     await expect(模态框).toBeHidden()
-  })
 
-  test('未指定尺寸的模态框按内容自适应', async ({ page }): Promise<void> => {
-    await 登录演示页(page)
+    // 2. 业务示例：自适应模态框
     await 切换演示标签(page, '业务示例')
-    await page.getByRole('button', { name: '添加数据' }).click()
-    let 模态框 = page.getByRole('dialog', { name: '添加用户' })
-    await expect(模态框).toBeVisible()
-    let 边界 = await 模态框.boundingBox()
-    let 视口 = page.viewportSize()
+    await 演示_说明_右下角(page, '点击“添加数据”打开未指定尺寸的自适应模态框')
+    await 演示_点击(page.getByRole('button', { name: '添加数据' }))
+    let 自适应模态框 = page.getByRole('dialog', { name: '添加用户' })
+    await expect(自适应模态框).toBeVisible()
+    let 边界 = await 自适应模态框.boundingBox()
     expect(边界).not.toBeNull()
-    expect(视口).not.toBeNull()
-    if (边界 === null || 视口 === null) return
+    if (边界 === null) return
     expect(边界.width).toBeLessThanOrEqual(642)
     expect(边界.height).toBeLessThan(视口.height * 0.7)
-    await page.getByRole('button', { name: '关闭' }).click()
-    await expect(模态框).toBeHidden()
-  })
 
-  test('表格多重排序显示方向和优先级', async ({ page }): Promise<void> => {
-    await 登录演示页(page)
-    await 切换演示标签(page, '业务示例')
-    await page.getByRole('button', { name: 'ID', exact: true }).click()
+    await 演示_说明_右下角(page, '自适应尺寸校验通过，点击“关闭”按钮')
+    await 演示_点击(page.getByRole('button', { name: '关闭' }))
+    await expect(自适应模态框).toBeHidden()
+
+    // 3. 业务示例：表格多重排序
+    await 演示_说明_右下角(page, '点击“ID”表头列，按 ID 升序排序')
+    await 演示_点击(page.getByRole('button', { name: 'ID', exact: true }))
     await expect(page.getByRole('button', { name: 'ID ▲0', exact: true })).toBeVisible()
 
-    await page.getByRole('button', { name: '名称', exact: true }).click()
+    await 演示_说明_右下角(page, '点击“名称”表头列，添加二级排序（优先级 1）')
+    await 演示_点击(page.getByRole('button', { name: '名称', exact: true }))
     await expect(page.getByRole('button', { name: 'ID ▲0', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '名称 ▲1', exact: true })).toBeVisible()
 
-    await page.getByRole('button', { name: 'ID ▲0', exact: true }).click()
+    await 演示_说明_右下角(page, '再次点击“ID ▲0”，将一级排序切换为降序 (ID ▼0)')
+    await 演示_点击(page.getByRole('button', { name: 'ID ▲0', exact: true }))
     await expect(page.getByRole('button', { name: 'ID ▼0', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '名称 ▲1', exact: true })).toBeVisible()
+
+    // 4. 定格在当前最终排好序的业务表格界面上，展示最终成果
+    await 演示_完成(
+      page,
+      '浮层与业务表格演示完成！\n已成功验证浮层最大化/自适应缩放机制，以及表格多重排序（多方向与多优先级协同更新）。当前页面为多重排序生效后的最终展示。',
+    )
   })
 })

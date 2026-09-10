@@ -4,7 +4,7 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { emitKeypressEvents } from 'node:readline'
 import { pathToFileURL } from 'node:url'
-import { 测试模型 } from '../../src/model/requirement'
+import { 测试模型 } from '../../src/model/test-requirement'
 import type { 已审阅的any } from '../../src/tools/types'
 import {
   从模型列表提取级联元数据,
@@ -80,8 +80,10 @@ async function 交互选择测试流程(全部维度列表: 级联维度项[], �
       let 状态 = 获得当前状态()
       渲染通用选择器界面({
         标签维度列表: 状态.保留标签维度列表,
+        验收维度列表: 状态.保留验收维度列表,
         需求维度列表: 状态.保留需求维度列表,
         标签选项下标们: 状态.标签选项下标们,
+        验收选项下标们: 状态.验收选项下标们,
         需求选项下标们: 状态.需求选项下标们,
         焦点下标,
         候选流程列表: 状态.候选流程列表,
@@ -92,7 +94,7 @@ async function 交互选择测试流程(全部维度列表: 级联维度项[], �
 
     let 处理按键 = (字符: string | undefined, 按键信息: 按键): void => {
       let 状态 = 获得当前状态()
-      let 筛选总行数 = 状态.保留标签维度列表.length + 状态.保留需求维度列表.length
+      let 筛选总行数 = 状态.保留标签维度列表.length + 状态.保留验收维度列表.length + 状态.保留需求维度列表.length
       let 方案总数 = 1 + 状态.候选流程列表.length
       let 最大焦点 = 筛选总行数 + 方案总数 - 1
 
@@ -110,7 +112,8 @@ async function 交互选择测试流程(全部维度列表: 级联维度项[], �
           搜索词 += 字符
         }
         let 更新后状态 = 获得当前状态()
-        let 更新后筛选行数 = 更新后状态.保留标签维度列表.length + 更新后状态.保留需求维度列表.length
+        let 更新后筛选行数 =
+          更新后状态.保留标签维度列表.length + 更新后状态.保留验收维度列表.length + 更新后状态.保留需求维度列表.length
         焦点下标 = 更新后状态.候选流程列表.length === 0 ? 更新后筛选行数 : 更新后筛选行数 + 1
         渲染()
         return
@@ -162,7 +165,8 @@ async function 交互选择测试流程(全部维度列表: 级联维度项[], �
       }
 
       let 最新状态 = 获得当前状态()
-      let 最新筛选行数 = 最新状态.保留标签维度列表.length + 最新状态.保留需求维度列表.length
+      let 最新筛选行数 =
+        最新状态.保留标签维度列表.length + 最新状态.保留验收维度列表.length + 最新状态.保留需求维度列表.length
       let 最新最大焦点 = 最新筛选行数 + 1 + 最新状态.候选流程列表.length - 1
       焦点下标 = Math.min(焦点下标, Math.max(0, 最新最大焦点))
       渲染()
@@ -180,6 +184,7 @@ async function 主函数(): Promise<void> {
   let { 全部维度列表, 流程列表 } = 从模型列表提取级联元数据(模型列表)
 
   let 命令行参数 = process.argv.slice(2)
+  let 全部运行 = false
   let 指定流程名称: string | undefined
   let 指定需求名称: string | undefined
   let 指定模式: 'auto' | 'demo' | undefined
@@ -188,6 +193,10 @@ async function 主函数(): Promise<void> {
   for (let 索引 = 0; 索引 < 命令行参数.length; 索引 += 1) {
     let 参数 = 命令行参数[索引]
     if (参数 === undefined) continue
+    if (参数 === '--all') {
+      全部运行 = true
+      continue
+    }
     if (参数 === '--demo') {
       指定模式 = 'demo'
       continue
@@ -220,7 +229,9 @@ async function 主函数(): Promise<void> {
   }
 
   let 目标: 筛选目标
-  if (指定流程名称 !== undefined && 指定流程名称 !== '') {
+  if (全部运行 === true) {
+    目标 = { 类型: '全部', 流程列表 }
+  } else if (指定流程名称 !== undefined && 指定流程名称 !== '') {
     let 找到的流程 = 流程列表.find((项) => 项.流程名称 === 指定流程名称)
     if (找到的流程 === undefined) throw new Error(`找不到指定的流程场景: ${指定流程名称}`)
     目标 = { 类型: '单流程', 流程: 找到的流程.流程 }
@@ -298,7 +309,10 @@ async function 主函数(): Promise<void> {
   })
 }
 
-主函数().catch((错误) => {
+主函数().catch((错误: unknown) => {
+  if (错误 instanceof Error && (错误.name === 'ExitPromptError' || 错误.message.includes('force closed the prompt'))) {
+    process.exit(0)
+  }
   console.error('\n💥 发生未处理的错误:', 错误)
   process.exit(1)
 })

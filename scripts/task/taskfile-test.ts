@@ -3,7 +3,7 @@ import { 命令, 定义任务 } from './task-runner'
 
 export let 测试任务表 = 定义任务({
   // 单元测试
-  'test:unit:all': {
+  'test:unit': {
     说明: '运行单元测试',
     环境文件: 测试环境文件,
     环境变量: 测试调试环境,
@@ -13,7 +13,7 @@ export let 测试任务表 = 定义任务({
   },
 
   // 集成测试
-  'test:integration:all': {
+  'test:integration': {
     说明: '运行集成测试',
     环境文件: 测试环境文件,
     环境变量: 测试调试环境,
@@ -30,7 +30,7 @@ export let 测试任务表 = 定义任务({
     运行: 命令('tsx', './src/server.ts'),
     公开: false,
   },
-  'test:e2e:all': {
+  'test:e2e': {
     说明: '运行端到端测试',
     环境文件: 测试环境文件,
     环境变量: 测试调试环境,
@@ -44,7 +44,7 @@ export let 测试任务表 = 定义任务({
     环境文件: 测试环境文件,
     运行: 命令('tsx', 'scripts/test/check-requirement-coverage.ts'),
   },
-  'test:requirement:all': {
+  'test:requirement': {
     说明: '运行业务需求流程测试',
     环境文件: 测试环境文件,
     环境变量: 测试调试环境,

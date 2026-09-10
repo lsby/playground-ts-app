@@ -411,7 +411,7 @@ export let 任务表 = 定义任务({
   },
 
   // 发布
-  'release:verify': { 说明: '发布前运行单元测试并完成构建', 依赖: ['test:unit:all', 'build:all'], 公开: false },
+  'release:verify': { 说明: '发布前运行单元测试并完成构建', 依赖: ['test:unit', 'build:all'], 公开: false },
   'release:version': {
     说明: '交互式选择新版本号',
     运行: 命令('bumpp', '--no-commit', '--no-tag', '--no-push'),

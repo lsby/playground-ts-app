@@ -10,7 +10,7 @@ async function 主函数(): Promise<void> {
   let 测试文件列表: string[] = []
 
   if (fs.existsSync(测试目录) === true) {
-    测试文件列表 = 扫描测试文件(测试目录).map((文件) => path.relative(测试目录, 文件))
+    测试文件列表 = 扫描测试文件(测试目录).map((文件) => path.relative(测试目录, 文件).replaceAll('\\', '/'))
   }
 
   // 2. 解析参数
@@ -37,11 +37,22 @@ async function 主函数(): Promise<void> {
       }
       continue
     }
-    if (参数 !== undefined && (参数.endsWith('.spec.ts') === true || 参数.includes('test/e2e') === true)) {
-      指定运行目标 = 参数
-      continue
-    }
     if (参数 !== undefined) {
+      let 规范化参数 = 参数.replaceAll('\\', '/')
+      if (规范化参数 === '--all') {
+        指定运行目标 = 'all'
+        continue
+      }
+      if (规范化参数.endsWith('.spec.ts') === true || 规范化参数.includes('test/e2e') === true) {
+        指定运行目标 = 规范化参数
+        continue
+      }
+      let 基础文件名 = path.basename(规范化参数)
+      let 匹配文件 = 测试文件列表.find((文件) => 文件 === 基础文件名 || 文件 === `${基础文件名}.spec.ts`)
+      if (匹配文件 !== undefined && 指定运行目标 === undefined) {
+        指定运行目标 = `test/e2e/${匹配文件}`
+        continue
+      }
       附加透传参数.push(参数)
     }
   }
@@ -53,11 +64,11 @@ async function 主函数(): Promise<void> {
   } else if (process.stdin.isTTY === true) {
     let 选项列表 = [
       { name: '[全部运行]', value: 'all' },
-      ...测试文件列表.map((文件) => ({ name: 文件, value: path.join('test/e2e', 文件) })),
+      ...测试文件列表.map((文件) => ({ name: 文件, value: `test/e2e/${文件}` })),
     ]
-    let 回答 = (await inquirer.prompt([
+    let 回答 = await inquirer.prompt<{ 运行目标: string }>([
       { type: 'list', name: '运行目标', message: '请选择要运行的端到端测试文件:', choices: 选项列表, default: 'all' },
-    ] as any)) as { 运行目标: string }
+    ])
     运行目标 = 回答.运行目标
   } else {
     运行目标 = 'all'
@@ -67,14 +78,14 @@ async function 主函数(): Promise<void> {
   if (指定模式 !== undefined) {
     演示模式 = 指定模式 === 'demo'
   } else if (process.stdin.isTTY === true) {
-    let 回答 = (await inquirer.prompt([
+    let 回答 = await inquirer.prompt<{ 演示模式: boolean }>([
       {
         type: 'confirm',
         name: '演示模式',
         message: '是否使用演示 (Demo) 模式? (将开启浏览器 UI 并减慢执行速度)',
-        default: true,
+        default: false,
       },
-    ] as any)) as { 演示模式: boolean }
+    ])
     演示模式 = 回答.演示模式
   } else {
     演示模式 = false
@@ -86,14 +97,14 @@ async function 主函数(): Promise<void> {
 
   let 参数列表 = ['test']
   if (运行目标 !== 'all') {
-    参数列表.push(运行目标)
+    参数列表.push(运行目标.replaceAll('\\', '/'))
   }
 
   if (演示模式 === true) {
     参数列表.push('--headed')
   }
 
-  // 支持透传额外的参数 (例如 npm run task -- test:e2e:all -- --ui)
+  // 支持透传额外的参数 (例如 npm run task -- test:e2e -- --ui)
   if (附加透传参数.length > 0) {
     参数列表.push(...附加透传参数)
   }
@@ -102,6 +113,11 @@ async function 主函数(): Promise<void> {
 
   // 4. 执行命令
   let 进程 = spawn('playwright', 参数列表, { stdio: 'inherit', env: 环境变量, shell: true, cwd: 根目录 })
+
+  进程.on('error', (错误) => {
+    console.error('\n💥 启动 playwright 失败:', 错误)
+    process.exit(1)
+  })
 
   进程.on('close', (退出码) => {
     process.exit(退出码 ?? 1)
@@ -118,7 +134,10 @@ function 扫描测试文件(目录: string): string[] {
   return 结果.sort((左, 右) => 左.localeCompare(右))
 }
 
-主函数().catch((错误) => {
+主函数().catch((错误: unknown) => {
+  if (错误 instanceof Error && (错误.name === 'ExitPromptError' || 错误.message.includes('force closed the prompt'))) {
+    process.exit(0)
+  }
   console.error(`\n💥 发生未处理的错误:`, 错误)
   process.exit(1)
 })
