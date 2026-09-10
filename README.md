@@ -42,19 +42,8 @@ npm run dev:pure-frontend
 重新进入初始化向导：
 
 ```powershell
-npm run setup:init
+npm run setup:all
 ```
-
-## 常用命令
-
-| 命令                      | 用途                           |
-| ------------------------- | ------------------------------ |
-| `npm run task`            | 交互式搜索任务                 |
-| `npm run task -- --list`  | 查看公开任务                   |
-| `npm run generate`        | 更新全部派生源码               |
-| `npm run check`           | 检查格式、ESLint 和 TypeScript |
-| `npm run fix`             | 自动修复并格式化               |
-| `npm run db:push:dev:web` | 创建或迁移开发数据库           |
 
 ## 开发指南
 

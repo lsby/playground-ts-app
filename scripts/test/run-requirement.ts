@@ -1,4 +1,5 @@
 import { spawn } from 'child_process'
+import inquirer from 'inquirer'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { emitKeypressEvents } from 'node:readline'
@@ -181,11 +182,28 @@ async function 主函数(): Promise<void> {
   let 命令行参数 = process.argv.slice(2)
   let 指定流程名称: string | undefined
   let 指定需求名称: string | undefined
+  let 指定模式: 'auto' | 'demo' | undefined
   let 传递给执行器的参数: string[] = []
 
   for (let 索引 = 0; 索引 < 命令行参数.length; 索引 += 1) {
     let 参数 = 命令行参数[索引]
     if (参数 === undefined) continue
+    if (参数 === '--demo') {
+      指定模式 = 'demo'
+      continue
+    }
+    if (参数 === '--auto') {
+      指定模式 = 'auto'
+      continue
+    }
+    if (参数 === '--mode') {
+      let 模式值 = 命令行参数[索引 + 1]
+      if (模式值 === 'auto' || 模式值 === 'demo') {
+        指定模式 = 模式值
+        索引 += 1
+      }
+      continue
+    }
     if (参数.startsWith('--scenario=')) {
       指定流程名称 = 参数.slice('--scenario='.length).trim()
     } else if (参数 === '--scenario') {
@@ -214,6 +232,23 @@ async function 主函数(): Promise<void> {
     目标 = await 交互选择测试流程(全部维度列表, 流程列表)
   }
 
+  let 演示模式: boolean
+  if (指定模式 !== undefined) {
+    演示模式 = 指定模式 === 'demo'
+  } else if (process.stdin.isTTY === true && process.stdout.isTTY === true) {
+    let 回答 = await inquirer.prompt<{ 演示模式: boolean }>([
+      {
+        type: 'confirm',
+        name: '演示模式',
+        message: '是否使用演示 (Demo) 模式? (将开启浏览器 UI 并减慢执行速度)',
+        default: false,
+      },
+    ])
+    演示模式 = 回答.演示模式
+  } else {
+    演示模式 = false
+  }
+
   let grep参数: string[] = []
   if (目标.类型 === '单流程') {
     console.log(`\n🎯 选中执行单一流程: ${目标.流程.名称}`)
@@ -233,11 +268,26 @@ async function 主函数(): Promise<void> {
     }
   }
 
-  let 完整参数 = ['test', '--config', 'playwright.requirement.config.ts', ...grep参数, ...传递给执行器的参数]
+  let 模式附加参数: string[] = []
+  if (演示模式 === true) {
+    模式附加参数.push('--headed')
+  }
+
+  let 完整参数 = [
+    'test',
+    '--config',
+    'playwright.requirement.config.ts',
+    ...grep参数,
+    ...模式附加参数,
+    ...传递给执行器的参数,
+  ]
 
   console.log(`🚀 执行命令: playwright ${完整参数.join(' ')}\n`)
 
-  let 子进程 = spawn('playwright', 完整参数, { cwd: 根目录, stdio: 'inherit', shell: true })
+  let 环境变量 = { ...process.env }
+  环境变量['DEMO_MODE'] = 演示模式 === true ? 'true' : 'false'
+
+  let 子进程 = spawn('playwright', 完整参数, { cwd: 根目录, stdio: 'inherit', shell: true, env: 环境变量 })
 
   await new Promise<void>((完成, 失败) => {
     子进程.on('error', 失败)

@@ -115,8 +115,7 @@ export let 任务表 = 定义任务({
   },
 
   // 初始化
-  'setup:all': { 说明: '初始化本地配置并分配端口', 依赖: ['setup:env', 'setup:ports'] },
-  'setup:init': { 说明: '重新运行项目初始化向导', 运行: 命令('node', 'scripts/setup/preinstall.mjs', '--force') },
+  'setup:all': { 说明: '重新运行项目初始化向导', 运行: 命令('node', 'scripts/setup/preinstall.mjs', '--force') },
   'setup:env': { 说明: '从示例初始化本地配置', 运行: 命令('tsx', 'scripts/setup/init-env.ts'), 传递参数: true },
   'setup:ports': { 说明: '扫描并分配本地端口', 运行: 命令('tsx', 'scripts/setup/init-ports.ts'), 传递参数: true },
   'setup:github-electron-env': {
@@ -368,7 +367,7 @@ export let 任务表 = 定义任务({
   'capacitor:sync:android': { 说明: '同步 Android 平台', 运行: 命令('cap', 'sync', 'android'), 传递参数: true },
   'capacitor:open:android': { 说明: '打开 Android 工程', 运行: 命令('cap', 'open', 'android'), 传递参数: true },
 
-  // 发布
+  // 发行
   'public:docker:local': {
     说明: '执行本地 Docker 发布',
     运行: 命令('tsx', 'scripts/public/release-docker-local.ts'),
@@ -409,7 +408,7 @@ export let 任务表 = 定义任务({
   },
 
   // 发布
-  'release:verify': { 说明: '发布前运行单元测试并完成构建', 依赖: ['test:unit:auto', 'build:all'], 公开: false },
+  'release:verify': { 说明: '发布前运行单元测试并完成构建', 依赖: ['test:unit:all', 'build:all'], 公开: false },
   'release:version': {
     说明: '交互式选择新版本号',
     运行: 命令('bumpp', '--no-commit', '--no-tag', '--no-push'),

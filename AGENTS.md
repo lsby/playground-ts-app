@@ -166,14 +166,14 @@
   - 基础的叶子任务不应该反向调用包含它的组合任务，以避免递归调用。
   - 只有当输出结果互不覆盖时才可以安排任务并行执行，以避免竞争冒险。
 - 初始化与监听：
-  - 仓库的初始化由 `scripts/setup/preinstall.mjs` 和 `scripts/setup/postinstall.mjs` 提供向导支持（也可通过 `npm run setup:init` 手动重新触发）。
+  - 仓库的初始化由 `scripts/setup/preinstall.mjs` 和 `scripts/setup/postinstall.mjs` 提供向导支持（也可通过 `npm run setup:all` 手动重新触发）。
   - 在初始化过程中，会顺次配置环境文件 (`init-env.ts`)、分配本地端口 (`init-ports.ts`) 并协助执行项目重命名 (`rename-project.ts`)。
   - `preinstall` 脚本执行时各种第三方包还没下载完毕，因此只能使用 Node.js 的内置模块。
   - 整个初始化流程必须保证幂等。
   - 初始化流程中不能向控制台泄漏敏感 Secret。
   - 系统级别的通用文件监听统一借助 `scripts/watch/watch.ts` 实现。
 - 文件生成机制：
-  - 运行 `npm run generate` 即可触发全量代码生成。
+  - 运行 `npm run generate:all` 即可触发全量代码生成。
   - 所有派生文件都交由生成器覆盖维护。任何手动修改都会在下次生成时被冲掉，正确做法是去修改源头定义然后重新生成。这些派生文件包含：
     - 数据库与接口层面的 `src/types/db.ts`、`src/interface/interface-list.ts` 以及 `src/types/interface-type.ts`。
     - 前端相关与本地数据库层面的 `src/web/components/index.ts`、`src/web/pure-frontend/local-api-list.ts` 和 `src/web/pure-frontend/local-schema.ts`。
@@ -192,7 +192,7 @@
 - 单元测试:
   - 单元测试指只测试某一个单独的模块，例如单个接口
   - 单元测试采用与目标代码同目录 (Co-location) 的存放方式，例如 `src/interface/demo/base/add/t01.test.ts`。
-  - 通过命令 `test:unit:auto`，脚本将自动搜集所有Co-location测试文件，生成测试聚合文件并支持全量或按正则筛选运行
+  - 通过命令 `test:unit:all`，脚本将自动搜集所有Co-location测试文件，生成测试聚合文件并支持全量或按正则筛选运行
 - 集成测试:
   - 集成测试指测试一系列单元的组合运行的情况
   - 集成级别的测试应当放在 `test/integration/` 下。
@@ -215,10 +215,10 @@
   - 相关目录、文件、任务和配置统一使用 `requirement` 命名，不建立平行测试体系。
   - 初始化可以直接准备数据，业务行为和观察必须通过真实业务入口完成，并返回符合项目证据策略的证据。
   - 演示模式只控制展示和速度，不得改变流程、断言、证据或测试数据。
-  - 修改需求模型后运行 `npm run task -- test:requirement:coverage`，演示运行使用 `npm run test:requirement:demo`，全自动运行使用 `npm run test:requirement:auto`。
+  - 修改需求模型后运行 `npm run task -- test:requirement:coverage`，执行测试使用 `npm run test:requirement:all`（支持交互选择流程及演示/自动模式，或通过 `--demo` 参数指定）。
 
 ### 修改完成后的验证
 
-- 普通源码修改至少运行 `npm run check`，它会依次检查格式、ESLint 和 TypeScript 类型。
-- 修改派生文件的源头定义后，先运行 `npm run generate`，再运行 `npm run check`，并确认生成结果已同步更新。
+- 普通源码修改至少运行 `npm run check:all`，它会依次检查格式、ESLint 和 TypeScript 类型。
+- 修改派生文件的源头定义后，先运行 `npm run generate:all`，再运行 `npm run check:all`，并确认生成结果已同步更新。
 - 修改数据库 Schema 时使用本文件规定的迁移任务，并检查生成的 migration 与数据库类型。

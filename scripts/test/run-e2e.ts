@@ -21,6 +21,14 @@ async function 主函数(): Promise<void> {
 
   for (let 索引 = 0; 索引 < 原始参数组.length; 索引 += 1) {
     let 参数 = 原始参数组[索引]
+    if (参数 === '--demo') {
+      指定模式 = 'demo'
+      continue
+    }
+    if (参数 === '--auto') {
+      指定模式 = 'auto'
+      continue
+    }
     if (参数 === '--mode') {
       let 模式值 = 原始参数组[索引 + 1]
       if (模式值 === 'auto' || 模式值 === 'demo') {
@@ -85,7 +93,7 @@ async function 主函数(): Promise<void> {
     参数列表.push('--headed')
   }
 
-  // 支持透传额外的参数 (例如 npm run task -- test:e2e:auto -- --ui)
+  // 支持透传额外的参数 (例如 npm run task -- test:e2e:all -- --ui)
   if (附加透传参数.length > 0) {
     参数列表.push(...附加透传参数)
   }
