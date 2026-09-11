@@ -1,4 +1,4 @@
-import { 组件基类 } from '../../../base/base'
+import { 组件基类, 要求组件构造参数 } from '../../../base/base'
 import { 创建元素 } from '../../../global/tools/create-element'
 import { 普通按钮 } from '../base/base-button'
 
@@ -20,7 +20,7 @@ export class 分页组件 extends 组件基类<发出事件类型, 监听事件�
 
   public constructor(分页配置: 数据表分页配置, 禁用: boolean = false) {
     super()
-    this.分页配置 = 分页配置
+    this.分页配置 = 要求组件构造参数(分页配置, '分页组件')
     this.禁用 = 禁用
   }
 

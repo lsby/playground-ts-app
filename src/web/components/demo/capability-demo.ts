@@ -1,4 +1,4 @@
-import { 组件基类 } from '../../base/base'
+import { 组件基类, 要求组件构造参数 } from '../../base/base'
 import { 创建元素 } from '../../global/tools/create-element'
 import { 卡片组件 } from '../general/base/card'
 import { 演示加法组件 } from './add-demo'
@@ -24,7 +24,7 @@ export class 演示能力组件 extends 组件基类<发出事件类型, 监听�
 
   public constructor(配置: 演示能力配置) {
     super()
-    this.配置 = 配置
+    this.配置 = 要求组件构造参数(配置, '演示能力组件')
   }
 
   protected override 当加载时(): void {

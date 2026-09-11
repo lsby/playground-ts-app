@@ -1,6 +1,7 @@
 import { 组件基类 } from '../../../base/base'
+import { 右键菜单管理器 } from '../../../global/manager/context-menu-manager'
 import { 创建元素 } from '../../../global/tools/create-element'
-import { 文本按钮, 普通按钮 } from '../base/base-button'
+import { 普通按钮 } from '../base/base-button'
 
 type 发出事件类型 = {}
 type 监听事件类型 = {}
@@ -18,7 +19,6 @@ export class 日志组件 extends 组件基类<发出事件类型, 监听事件�
   private 选中的索引集合 = new Set<number>()
   private 正在选择 = false
   private 选择起始索引: number | null = null
-  private 右键菜单: HTMLDivElement | null = null
   private 发生了拖动 = false
   private 上一个选中的索引: number | null = null
   private 正在加载 = false
@@ -74,62 +74,6 @@ export class 日志组件 extends 组件基类<发出事件类型, 监听事件�
 
     this.滚动到底部按钮 = 滚动到底部按钮
 
-    // 创建右键菜单
-    let 右键菜单 = 创建元素('div', {
-      style: {
-        position: 'absolute',
-        display: 'none',
-        backgroundColor: 'var(--卡片背景颜色)',
-        border: '1px solid var(--边框颜色)',
-        borderRadius: '4px',
-        boxShadow: '0 2px 8px var(--深阴影颜色)',
-        zIndex: '1000',
-        padding: '4px 0',
-      },
-    })
-
-    let 复制按钮 = new 文本按钮({
-      文本: '复制',
-      元素样式: {
-        width: '100%',
-        padding: '8px 16px',
-        backgroundColor: 'transparent',
-        border: 'none',
-        cursor: 'pointer',
-        textAlign: 'left',
-        fontSize: '14px',
-        color: 'var(--文字颜色)',
-      },
-      点击处理函数: (): void => {
-        this.复制选中日志()
-        this.隐藏右键菜单()
-      },
-    })
-
-    let 清空日志按钮 = new 文本按钮({
-      文本: '清空日志',
-      元素样式: {
-        width: '100%',
-        padding: '8px 16px',
-        backgroundColor: 'transparent',
-        border: 'none',
-        cursor: 'pointer',
-        textAlign: 'left',
-        fontSize: '14px',
-        color: 'var(--文字颜色)',
-      },
-      点击处理函数: (): void => {
-        this.清空日志()
-        this.隐藏右键菜单()
-      },
-    })
-
-    右键菜单.appendChild(复制按钮)
-    右键菜单.appendChild(清空日志按钮)
-
-    this.右键菜单 = 右键菜单
-    包装器.appendChild(右键菜单)
-
     this.日志容器 = 容器
     包装器.appendChild(容器)
     包装器.appendChild(滚动到底部按钮)
@@ -157,46 +101,36 @@ export class 日志组件 extends 组件基类<发出事件类型, 监听事件�
       }
     }
 
-    // 监听鼠标事件用于选择
-    容器.onmousedown = (事件: MouseEvent): void => {
-      if (事件.button === 0) {
-        // 左键
-        事件.preventDefault() // 阻止默认文本选择
-        this.正在选择 = true
-        this.发生了拖动 = false
-        let 索引 = this.获取日志行索引(事件.target as HTMLElement)
-        if (索引 !== null) {
-          this.选择起始索引 = 索引
-          if (事件.ctrlKey === false && 事件.shiftKey === false) {
-            this.选中的索引集合.clear()
-            this.选中的索引集合.add(索引)
-            this.上一个选中的索引 = 索引
-          } else if (事件.ctrlKey === true) {
-            // Ctrl+点击：切换选择
-            if (this.选中的索引集合.has(索引) === true) {
-              this.选中的索引集合.delete(索引)
-            } else {
-              this.选中的索引集合.add(索引)
-            }
-            this.上一个选中的索引 = 索引
-          } else if (事件.shiftKey === true) {
-            // Shift+点击：区域选择，保持上一个选中的索引不变，使用当前点击作为范围的另一端
-            let 基准索引 = this.上一个选中的索引
-            if (基准索引 !== null) {
-              let 开始 = Math.min(基准索引, 索引)
-              let 结束 = Math.max(基准索引, 索引)
-              this.选中的索引集合.clear()
-              for (let i = 开始; i <= 结束; i++) {
-                this.选中的索引集合.add(i)
-              }
-            } else {
-              this.选中的索引集合.add(索引)
-              this.上一个选中的索引 = 索引
-            }
-          }
-          this.更新选中状态()
+    容器.onpointerdown = (事件: PointerEvent): void => {
+      if (事件.pointerType !== 'mouse' || 事件.button !== 0 || 事件.target instanceof HTMLElement === false) return
+      let 索引 = this.获取日志行索引(事件.target)
+      if (索引 === null) return
+      事件.preventDefault()
+      容器.setPointerCapture(事件.pointerId)
+      this.正在选择 = true
+      this.发生了拖动 = false
+      this.选择起始索引 = 索引
+      if (事件.ctrlKey === false && 事件.shiftKey === false) {
+        this.选中的索引集合.clear()
+        this.选中的索引集合.add(索引)
+        this.上一个选中的索引 = 索引
+      } else if (事件.ctrlKey === true) {
+        if (this.选中的索引集合.has(索引) === true) this.选中的索引集合.delete(索引)
+        else this.选中的索引集合.add(索引)
+        this.上一个选中的索引 = 索引
+      } else if (事件.shiftKey === true) {
+        let 基准索引 = this.上一个选中的索引
+        if (基准索引 !== null) {
+          let 开始 = Math.min(基准索引, 索引)
+          let 结束 = Math.max(基准索引, 索引)
+          this.选中的索引集合.clear()
+          for (let i = 开始; i <= 结束; i++) this.选中的索引集合.add(i)
+        } else {
+          this.选中的索引集合.add(索引)
+          this.上一个选中的索引 = 索引
         }
       }
+      this.更新选中状态()
     }
 
     // 添加点击事件监听器,用于清除选择
@@ -212,9 +146,11 @@ export class 日志组件 extends 组件基类<发出事件类型, 监听事件�
       }
     }
 
-    容器.onmousemove = (事件: MouseEvent): void => {
+    容器.onpointermove = (事件: PointerEvent): void => {
       if (this.正在选择 === true && this.选择起始索引 !== null) {
-        let 当前索引 = this.获取日志行索引(事件.target as HTMLElement)
+        let 指针下元素 = this.shadow.elementFromPoint(事件.clientX, 事件.clientY)
+        if (指针下元素 instanceof HTMLElement === false) return
+        let 当前索引 = this.获取日志行索引(指针下元素)
         if (当前索引 !== null && 当前索引 !== this.选择起始索引) {
           this.发生了拖动 = true
           let 起始索引 = this.选择起始索引
@@ -246,21 +182,19 @@ export class 日志组件 extends 组件基类<发出事件类型, 监听事件�
       }
     }
 
-    容器.onmouseup = (): void => {
+    let 结束选择 = (事件: PointerEvent): void => {
+      if (容器.hasPointerCapture(事件.pointerId) === true) 容器.releasePointerCapture(事件.pointerId)
       this.正在选择 = false
       this.选择起始索引 = null
     }
-
-    // 监听全局mouseup事件,防止鼠标移出容器后松开
-    document.onmouseup = (): void => {
-      this.正在选择 = false
-      this.选择起始索引 = null
-    }
+    容器.onpointerup = 结束选择
+    容器.onpointercancel = 结束选择
 
     // 监听右键菜单
     容器.oncontextmenu = (事件: MouseEvent): void => {
       事件.preventDefault()
-      let 索引 = this.获取日志行索引(事件.target as HTMLElement)
+      if (事件.target instanceof HTMLElement === false) return
+      let 索引 = this.获取日志行索引(事件.target)
       if (索引 !== null && this.选中的索引集合.has(索引) === false) {
         // 如果点击的项没有被选中，则选中它
         this.选中的索引集合.clear()
@@ -268,55 +202,30 @@ export class 日志组件 extends 组件基类<发出事件类型, 监听事件�
         this.上一个选中的索引 = 索引
         this.更新选中状态()
       }
-      if (this.右键菜单 !== null) {
-        let 包装器矩形 = 包装器.getBoundingClientRect()
-        this.右键菜单.style.left = `${事件.clientX - 包装器矩形.left}px`
-        this.右键菜单.style.top = `${事件.clientY - 包装器矩形.top}px`
-        this.右键菜单.style.display = 'block'
-      }
+      右键菜单管理器.获得实例().显示菜单(事件.clientX, 事件.clientY, [
+        { 文本: '复制', 回调: (): void => this.复制选中日志() },
+        { 文本: '清空日志', 回调: (): void => this.清空日志(), 危险: true },
+      ])
     }
-
-    // 点击其他地方隐藏菜单
-    document.onclick = (事件: MouseEvent): void => {
-      if (
-        this.右键菜单 !== null &&
-        事件.target !== this.右键菜单 &&
-        this.右键菜单.contains(事件.target as Node) === false
-      ) {
-        this.隐藏右键菜单()
-      }
-    }
+    this.渲染日志()
   }
 
   public 添加日志(消息: string): void {
-    this.日志数组.push(消息)
-    if (this.日志数组.length > this.最大行数) {
-      this.日志数组.shift()
-      // 调整选中的索引:所有索引减1,移除小于0的索引
-      let 新选中集合 = new Set<number>()
-      for (let 索引 of this.选中的索引集合) {
-        let 新索引 = 索引 - 1
-        if (新索引 >= 0) {
-          新选中集合.add(新索引)
-        }
-      }
-      this.选中的索引集合 = 新选中集合
-      // 调整选择起始索引
-      if (this.选择起始索引 !== null) {
-        this.选择起始索引 = this.选择起始索引 - 1
-        if (this.选择起始索引 < 0) {
-          this.选择起始索引 = null
-        }
-      }
-      // 调整上一个选中的索引
-      if (this.上一个选中的索引 !== null) {
-        this.上一个选中的索引 = this.上一个选中的索引 - 1
-        if (this.上一个选中的索引 < 0) {
-          this.上一个选中的索引 = null
-        }
-      }
+    this.添加多条日志([消息])
+  }
+
+  public 添加多条日志(消息列表: readonly string[]): void {
+    for (let 消息 of 消息列表) this.日志数组.push(消息)
+    let 移除数量 = Math.max(0, this.日志数组.length - this.最大行数)
+    if (移除数量 > 0) {
+      this.日志数组.splice(0, 移除数量)
+      this.选中的索引集合 = new Set(
+        [...this.选中的索引集合].map((索引): number => 索引 - 移除数量).filter((索引): boolean => 索引 >= 0),
+      )
+      this.选择起始索引 = this.调整日志索引(this.选择起始索引, 移除数量)
+      this.上一个选中的索引 = this.调整日志索引(this.上一个选中的索引, 移除数量)
     }
-    this.渲染日志()
+    if (this.正在加载 === false) this.渲染日志(移除数量)
   }
 
   public 清空日志(): void {
@@ -325,11 +234,9 @@ export class 日志组件 extends 组件基类<发出事件类型, 监听事件�
     this.正在选择 = false
     this.选择起始索引 = null
     this.上一个选中的索引 = null
-    if (this.日志容器 !== null) {
-      this.日志容器.innerHTML = ''
-    }
     this.自动滚动 = true
     this.上一次滚动位置 = 0
+    this.渲染日志()
   }
 
   private 获取日志行索引(元素: HTMLElement): number | null {
@@ -341,9 +248,8 @@ export class 日志组件 extends 组件基类<发出事件类型, 监听事件�
       日志行元素 = 日志行元素.parentElement
     }
 
-    if (日志行元素 === null || 日志行元素.parentElement !== this.日志容器) {
+    if (日志行元素 === null || 日志行元素.parentElement !== this.日志容器 || 日志行元素.dataset['logRow'] !== 'true')
       return null
-    }
 
     // 获取元素在容器中的索引
     let 子元素数组 = Array.from(this.日志容器.children)
@@ -366,22 +272,10 @@ export class 日志组件 extends 组件基类<发出事件类型, 监听事件�
     }
   }
 
-  private 渲染日志(): void {
+  private 渲染日志(移除头部行数: number = 0): void {
     if (this.日志容器 === null) return
 
-    // 清空特殊状态提示
-    if (this.日志容器.children.length === 1) {
-      let 第一个子元素 = this.日志容器.children[0]
-      if (
-        第一个子元素 instanceof HTMLDivElement &&
-        (第一个子元素.textContent === '正在加载日志...' || 第一个子元素.textContent === '暂无日志')
-      ) {
-        this.日志容器.innerHTML = ''
-      }
-    }
-
     if (this.正在加载 === true) {
-      // 显示加载指示器
       let 加载指示器 = 创建元素('div', {
         textContent: '正在加载日志...',
         style: {
@@ -393,12 +287,11 @@ export class 日志组件 extends 组件基类<发出事件类型, 监听事件�
           color: 'var(--文字颜色)',
         },
       })
-      this.日志容器.appendChild(加载指示器)
+      this.日志容器.replaceChildren(加载指示器)
       return
     }
 
     if (this.日志数组.length === 0) {
-      // 显示暂无日志提示
       let 无日志提示 = 创建元素('div', {
         textContent: '暂无日志',
         style: {
@@ -410,31 +303,19 @@ export class 日志组件 extends 组件基类<发出事件类型, 监听事件�
           color: 'var(--文字颜色)',
         },
       })
-      this.日志容器.appendChild(无日志提示)
+      this.日志容器.replaceChildren(无日志提示)
       return
     }
 
-    // 计算需要移除的行数（当数组被shift时）
-    let 需要移除的行数 = this.日志容器.children.length - this.日志数组.length
-    if (需要移除的行数 > 0) {
-      for (let i = 0; i < 需要移除的行数; i++) {
-        let 第一个子元素 = this.日志容器.firstChild
-        if (第一个子元素 !== null) {
-          this.日志容器.removeChild(第一个子元素)
-        }
-      }
+    let 首个元素 = this.日志容器.firstElementChild
+    let 需要重建 = 首个元素 !== null && 首个元素 instanceof HTMLElement && 首个元素.dataset['logRow'] !== 'true'
+    if (需要重建 === true) {
+      this.日志容器.replaceChildren()
+      移除头部行数 = 0
     }
+    for (let i = 0; i < 移除头部行数; i += 1) this.日志容器.firstElementChild?.remove()
 
-    // 更新现有行的内容
-    for (let i = 0; i < this.日志容器.children.length; i++) {
-      let 子元素 = this.日志容器.children[i] as HTMLDivElement
-      let 对应日志 = this.日志数组[i]
-      if (对应日志 !== undefined && 子元素.textContent !== 对应日志) {
-        子元素.textContent = 对应日志
-      }
-    }
-
-    // 添加新的日志行
+    let 新日志片段 = document.createDocumentFragment()
     for (let i = this.日志容器.children.length; i < this.日志数组.length; i++) {
       let 日志 = this.日志数组[i]
       if (日志 !== undefined) {
@@ -442,12 +323,13 @@ export class 日志组件 extends 组件基类<发出事件类型, 监听事件�
           textContent: 日志,
           style: { marginBottom: '2px', wordBreak: 'break-word', cursor: 'default' },
         })
-        this.日志容器.appendChild(日志行)
+        日志行.dataset['logRow'] = 'true'
+        新日志片段.appendChild(日志行)
       }
     }
+    this.日志容器.appendChild(新日志片段)
 
-    // 恢复选中状态
-    this.更新选中状态()
+    if (需要重建 === true || 移除头部行数 > 0) this.更新选中状态()
 
     // 如果自动滚动，则滚动到底部
     if (this.自动滚动) {
@@ -489,10 +371,10 @@ export class 日志组件 extends 组件基类<发出事件类型, 监听事件�
     }
   }
 
-  private 隐藏右键菜单(): void {
-    if (this.右键菜单 !== null) {
-      this.右键菜单.style.display = 'none'
-    }
+  private 调整日志索引(索引: number | null, 移除数量: number): number | null {
+    if (索引 === null) return null
+    let 新索引 = 索引 - 移除数量
+    return 新索引 < 0 ? null : 新索引
   }
 
   public 设置加载状态(加载: boolean): void {

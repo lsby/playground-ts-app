@@ -26,7 +26,8 @@ export type 表格渲染上下文<数据项> = {
   处理单元格点击: (行索引: number, 列索引: number, ctrl键: boolean, shift键: boolean) => void
   更新选中状态: () => void
   显示右键菜单: (x: number, y: number) => void
-  开始调整列宽: (列索引: number, event: MouseEvent, 表头: HTMLElement) => void
+  开始调整列宽: (列索引: number, event: PointerEvent, 表头: HTMLElement, 调整柄: HTMLElement) => void
+  键盘调整列宽: (列索引: number, 变化量: number, 表头: HTMLElement) => void
 }
 
 export function 渲染顶部操作区<数据项>(上下文: 表格渲染上下文<数据项>): HTMLElement | null {
@@ -47,6 +48,8 @@ export function 渲染表头<数据项>(上下文: 表格渲染上下文<数据�
     let 字段名 = String(列.字段名)
     let 列最大宽度 = 列.列最大宽度 ?? 上下文.列最大宽度
     let 有筛选 = 上下文.筛选条件[字段名] !== undefined
+    let 排序索引 = 上下文.排序列表.findIndex((项) => 项.field === 列.字段名)
+    let 排序项 = 上下文.排序列表[排序索引]
     let th = 创建元素('th', {
       scope: 'col',
       style: {
@@ -62,10 +65,12 @@ export function 渲染表头<数据项>(上下文: 表格渲染上下文<数据�
         ...(列最大宽度 === undefined ? {} : { maxWidth: 列最大宽度, width: 列最大宽度 }),
       },
     })
+    if (列.可排序 === true) {
+      let 排序方向 = 排序项?.direction
+      th.setAttribute('aria-sort', 排序方向 === 'asc' ? 'ascending' : 排序方向 === 'desc' ? 'descending' : 'none')
+    }
     上下文.表头元素映射.set(列索引, th)
     let 内容 = 创建元素('div', { style: { display: 'flex', alignItems: 'center', gap: 'var(--间距-1)' } })
-    let 排序索引 = 上下文.排序列表.findIndex((项) => 项.field === 列.字段名)
-    let 排序项 = 上下文.排序列表[排序索引]
     let 排序标识 = 排序项 === undefined ? '' : ` ${排序项.direction === 'asc' ? '▲' : '▼'}${排序索引}`
     let 标签 = new 文本按钮({
       文本: `${列.显示名}${排序标识}`,
@@ -88,10 +93,18 @@ export function 渲染表头<数据项>(上下文: 表格渲染上下文<数据�
     th.append(内容)
     let 调整柄 = 创建元素('div', {
       role: 'separator',
+      tabIndex: 0,
       title: '调整列宽',
       style: { position: 'absolute', right: '0', top: '0', bottom: '0', width: '6px', cursor: 'col-resize' },
-      onmousedown: (event: MouseEvent): void => 上下文.开始调整列宽(列索引, event, th),
+      onpointerdown: (event: PointerEvent): void => 上下文.开始调整列宽(列索引, event, th, 调整柄),
+      onkeydown: (event: KeyboardEvent): void => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+        event.preventDefault()
+        上下文.键盘调整列宽(列索引, event.key === 'ArrowLeft' ? -10 : 10, th)
+      },
     })
+    调整柄.setAttribute('aria-label', `调整${列.显示名}列宽`)
+    调整柄.setAttribute('aria-orientation', 'vertical')
     th.append(调整柄)
     表头行.append(th)
   }

@@ -1,6 +1,6 @@
 import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
-import { 表单组件基类 } from './form'
+import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
 type 复选框组事件 = { 变化: string[]; 失焦: void }
 
@@ -11,6 +11,7 @@ type 复选框组配置 = {
   选中值列表?: string[]
   禁用?: boolean
   额外提示?: string
+  可访问名称?: string
   变化处理函数?: (选中值列表: string[]) => void | Promise<void>
   宿主样式?: 增强样式类型
   元素样式?: 增强样式类型
@@ -19,6 +20,7 @@ type 复选框组配置 = {
 class 复选框组 extends 表单组件基类<复选框组事件, 监听复选框组事件, string[]> {
   protected 配置: 复选框组配置
   private 复选框元素们: HTMLInputElement[] = []
+  private 容器元素?: HTMLDivElement
 
   public constructor(配置: 复选框组配置 = {}) {
     super()
@@ -29,7 +31,11 @@ class 复选框组 extends 表单组件基类<复选框组事件, 监听复选�
     this.复选框元素们 = []
     应用宿主样式(this.获得宿主样式(), this.配置.宿主样式)
 
-    let 容器 = 创建元素('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } })
+    let 容器 = 创建元素('div', {
+      role: 'group',
+      style: { display: 'flex', flexDirection: 'column', gap: '8px', ...this.配置.元素样式 },
+    })
+    if (this.配置.可访问名称 !== undefined) 容器.setAttribute('aria-label', this.配置.可访问名称)
 
     if (this.配置.选项列表 !== undefined) {
       for (let 选项 of this.配置.选项列表) {
@@ -76,6 +82,7 @@ class 复选框组 extends 表单组件基类<复选框组事件, 监听复选�
     }
 
     this.shadow.appendChild(容器)
+    this.容器元素 = 容器
   }
 
   public 设置选中值列表(选中值列表: string[]): void {
@@ -86,6 +93,7 @@ class 复选框组 extends 表单组件基类<复选框组事件, 监听复选�
   }
 
   public 获得选中值列表(): string[] {
+    if (this.复选框元素们.length === 0) return [...(this.配置.选中值列表 ?? [])]
     return this.复选框元素们.filter((复选框) => 复选框.checked).map((复选框) => 复选框.value)
   }
 
@@ -111,6 +119,8 @@ class 复选框组 extends 表单组件基类<复选框组事件, 监听复选�
     this.配置.禁用 = 值
     for (let 复选框 of this.复选框元素们) {
       复选框.disabled = 值
+      if (复选框.parentElement instanceof HTMLLabelElement)
+        复选框.parentElement.style.cursor = 值 ? 'not-allowed' : 'pointer'
     }
   }
 
@@ -121,7 +131,11 @@ class 复选框组 extends 表单组件基类<复选框组事件, 监听复选�
     this.复选框元素们[0]?.focus()
   }
   public 设置可访问名称(名称: string): void {
-    this.setAttribute('aria-label', 名称)
+    this.配置.可访问名称 = 名称
+    this.容器元素?.setAttribute('aria-label', 名称)
+  }
+  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
+    同步表单控件校验状态(this.复选框元素们, 错误, 描述元素标识列表)
   }
 }
 

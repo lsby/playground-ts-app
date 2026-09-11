@@ -1,6 +1,6 @@
 import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
-import { 表单组件基类 } from './form'
+import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
 type 事件类型 = { 输入: string; 变化: string; 焦点: void; 失焦: void; 提交: string }
 type 监听事件类型 = {}
@@ -26,6 +26,7 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
 
   private 配置: 配置类型
   private 文本框元素: HTMLTextAreaElement | undefined
+  private 自适应动画帧: number | null = null
 
   public constructor(配置: 配置类型 = {}) {
     super()
@@ -44,8 +45,10 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
         fontSize: '14px',
         border: '1px solid var(--边框颜色)',
         borderRadius: '8px',
-        backgroundColor: 'var(--输入框背景)',
+        backgroundColor: this.配置.禁用 === true ? 'var(--禁用背景)' : 'var(--输入框背景)',
         color: 'var(--文字颜色)',
+        cursor: this.配置.禁用 === true ? 'not-allowed' : 'text',
+        opacity: this.配置.禁用 === true ? '0.6' : '1',
         boxSizing: 'border-box',
         resize: this.配置.自动伸缩 === true ? 'none' : 'vertical',
         minHeight: this.配置.最小高度,
@@ -116,6 +119,10 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
       observer.observe(this.文本框元素)
       this.注册观察器(observer)
     }
+    this.注册清理((): void => {
+      if (this.自适应动画帧 !== null) cancelAnimationFrame(this.自适应动画帧)
+      this.自适应动画帧 = null
+    })
   }
 
   private 自适应高度(): void {
@@ -126,10 +133,11 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
     this.执行自适应高度(元素)
 
     // 在下一帧再次计算，确保浏览器已完成布局
-    let 动画帧 = requestAnimationFrame(() => {
+    if (this.自适应动画帧 !== null) cancelAnimationFrame(this.自适应动画帧)
+    this.自适应动画帧 = requestAnimationFrame(() => {
+      this.自适应动画帧 = null
       this.执行自适应高度(元素)
     })
-    this.注册清理((): void => cancelAnimationFrame(动画帧))
   }
 
   private 执行自适应高度(元素: HTMLTextAreaElement): void {
@@ -142,14 +150,15 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
       return
     }
 
-    let maxHeight = parseInt(this.配置.最大高度 ?? '200')
-    let targetHeight = scrollHeight + 2
+    let 计算样式最大高度 = getComputedStyle(元素).maxHeight
+    let 最大高度 = 计算样式最大高度 === 'none' ? Number.POSITIVE_INFINITY : Number.parseFloat(计算样式最大高度)
+    let targetHeight = Math.min(scrollHeight + 2, Number.isFinite(最大高度) ? 最大高度 : scrollHeight + 2)
     let 目标高度 = `${targetHeight}px`
 
     // 只有当高度确实需要变化时才进行设置，减少 resize 触发的可能性
     if (目标高度 !== 原始高度) {
       元素.style.height = 目标高度
-      if (targetHeight < maxHeight) {
+      if (scrollHeight + 2 <= 最大高度) {
         元素.style.overflowY = 'hidden'
       } else {
         元素.style.overflowY = 'auto'
@@ -197,6 +206,10 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
   public 设置可访问名称(名称: string): void {
     this.配置.可访问名称 = 名称
     this.文本框元素?.setAttribute('aria-label', 名称)
+  }
+
+  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
+    if (this.文本框元素 !== undefined) 同步表单控件校验状态([this.文本框元素], 错误, 描述元素标识列表)
   }
 
   public 聚焦(): void {

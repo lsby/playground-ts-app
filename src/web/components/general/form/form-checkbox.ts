@@ -1,6 +1,6 @@
 import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
-import { 表单组件基类 } from './form'
+import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
 type 复选框事件 = { 变化: boolean; 失焦: void }
 
@@ -20,6 +20,7 @@ type 复选框配置 = {
 class 复选框 extends 表单组件基类<复选框事件, 监听复选框事件, boolean> {
   protected 配置: 复选框配置
   private 复选框元素?: HTMLInputElement
+  private 容器元素?: HTMLLabelElement
 
   public constructor(配置: 复选框配置 = {}) {
     super()
@@ -72,6 +73,7 @@ class 复选框 extends 表单组件基类<复选框事件, 监听复选框事�
 
     this.shadow.appendChild(容器)
     this.复选框元素 = 复选框元素
+    this.容器元素 = 容器
   }
 
   public 设置值(值: boolean): void {
@@ -89,7 +91,9 @@ class 复选框 extends 表单组件基类<复选框事件, 监听复选框事�
     this.配置.禁用 = 值
     if (this.复选框元素 !== undefined) {
       this.复选框元素.disabled = 值
+      this.复选框元素.style.opacity = 值 ? '0.6' : '1'
     }
+    if (this.容器元素 !== undefined) this.容器元素.style.cursor = 值 ? 'not-allowed' : 'pointer'
   }
 
   public 获得禁用(): boolean {
@@ -101,6 +105,9 @@ class 复选框 extends 表单组件基类<复选框事件, 监听复选框事�
   public 设置可访问名称(名称: string): void {
     this.配置.可访问名称 = 名称
     this.复选框元素?.setAttribute('aria-label', 名称)
+  }
+  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
+    if (this.复选框元素 !== undefined) 同步表单控件校验状态([this.复选框元素], 错误, 描述元素标识列表)
   }
 }
 

@@ -1,6 +1,6 @@
 import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
-import { 表单组件基类 } from './form'
+import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
 type 单选框组事件 = { 变化: string; 失焦: void }
 
@@ -12,6 +12,7 @@ type 单选框组配置<值类型 extends string> = {
   值?: 值类型
   禁用?: boolean
   额外提示?: string
+  可访问名称?: string
   变化处理函数?: (值: 值类型) => void | Promise<void>
   宿主样式?: 增强样式类型
   元素样式?: 增强样式类型
@@ -25,6 +26,7 @@ class 单选框组<值类型 extends string = string> extends 表单组件基类
   protected 配置: 单选框组配置<值类型>
   private 单选框元素们: HTMLInputElement[] = []
   private 组名: string
+  private 容器元素?: HTMLDivElement
 
   public constructor(配置: 单选框组配置<值类型> = {}) {
     super()
@@ -41,7 +43,7 @@ class 单选框组<值类型 extends string = string> extends 表单组件基类
       let 头部 = 创建元素('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' } })
 
       if (this.配置.标签 !== undefined) {
-        let 标签元素 = 创建元素('label', {
+        let 标签元素 = 创建元素('span', {
           textContent: this.配置.标签,
           style: { fontSize: '14px', color: 'var(--文字颜色)' },
         })
@@ -57,8 +59,15 @@ class 单选框组<值类型 extends string = string> extends 表单组件基类
     }
 
     let 容器 = 创建元素('div', {
-      style: { display: 'flex', flexDirection: this.配置.方向 === '横' ? 'row' : 'column', gap: '8px' },
+      role: 'radiogroup',
+      style: {
+        display: 'flex',
+        flexDirection: this.配置.方向 === '横' ? 'row' : 'column',
+        gap: '8px',
+        ...this.配置.元素样式,
+      },
     })
+    if (this.配置.可访问名称 !== undefined) 容器.setAttribute('aria-label', this.配置.可访问名称)
 
     if (this.配置.选项列表 !== undefined) {
       for (let 选项 of this.配置.选项列表) {
@@ -99,6 +108,7 @@ class 单选框组<值类型 extends string = string> extends 表单组件基类
     }
 
     this.shadow.appendChild(容器)
+    this.容器元素 = 容器
   }
 
   public 设置值(值: 值类型): void {
@@ -109,13 +119,15 @@ class 单选框组<值类型 extends string = string> extends 表单组件基类
   }
 
   public 获得值(): 值类型 {
-    return (this.单选框元素们.find((单选框) => 单选框.checked)?.value ?? '') as 值类型
+    return (this.单选框元素们.find((单选框) => 单选框.checked)?.value ?? this.配置.值 ?? '') as 值类型
   }
 
   public 设置禁用(值: boolean): void {
     this.配置.禁用 = 值
     for (let 单选框 of this.单选框元素们) {
       单选框.disabled = 值
+      if (单选框.parentElement instanceof HTMLLabelElement)
+        单选框.parentElement.style.cursor = 值 ? 'not-allowed' : 'pointer'
     }
   }
 
@@ -126,7 +138,11 @@ class 单选框组<值类型 extends string = string> extends 表单组件基类
     this.单选框元素们[0]?.focus()
   }
   public 设置可访问名称(名称: string): void {
-    this.setAttribute('aria-label', 名称)
+    this.配置.可访问名称 = 名称
+    this.容器元素?.setAttribute('aria-label', 名称)
+  }
+  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
+    同步表单控件校验状态(this.单选框元素们, 错误, 描述元素标识列表)
   }
 }
 

@@ -21,6 +21,7 @@ class 浮层管理器类 {
   private 序号 = 0
   private 全局监听器 = new AbortController()
   private 原页面滚动状态: 页面滚动状态 | null = null
+  private 原惰性状态 = new Map<HTMLElement, boolean>()
 
   public constructor() {
     this.绑定全局事件()
@@ -29,11 +30,12 @@ class 浮层管理器类 {
   public 打开(选项: 浮层选项): 浮层句柄 {
     this.序号 += 1
     let 记录: 浮层记录 = { ...选项, id: this.序号, 原焦点: this.获得当前焦点(), 正在关闭: false }
-    记录.根元素.style.zIndex = String(1000 + this.栈.length * 2)
+    记录.根元素.style.zIndex = `calc(var(--浮层起始层级) + ${String(this.栈.length * 2)})`
     记录.根元素.dataset['overlayId'] = String(记录.id)
     this.栈.push(记录)
     document.body.appendChild(记录.根元素)
     this.同步页面滚动()
+    this.同步背景可交互性()
     this.安排初始聚焦(记录)
 
     return { id: 记录.id, 关闭: async (): Promise<void> => await this.关闭(记录.id) }
@@ -42,12 +44,14 @@ class 浮层管理器类 {
   public async 关闭(id?: number): Promise<void> {
     let 记录 = id === undefined ? this.栈[this.栈.length - 1] : this.栈.find((项) => 项.id === id)
     if (记录 === undefined || 记录.正在关闭 === true) return
+    let 是顶层 = this.栈[this.栈.length - 1]?.id === 记录.id
     记录.正在关闭 = true
     let 索引 = this.栈.findIndex((项) => 项.id === 记录.id)
     if (索引 >= 0) this.栈.splice(索引, 1)
     记录.根元素.remove()
     this.同步页面滚动()
-    if (记录.原焦点?.isConnected === true) 记录.原焦点.focus()
+    this.同步背景可交互性()
+    if (是顶层 === true && 记录.原焦点?.isConnected === true) 记录.原焦点.focus()
   }
 
   public async 请求关闭(id: number): Promise<void> {
@@ -140,7 +144,13 @@ class 浮层管理器类 {
     let 遍历 = (节点: ParentNode): void => {
       for (let 子节点 of 节点.children) {
         if (子节点 instanceof HTMLElement) {
-          let 可见 = 子节点.hidden === false && 子节点.getAttribute('aria-hidden') !== 'true'
+          let 计算样式 = getComputedStyle(子节点)
+          let 可见 =
+            子节点.hidden === false &&
+            子节点.getAttribute('aria-hidden') !== 'true' &&
+            计算样式.display !== 'none' &&
+            计算样式.visibility !== 'hidden' &&
+            子节点.getClientRects().length > 0
           let 可用 = 'disabled' in 子节点 === false || 子节点.getAttribute('disabled') === null
           if (
             可见 === true &&
@@ -190,6 +200,23 @@ class 浮层管理器类 {
       document.body.style.overflow = this.原页面滚动状态.overflow
       document.body.style.paddingRight = this.原页面滚动状态.paddingRight
       this.原页面滚动状态 = null
+    }
+  }
+
+  private 同步背景可交互性(): void {
+    let 顶层模态索引 = this.栈.findLastIndex((项): boolean => 项.模态 === true)
+    if (顶层模态索引 < 0) {
+      for (let [元素, 原状态] of this.原惰性状态) {
+        if (元素.isConnected === true) 元素.inert = 原状态
+      }
+      this.原惰性状态.clear()
+      return
+    }
+    let 可交互根元素 = new Set(this.栈.slice(顶层模态索引).map((项) => 项.根元素))
+    for (let 子元素 of document.body.children) {
+      if (子元素 instanceof HTMLElement === false) continue
+      if (this.原惰性状态.has(子元素) === false) this.原惰性状态.set(子元素, 子元素.inert)
+      子元素.inert = 可交互根元素.has(子元素) === false
     }
   }
 }

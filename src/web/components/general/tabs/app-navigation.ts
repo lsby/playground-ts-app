@@ -86,7 +86,7 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
     this.内容容器.style.overflow = 'hidden'
 
     let 插槽: HTMLSlotElement = 创建元素('slot')
-    this.内容容器.appendChild(插槽)
+    this.内容容器.replaceChildren(插槽)
 
     this.shadow.appendChild(this.导航栏容器)
     this.shadow.appendChild(this.内容容器)

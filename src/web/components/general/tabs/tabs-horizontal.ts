@@ -70,11 +70,9 @@ export class 横向tab组件 extends 组件基类<tabHorizontal发出事件类�
     this.标签头容器.style.backdropFilter = 'blur(10px)'
     this.标签头容器.style.overflowX = 'auto'
     this.标签头容器.style.flexShrink = '0'
+    this.标签头容器.setAttribute('role', 'tablist')
     this.标签头容器.setAttribute('aria-label', '标签页')
-    // 隐藏滚动条但保留滚动功能
     this.标签头容器.style.scrollbarWidth = 'none' // Firefox
-    // @ts-ignore
-    this.标签头容器.style.msOverflowStyle = 'none' // IE/Edge
 
     this.插槽容器.style.flex = '1'
     this.插槽容器.style.display = 'flex'
@@ -82,7 +80,7 @@ export class 横向tab组件 extends 组件基类<tabHorizontal发出事件类�
     this.插槽容器.style.overflow = 'hidden'
 
     let 插槽: HTMLSlotElement = 创建元素('slot')
-    this.插槽容器.appendChild(插槽)
+    this.插槽容器.replaceChildren(插槽)
 
     this.shadow.appendChild(this.标签头容器)
     this.shadow.appendChild(this.插槽容器)
@@ -119,11 +117,12 @@ export class 横向tab组件 extends 组件基类<tabHorizontal发出事件类�
       let 标签标识 = `${this.标签页标识前缀}-tab-${idx}`
       let 面板标识 = `${this.标签页标识前缀}-panel-${idx}`
       按钮.id = 标签标识
+      按钮.setAttribute('role', 'tab')
       按钮.setAttribute('aria-controls', 面板标识)
-      按钮.setAttribute('aria-pressed', 选中 ? 'true' : 'false')
+      按钮.setAttribute('aria-selected', 选中 ? 'true' : 'false')
       按钮.tabIndex = 选中 ? 0 : -1
       项.内容滚动容器.id = 面板标识
-      项.内容滚动容器.setAttribute('role', 'region')
+      项.内容滚动容器.setAttribute('role', 'tabpanel')
       项.内容滚动容器.setAttribute('aria-labelledby', 标签标识)
       项.内容滚动容器.hidden = 选中 === false
 

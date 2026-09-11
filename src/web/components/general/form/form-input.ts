@@ -1,6 +1,6 @@
-import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
+import { 创建元素, 应用宿主样式, 应用样式 } from '../../../global/tools/create-element'
 import { 增强样式类型 } from '../../../global/types/style'
-import { 表单组件基类 } from './form'
+import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
 type 输入框事件 = { 输入: string; 变化: string; 焦点: void; 失焦: void; 回车: string }
 type 监听输入框事件 = {}
@@ -111,7 +111,10 @@ abstract class 输入框基类 extends 表单组件基类<输入框事件, 监�
 
   public 设置禁用(值: boolean): void {
     this.配置.禁用 = 值
-    if (this.输入框元素 !== undefined) this.输入框元素.disabled = 值
+    if (this.输入框元素 !== undefined) {
+      this.输入框元素.disabled = 值
+      应用样式(this.输入框元素, { ...this.获得输入框样式对象(), ...this.配置.元素样式 })
+    }
   }
 
   public 获得禁用(): boolean {
@@ -141,6 +144,10 @@ abstract class 输入框基类 extends 表单组件基类<输入框事件, 监�
   public 设置可访问名称(名称: string): void {
     this.配置.可访问名称 = 名称
     this.输入框元素?.setAttribute('aria-label', 名称)
+  }
+
+  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
+    if (this.输入框元素 !== undefined) 同步表单控件校验状态([this.输入框元素], 错误, 描述元素标识列表)
   }
 }
 

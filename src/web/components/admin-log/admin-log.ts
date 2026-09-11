@@ -45,10 +45,7 @@ export class 系统日志页面组件 extends 组件基类<发出事件类型, �
         { 信号 },
       )
 
-      // 显示历史日志
-      响应.日志列表.forEach((日志) => {
-        this.添加新日志(日志)
-      })
+      this.日志组件.添加多条日志(响应.日志列表.map((日志): string => this.格式化日志(日志)))
 
       // 隐藏加载状态
       this.日志组件.设置加载状态(false)
@@ -61,7 +58,10 @@ export class 系统日志页面组件 extends 组件基类<发出事件类型, �
   }
 
   private 添加新日志(日志: { 时间: string; 消息: string }): void {
-    let 日志消息 = `[${new Date(日志.时间).toLocaleString()}] ${日志.消息}`
-    this.日志组件.添加日志(日志消息)
+    this.日志组件.添加日志(this.格式化日志(日志))
+  }
+
+  private 格式化日志(日志: { 时间: string; 消息: string }): string {
+    return `[${new Date(日志.时间).toLocaleString()}] ${日志.消息}`
   }
 }

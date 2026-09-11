@@ -1,6 +1,6 @@
 import { 增强样式类型 } from '../../../../web/global/types/style'
-import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
-import { 表单组件基类 } from './form'
+import { 创建元素, 应用宿主样式, 应用样式 } from '../../../global/tools/create-element'
+import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
 type 下拉框事件 = { 变化: string; 焦点: void; 失焦: void }
 
@@ -111,6 +111,7 @@ abstract class 下拉框基类 extends 表单组件基类<下拉框事件, 监�
     this.配置.禁用 = 值
     if (this.下拉框元素 !== undefined) {
       this.下拉框元素.disabled = 值
+      应用样式(this.下拉框元素, { ...this.获得下拉框样式对象(), ...this.配置.元素样式 })
     }
   }
 
@@ -127,11 +128,15 @@ abstract class 下拉框基类 extends 表单组件基类<下拉框事件, 监�
     this.下拉框元素?.setAttribute('aria-label', 名称)
   }
 
+  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
+    if (this.下拉框元素 !== undefined) 同步表单控件校验状态([this.下拉框元素], 错误, 描述元素标识列表)
+  }
+
   public 设置选项列表(选项列表: 选项类型[]): void {
+    let 原值 = this.获得值()
     this.配置.选项列表 = 选项列表
     if (this.下拉框元素 !== undefined) {
-      // 清空现有选项
-      this.下拉框元素.innerHTML = ''
+      this.下拉框元素.replaceChildren()
       if (this.配置.占位符 !== undefined) {
         let 占位符选项 = 创建元素('option', {
           value: '',
@@ -145,6 +150,9 @@ abstract class 下拉框基类 extends 表单组件基类<下拉框事件, 监�
         let 选项元素 = 创建元素('option', { value: 选项.值, textContent: 选项.文本, disabled: 选项.禁用 ?? false })
         this.下拉框元素.appendChild(选项元素)
       }
+      let 保留原值 = 原值 !== '' && 选项列表.some((选项): boolean => 选项.值 === 原值 && 选项.禁用 !== true)
+      this.下拉框元素.value = 保留原值 ? 原值 : ''
+      this.配置.值 = this.下拉框元素.value
     }
   }
 }

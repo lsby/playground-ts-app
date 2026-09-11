@@ -28,7 +28,7 @@ async function 登录演示页(page: Page): Promise<void> {
 
 async function 切换演示标签(page: Page, 标签: string): Promise<void> {
   await 演示_说明_右下角(page, `切换演示标签页至：“${标签}”`)
-  await 演示_点击(page.getByRole('button', { name: 标签, exact: true }))
+  await 演示_点击(page.getByRole('tab', { name: 标签, exact: true }))
 }
 
 async function 添加演示用户(page: Page, 用户名: string): Promise<void> {

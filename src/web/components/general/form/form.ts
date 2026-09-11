@@ -1,5 +1,5 @@
 import { 增强样式类型 } from '../../../../web/global/types/style'
-import { 组件基类 } from '../../../base/base'
+import { 组件基类, 要求组件构造参数 } from '../../../base/base'
 import { 提示管理器 } from '../../../global/manager/hint-manager'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
 
@@ -7,13 +7,27 @@ export type 基础值 = string | number | boolean | null
 export type 基础值结构 = 基础值 | 基础值结构[] | { [键: string]: 基础值结构 }
 export type 表单数据 = Record<string, 基础值结构>
 
-export interface 表单元素<值类型 extends 基础值结构 = 基础值结构> extends HTMLElement {
+export type 表单元素<值类型 extends 基础值结构 = 基础值结构> = HTMLElement & {
   获得值(): 值类型
   设置值(值: 值类型): void
   设置禁用?(值: boolean): void
   获得禁用?(): boolean
   聚焦?(): void
   设置可访问名称?(名称: string): void
+  设置校验状态?(错误: string | null, 描述元素标识列表: string[]): void
+}
+
+export function 同步表单控件校验状态(
+  元素列表: Iterable<HTMLElement>,
+  错误: string | null,
+  描述元素标识列表: string[],
+): void {
+  let 描述 = 描述元素标识列表.join(' ')
+  for (let 元素 of 元素列表) {
+    元素.setAttribute('aria-invalid', 错误 === null ? 'false' : 'true')
+    if (描述 === '') 元素.removeAttribute('aria-describedby')
+    else 元素.setAttribute('aria-describedby', 描述)
+  }
 }
 
 export type 表单校验器<值类型 extends 基础值结构, 数据类型 extends 表单数据> = (
@@ -33,6 +47,7 @@ export type 表单项配置<
   额外提示?: string
   必填?: boolean
   校验器们?: Array<表单校验器<数据类型[键], 数据类型>>
+  依赖字段?: Array<Extract<keyof 数据类型, string>>
   变化时校验?: boolean
 }
 
@@ -56,8 +71,11 @@ type 运行项 = {
   获得禁用?: () => boolean
   聚焦?: () => void
   校验: () => Promise<string | null>
+  依赖字段: ReadonlySet<string>
   变化时校验: boolean
   错误元素: HTMLDivElement | null
+  当前错误: string | null
+  描述元素标识列表: string[]
   已触碰: boolean
   已修改: boolean
   校验代次: number
@@ -73,22 +91,27 @@ type 表单事件<数据类型 extends 表单数据> = {
 }
 type 监听表单事件 = { 变化: 基础值结构; 失焦: void }
 
+let 表单序号 = 0
+
 export class 表单<数据类型 extends 表单数据> extends 组件基类<表单事件<数据类型>, 监听表单事件> {
   private 配置: 表单配置<数据类型>
   private 运行项映射 = new Map<string, 运行项>()
   private 默认值映射 = new Map<string, 基础值结构>()
   private 正在提交 = false
   private 数据代次 = 0
+  private readonly 表单标识前缀: string
 
   public constructor(配置: 表单配置<数据类型>) {
     super()
-    this.配置 = 配置
-    for (let 项 of 配置.项列表) this.注册项(项)
-    if (配置.初始数据 !== undefined) this.设置数据(配置.初始数据)
+    this.配置 = 要求组件构造参数(配置, '表单组件')
+    表单序号 += 1
+    this.表单标识前缀 = `lsby-form-${表单序号}`
+    for (let 项 of this.配置.项列表) this.注册项(项)
+    if (this.配置.初始数据 !== undefined) this.设置数据(this.配置.初始数据)
     for (let [键, 运行项] of this.运行项映射) this.默认值映射.set(键, 运行项.获得值())
   }
 
-  protected override 当加载时(): void {
+  protected override async 当加载时(): Promise<void> {
     应用宿主样式(this.获得宿主样式(), this.配置.宿主样式)
     let 容器样式: 增强样式类型 = {
       display: 'grid',
@@ -97,9 +120,13 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
     }
     let 容器 = 创建元素('div', { style: { ...容器样式, ...this.配置.元素样式 } })
     容器.setAttribute('role', 'group')
-    for (let 项配置 of this.配置.项列表) {
+    for (let 项索引 = 0; 项索引 < this.配置.项列表.length; 项索引 += 1) {
+      let 项配置 = this.配置.项列表[项索引]
+      if (项配置 === undefined) continue
       let 运行项 = this.运行项映射.get(项配置.键)
       if (运行项 === undefined) continue
+      运行项.描述元素标识列表 = []
+      运行项.错误元素 = null
       let 项包装器 = 创建元素('div', {
         style: {
           gridColumn: `span ${项配置.宽度 ?? 1}`,
@@ -124,22 +151,33 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
       }
       项包装器.append(运行项.组件)
       if (项配置.帮助文本 !== undefined) {
+        let 帮助标识 = `${this.表单标识前缀}-help-${项索引}`
         项包装器.append(
           创建元素('div', {
+            id: 帮助标识,
             textContent: 项配置.帮助文本,
             style: { color: 'var(--次要文字颜色)', fontSize: 'var(--字号-小)' },
           }),
         )
+        运行项.描述元素标识列表.push(帮助标识)
       }
+      let 错误标识 = `${this.表单标识前缀}-error-${项索引}`
       let 错误元素 = 创建元素('div', {
+        id: 错误标识,
         role: 'alert',
         style: { minHeight: '18px', color: 'var(--错误颜色)', fontSize: 'var(--字号-小)' },
       })
       项包装器.append(错误元素)
       运行项.错误元素 = 错误元素
+      运行项.描述元素标识列表.push(错误标识)
+      this.显示项错误(运行项, 运行项.当前错误)
       容器.append(项包装器)
     }
     this.shadow.append(容器)
+    for (let 运行项 of this.运行项映射.values()) {
+      if (运行项.组件 instanceof 组件基类) await 运行项.组件.等待初始化()
+      this.显示项错误(运行项, 运行项.当前错误)
+    }
     this.监听冒泡事件('变化', async (event): Promise<void> => await this.处理子项变化(event))
     this.监听冒泡事件('失焦', async (event): Promise<void> => await this.处理子项失焦(event))
   }
@@ -256,8 +294,11 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
         }
         return null
       },
+      依赖字段: new Set(项.依赖字段 ?? []),
       变化时校验: 项.变化时校验 ?? false,
       错误元素: null,
+      当前错误: null,
+      描述元素标识列表: [],
       已触碰: false,
       已修改: false,
       校验代次: 0,
@@ -272,9 +313,17 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
     if (event.target === this || event.target instanceof HTMLElement === false) return
     let 运行项 = [...this.运行项映射.values()].find((项) => 项.组件 === event.target)
     if (运行项 === undefined) return
-    this.使校验过期(运行项)
+    let 受影响项 = [
+      运行项,
+      ...[...this.运行项映射.values()].filter(
+        (候选项): boolean => 候选项 !== 运行项 && 候选项.依赖字段.has(运行项.键) === true,
+      ),
+    ]
+    for (let 项 of 受影响项) this.使校验过期(项)
     运行项.已修改 = true
-    if (运行项.变化时校验 === true || 运行项.已触碰 === true) await this.校验项(运行项)
+    for (let 项 of 受影响项) {
+      if (项.变化时校验 === true || 项.已触碰 === true) await this.校验项(项)
+    }
     this.派发事件('变化', this.获得数据())
   }
 
@@ -314,8 +363,12 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
   }
 
   private 显示项错误(运行项: 运行项, 错误: string | null): void {
+    运行项.当前错误 = 错误
     if (运行项.错误元素 !== null) 运行项.错误元素.textContent = 错误 ?? ''
     运行项.组件.setAttribute('aria-invalid', 错误 === null ? 'false' : 'true')
+    运行项.组件.setAttribute('aria-describedby', 运行项.描述元素标识列表.join(' '))
+    let 设置校验状态 = '设置校验状态' in 运行项.组件 ? 运行项.组件['设置校验状态'] : undefined
+    if (typeof 设置校验状态 === 'function') 设置校验状态.call(运行项.组件, 错误, 运行项.描述元素标识列表)
   }
 
   private 是空值(值: 基础值结构): boolean {
@@ -352,7 +405,7 @@ export type 动态表单项配置 = {
 
 export class 动态表单 extends 表单<表单数据> {
   public constructor(配置: { 项列表: 动态表单项配置[]; 宿主样式?: 增强样式类型; 元素样式?: 增强样式类型 }) {
-    super(配置 as 表单配置<表单数据>)
+    super(要求组件构造参数(配置, '动态表单组件') as 表单配置<表单数据>)
   }
 }
 
@@ -376,6 +429,8 @@ export abstract class 表单组件基类<
     })
     图标.onmouseenter = (): void => 提示管理器.显示({ 文本: 提示内容 }, 图标)
     图标.onmouseleave = (): void => 提示管理器.隐藏()
+    图标.onfocus = (): void => 提示管理器.显示({ 文本: 提示内容 }, 图标)
+    图标.onblur = (): void => 提示管理器.隐藏()
     return 图标
   }
 }

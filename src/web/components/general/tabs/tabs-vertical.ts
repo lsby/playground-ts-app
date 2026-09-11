@@ -115,6 +115,8 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
     this.标签头容器.style.flexShrink = '0'
     this.标签头容器.style.overflowY = 'auto'
     this.标签头容器.id = `${this.标签页标识前缀}-tablist`
+    this.标签头容器.setAttribute('role', 'tablist')
+    this.标签头容器.setAttribute('aria-orientation', 'vertical')
     this.标签头容器.setAttribute('aria-label', '标签页')
 
     this.插槽容器.style.flex = '1'
@@ -123,7 +125,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
     this.插槽容器.style.overflow = 'hidden'
 
     let 插槽: HTMLSlotElement = 创建元素('slot')
-    this.插槽容器.appendChild(插槽)
+    this.插槽容器.replaceChildren(插槽)
 
     // 移动端遮罩层
     let 遮罩层 = 创建元素('div', {
@@ -220,6 +222,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
       // 如果有分组，且与上一个分组不同，则渲染分组标题
       if (项.分组 !== undefined && 项.分组 !== 上一个分组) {
         let 分组标题 = 创建元素('div', {
+          role: 'presentation',
           textContent: 项.分组,
           style: {
             fontSize: '12px',
@@ -265,11 +268,12 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
       let 标签标识 = `${this.标签页标识前缀}-tab-${idx}`
       let 面板标识 = `${this.标签页标识前缀}-panel-${idx}`
       按钮.id = 标签标识
+      按钮.setAttribute('role', 'tab')
       按钮.setAttribute('aria-controls', 面板标识)
-      按钮.setAttribute('aria-pressed', 选中 ? 'true' : 'false')
+      按钮.setAttribute('aria-selected', 选中 ? 'true' : 'false')
       按钮.tabIndex = 选中 ? 0 : -1
       项.内容.id = 面板标识
-      项.内容.setAttribute('role', 'region')
+      项.内容.setAttribute('role', 'tabpanel')
       项.内容.setAttribute('aria-labelledby', 标签标识)
       项.内容.hidden = 选中 === false
 

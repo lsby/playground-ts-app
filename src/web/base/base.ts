@@ -4,6 +4,11 @@ import { 是中止错误, 等待可取消任务 } from '../global/tools/abort'
 
 type 清理函数 = () => void | Promise<void>
 
+export function 要求组件构造参数<参数类型>(参数: 参数类型 | undefined, 组件名称: string): 参数类型 {
+  if (参数 === undefined) throw new Error(`${组件名称}只能通过 new 并传入配置参数创建`)
+  return 参数
+}
+
 export abstract class 组件基类<
   发出事件类型 extends Record<string, unknown>,
   监听事件类型 extends Record<string, unknown>,
@@ -155,11 +160,16 @@ export abstract class 组件基类<
     this.渲染代次 += 1
     this.渲染控制器.abort()
     this.重置初始化事件()
-    void this.执行清理()
-      .then(async (): Promise<void> => await this.当卸载时?.())
+    let 任务 = this.渲染队列
+      .catch((): void => {})
+      .then(async (): Promise<void> => {
+        await this.执行清理()
+        await this.当卸载时?.()
+      })
       .catch((错误: unknown): void => {
         this.报告错误(错误)
       })
+    this.渲染队列 = 任务
   }
 
   private adoptedCallback(): void {

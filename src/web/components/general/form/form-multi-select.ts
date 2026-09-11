@@ -2,7 +2,7 @@ import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 组件基类 } from '../../../base/base'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
 import { 创建图标 } from '../base/icon'
-import type { 表单元素 } from './form'
+import { 同步表单控件校验状态, type 表单元素 } from './form'
 
 export type 多选下拉框选项 = { 文字: string; value: string }
 
@@ -56,7 +56,7 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
         borderRadius: '4px',
         backgroundColor: 'var(--输入框背景)',
         color: 'var(--文字颜色)',
-        cursor: 'pointer',
+        cursor: this.配置.禁用 === true ? 'not-allowed' : 'pointer',
         userSelect: 'none',
         display: 'flex',
         justifyContent: 'space-between',
@@ -224,14 +224,23 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
     this.配置.值 = [...值]
     for (let input of this.当前输入列表) {
       input.checked = 值.includes(input.value)
+      if (input.parentElement instanceof HTMLLabelElement)
+        input.parentElement.setAttribute('aria-selected', input.checked ? 'true' : 'false')
     }
     this.更新显示文本()
   }
 
   public 设置禁用(值: boolean): void {
     this.配置.禁用 = 值
-    if (this.触发按钮 !== undefined) this.触发按钮.disabled = 值
-    for (let 输入 of this.当前输入列表) 输入.disabled = 值
+    if (this.触发按钮 !== undefined) {
+      this.触发按钮.disabled = 值
+      this.触发按钮.style.cursor = 值 ? 'not-allowed' : 'pointer'
+    }
+    for (let 输入 of this.当前输入列表) {
+      输入.disabled = 值
+      if (输入.parentElement instanceof HTMLLabelElement)
+        输入.parentElement.style.cursor = 值 ? 'not-allowed' : 'pointer'
+    }
     if (值 === true) this.关闭面板()
   }
   public 获得禁用(): boolean {
@@ -243,6 +252,10 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
   public 设置可访问名称(名称: string): void {
     this.配置.可访问名称 = 名称
     this.触发按钮?.setAttribute('aria-label', 名称)
+  }
+  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
+    if (this.触发按钮 !== undefined) 同步表单控件校验状态([this.触发按钮], 错误, 描述元素标识列表)
+    同步表单控件校验状态(this.当前输入列表, 错误, 描述元素标识列表)
   }
 }
 

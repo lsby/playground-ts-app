@@ -42,6 +42,7 @@ export class 登录组件 extends 组件基类<发出事件类型, 监听事件�
           组件: 确认密码,
           宽度: 2,
           必填: true,
+          依赖字段: ['password'],
           校验器们: [(值, 数据): string | null => (值 === 数据.password ? null : '两次输入的密码不一致')],
         },
       ],
