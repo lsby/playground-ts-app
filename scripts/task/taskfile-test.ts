@@ -44,6 +44,10 @@ export let 测试任务表 = 定义任务({
     环境文件: 测试环境文件,
     运行: 命令('tsx', 'scripts/test/check-requirement-coverage.ts'),
   },
+  'clean:requirement-snapshots': {
+    说明: '显式清理全部需求测试快照',
+    运行: 命令('tsx', 'scripts/test/clean-requirement-snapshots.ts'),
+  },
   'test:requirement': {
     说明: '运行业务需求流程测试',
     环境文件: 测试环境文件,

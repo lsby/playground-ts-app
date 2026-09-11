@@ -8,8 +8,7 @@ import {
   演示需求依赖,
   管理员交互式人工核验用户管理界面流程,
   管理员全流程维护用户资料与安全凭据流程,
-  管理员核验用户管理操作入口流程,
-  管理员访问用户管理模块流程,
+  管理员访问并自动核验用户管理模块流程,
   账号类型选择,
   type 演示需求流程上下文,
 } from './demo-model'
@@ -23,8 +22,10 @@ async function 运行需求演示流程(参数: {
   演示说明: string
   演示粒度?: string
   选择结果?: 选择结果
-  附加报告?: (报告: 流程执行报告<演示需求依赖>) => Promise<void>
-}): Promise<void> {
+  从快照恢复?: string
+  证据附件后缀?: string
+  testInfo: TestInfo
+}): Promise<流程执行报告<演示需求依赖>> {
   let 选择 =
     参数.选择结果 ??
     参数.流程.选择结果 ??
@@ -61,60 +62,67 @@ async function 运行需求演示流程(参数: {
     },
   })
 
-  let 报告 = await 执行器.执行(参数.流程, 参数.演示粒度 === undefined ? {} : { 演示粒度: 参数.演示粒度 })
+  let 报告 = await 执行器.执行(参数.流程, {
+    ...(参数.演示粒度 === undefined ? {} : { 演示粒度: 参数.演示粒度 }),
+    ...(参数.从快照恢复 === undefined ? {} : { 从快照恢复: 参数.从快照恢复 }),
+  })
   expect(报告.观察记录们.length).toBeGreaterThan(0)
   for (let 记录 of 报告.观察记录们) {
     expect(记录.结果.通过).toBe(true)
   }
 
-  if (参数.附加报告 !== undefined) {
-    await 参数.附加报告(报告)
-  }
+  let 附件后缀 = 参数.证据附件后缀 === undefined ? '' : `-${参数.证据附件后缀}`
+  await 参数.testInfo.attach(`requirement-evidence${附件后缀}.json`, {
+    body: JSON.stringify(报告, undefined, 2),
+    contentType: 'application/json',
+  })
 
   await 演示_完成(
     参数.page,
     `流程【${参数.流程.名称}】验证通过！\n覆盖验收点：${参数.流程.覆盖验收点们.map((点) => 点.描述).join('、')}\n观察证据数：${报告.观察记录们.length}`,
   )
+  return 报告
 }
 
 test.describe('演示用户管理业务需求', (): void => {
-  test(管理员访问用户管理模块流程.名称, async ({ page }): Promise<void> => {
+  test(管理员访问并自动核验用户管理模块流程.名称, async ({ page }, testInfo): Promise<void> => {
     await 运行需求演示流程({
       page,
-      流程: 管理员访问用户管理模块流程,
+      流程: 管理员访问并自动核验用户管理模块流程,
       新用户名后缀: '0',
-      演示说明: '演示管理员从系统门户登录，成功访问用户管理模块并加载主界面与核心操作入口。',
+      演示说明: '演示管理员从系统门户登录，访问用户管理模块，并自动核验主界面及添加、编辑、删除、修改密码入口。',
+      testInfo,
     })
   })
 
   test(管理员全流程维护用户资料与安全凭据流程.名称, async ({ page }, testInfo: TestInfo): Promise<void> => {
-    await 运行需求演示流程({
+    let 首次报告 = await 运行需求演示流程({
       page,
       流程: 管理员全流程维护用户资料与安全凭据流程,
       新用户名后缀: `test-${String(testInfo.retry)}`,
       演示说明:
         '演示管理员在用户管理模块中完整的新增用户、表单输入与安全校验、资料持久化以及后续为该用户修改安全凭据（重置密码）的核心业务闭环。',
-      附加报告: async (报告): Promise<void> => {
-        expect(报告.创建快照们.length).toBeGreaterThan(0)
-        await testInfo.attach('requirement-evidence.json', {
-          body: JSON.stringify(报告, undefined, 2),
-          contentType: 'application/json',
-        })
-      },
+      证据附件后缀: 'initial',
+      testInfo,
     })
-  })
+    let 快照 = 首次报告.创建快照们[0]
+    expect(快照).toBeDefined()
+    if (快照 === undefined) throw new Error('首次流程没有创建可恢复的快照')
 
-  test(管理员核验用户管理操作入口流程.名称, async ({ page }): Promise<void> => {
-    await 运行需求演示流程({
+    let 恢复报告 = await 运行需求演示流程({
       page,
-      流程: 管理员核验用户管理操作入口流程,
-      新用户名后缀: 'auto-check',
-      演示说明:
-        '演示系统核验用户管理列表中各项核心操作入口（添加数据、行内编辑、删除、修改密码）的布局完备性与可访问性。',
+      流程: 管理员全流程维护用户资料与安全凭据流程,
+      新用户名后缀: `test-${String(testInfo.retry)}`,
+      演示说明: '从新增用户已持久化的检查点恢复，跳过前置创建步骤并继续完成密码维护与重新登录验证。',
+      从快照恢复: 快照.uuid,
+      证据附件后缀: 'restored',
+      testInfo,
     })
+    expect(恢复报告.从快照恢复?.uuid).toBe(快照.uuid)
+    expect(恢复报告.跳过步骤数量).toBeGreaterThan(0)
   })
 
-  test(管理员交互式人工核验用户管理界面流程.名称, async ({ page }): Promise<void> => {
+  test(管理员交互式人工核验用户管理界面流程.名称, async ({ page }, testInfo): Promise<void> => {
     await 运行需求演示流程({
       page,
       流程: 管理员交互式人工核验用户管理界面流程,
@@ -122,6 +130,7 @@ test.describe('演示用户管理业务需求', (): void => {
       演示说明:
         '演示需要人工介入的验收环节：在用户管理界面排版渲染就绪后，由人工审核员通过交互式确认框在线核验排版与功能可用性。',
       演示粒度: '用户管理人工核验',
+      testInfo,
     })
   })
 })

@@ -7,6 +7,7 @@ import { init } from '../../src/init/init'
 import 是否登录接口 from '../../src/interface/project/is-login/index'
 import 登录接口 from '../../src/interface/project/login/index'
 import 注册接口 from '../../src/interface/project/register/index'
+import type { 已审阅的any } from '../../src/tools/types'
 
 async function 主函数(): Promise<void> {
   console.log('========== 登录与注册纯后端集成测试 ==========')
@@ -41,7 +42,7 @@ async function 主函数(): Promise<void> {
 
   // 5. 获取 JWT 签名器插件并生成签名函数
   let jwt签名插件 = await jwt插件.签名器.run()
-  let 签名结果 = await jwt签名插件.运行({} as any, {} as any, 默认请求附加参数)
+  let 签名结果 = await jwt签名插件.运行({} as 已审阅的any, {} as 已审阅的any, 默认请求附加参数)
   assert.strictEqual(签名结果.isRight(), true)
   let { signJwt } = 签名结果.assertRight().getRight()
 

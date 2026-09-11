@@ -76,7 +76,7 @@
 - 场景示例:
   - 包含基础用法的最小 JSON 示例在 `base/add/`, 内部调用在 `base/sub/`, 错误返回在 `base/div/`
   - 包含典型业务的 CRUD 接口示例在 `src/interface/demo/crud/user/`, 对应前端组件在 `src/web/components/demo/user-management-demo.ts`. 表单示例在 `src/interface/demo/form/form-submit/`, 文件处理示例在 `src/interface/demo/file/`
-  - 进阶场景包括 WebSocket (`ws/ws-test/`), 事务回滚 (`logic-advanced/rollback-test/`) 和插件机制 (`plugin-advanced/`)
+  - 进阶场景包括 WebSocket (`ws/ws-test/`), 组合逻辑的逆序清理 (`logic-advanced/cleanup-order/`), 事务回滚 (`logic-advanced/rollback-test/`) 和插件机制 (`plugin-advanced/`)
   - 跨端示例包括纯前端模式 (`pure/pure-string/`) 和 Electron 模式 (`electron/`)
 - 接口约定:
   - 接口应尽可能使用 POST 请求, 除非需要依赖 GET 等缓存能力, 不要强行使用 REST 风格
@@ -138,7 +138,7 @@
   - 并不是所有接口都自动进入前端环境, 只有明确带有 `{ 支持纯前端模式: true }` 声明的接口才会被生成器收录
     - 可以参考 `src/interface/demo/auth/is-login/index.ts`
 - 运行与并发:
-  - 启动开发环境时, 必须运行完整的 `dev:pure-frontend` 任务, 这样才能同时监听本地 API 列表和 Schema 等派生文件的更新
+  - 启动开发环境时, 必须运行完整的 `npm run task -- dev:pure-frontend` 任务, 这样才能同时监听本地 API 列表和 Schema 等派生文件的更新
   - 为了保证并发安全, 在本地执行 API 调用或 DB 管理命令期间, 系统必须持有 Web Locks 的排他锁, 防止多标签页同时写入 IndexedDB 内的 SQLite 数据库
 
 ## 环境变量与路径
@@ -173,7 +173,7 @@
   - 初始化流程中不能向控制台泄漏敏感 Secret
   - 系统级别的通用文件监听统一借助 `scripts/watch/watch.ts` 实现
 - 文件生成机制:
-  - 运行 `npm run generate:all` 即可触发全量代码生成
+  - 运行 `npm run task -- generate:all` 即可触发全量代码生成
   - 所有派生文件都交由生成器覆盖维护. 任何手动修改都会在下次生成时被冲掉, 正确做法是去修改源头定义然后重新生成. 这些派生文件包含:
     - 数据库与接口层面的 `src/types/db.ts`, `src/interface/interface-list.ts` 以及 `src/types/interface-type.ts`
     - 前端相关与本地数据库层面的 `src/web/components/index.ts`, `src/web/pure-frontend/local-api-list.ts` 和 `src/web/pure-frontend/local-schema.ts`
@@ -193,13 +193,13 @@
 - 单元测试:
   - 单元测试指只测试某一个单独的模块, 例如单个接口
   - 单元测试采用与目标代码同目录 (Co-location) 的存放方式, 例如 `src/interface/demo/base/add/t01.test.ts`
-  - 通过命令 `test:unit` 运行, 支持交互选择或通过参数控制: `--all` 全量执行, `--filter <正则>` (或直接传正则参数) 筛选接口, `--no-coverage` 跳过覆盖率生成, `--open` 自动打开报告
+  - 通过命令 `npm run test:unit` 运行, 支持交互选择或通过参数控制: `--all` 全量执行, `--filter <正则>` (或直接传正则参数) 筛选接口, `--no-coverage` 跳过覆盖率生成, `--open` 自动打开报告
   - 默认无需额外参数即自动生成代码覆盖率与测试报告至 `test-outputs/coverage/index.html`
 - 集成测试:
   - 集成测试指测试一系列单元的组合运行的情况
   - 集成级别的测试应当放在 `test/integration/` 下
   - 借助接口两用性, 可以在不构造服务器环境的情况下, 对接口逻辑进行直接调用, 可以参考 `test/integration/demo.ts`
-  - 通过命令 `test:integration` 运行, 支持交互选择, `--all` 全量执行, 直接指定文件名 (如 `demo.ts`), 或通过 `--open` 自动打开报告
+  - 通过命令 `npm run test:integration` 运行, 支持交互选择, `--all` 全量执行, 直接指定文件名 (如 `demo.ts`), 或通过 `--open` 自动打开报告
   - 默认无需额外参数即自动收集用例执行日志与状态，生成 HTML 与 JSON 测试报告至 `test-outputs/integration-report/index.html`
 - 端到端测试:
   - 端到端测试指模拟用户实际操作来测试
@@ -212,7 +212,7 @@
     - 调试代码时, 总是使用非演示模式来快速测试
   - 端到端测试的测试过程应该是黑盒的, 禁止通过 API 接口, 数据库句柄伪造初始状态
   - 端到端测试的验证过程应该是灰盒的, 可以通过数据库句柄等手段验证数据库内的数据
-  - 通过命令 `test:e2e` 运行, 支持交互选择, `--all` 全量执行, 指定测试文件名, 以及 `--auto` (无头模式) / `--demo` (演示模式)
+  - 通过命令 `npm run test:e2e` 运行, 支持交互选择, `--all` 全量执行, 指定测试文件名, 以及 `--auto` (无头模式) / `--demo` (演示模式)
   - 默认无需额外参数即自动生成 Playwright HTML 测试报告至 `test-outputs/playwright-report/index.html`
 - 需求测试:
   - 需求测试以业务需求和验收点为中心, 不限制具体测试技术, 模型与使用说明见 `src/model/test-requirement/README.md`
@@ -222,11 +222,12 @@
   - 初始化可以直接准备数据, 业务行为和观察必须通过真实业务入口完成, 并返回符合项目证据策略的证据
   - 演示模式只控制展示和速度, 不得改变流程, 断言, 证据或测试数据
   - 修改需求模型后运行 `npm run task -- test:requirement:coverage`, 执行测试使用 `npm run test:requirement` (支持交互选择流程, 或通过 `--all` 全量执行, `--scenario=<流程名>`, `--requirement=<需求名>` 及 `--auto` / `--demo` 参数指定). 各测试在非 TTY 环境下均会自动静默全量运行
+  - 需求测试快照由快照模块自动只保留最近 10 个, 需要显式清空时运行 `npm run task -- clean:requirement-snapshots`
   - 默认无需额外参数即自动生成 Playwright HTML 测试报告与业务需求证据附件至 `test-outputs/requirement-report/index.html`
 
 ### 修改完成后的验证
 
 - 普通源码修改至少运行 `npm run check:all`, 它会依次检查格式, ESLint 和 TypeScript 类型
-- 修改派生文件的源头定义后, 先运行 `npm run generate:all`, 再运行 `npm run check:all`, 并确认生成结果已同步更新
+- 修改派生文件的源头定义后, 先运行 `npm run task -- generate:all`, 再运行 `npm run check:all`, 并确认生成结果已同步更新
 - 也可以直接运行 `npm run tidy:all`, 一键串行完成派生代码生成, 代码自动修复格式化与静态检查
 - 修改数据库 Schema 时使用本文件规定的迁移任务, 并检查生成的 migration 与数据库类型

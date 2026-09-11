@@ -28,6 +28,7 @@ import _src_interface_demo_file_static_file_index_ts from './demo/file/static-fi
 import _src_interface_demo_file_stream_file_index_ts from './demo/file/stream-file/index'
 import _src_interface_demo_file_upload_file_index_ts from './demo/file/upload-file/index'
 import _src_interface_demo_form_form_submit_index_ts from './demo/form/form-submit/index'
+import _src_interface_demo_logic_advanced_cleanup_order_index_ts from './demo/logic-advanced/cleanup-order/index'
 import _src_interface_demo_logic_advanced_rollback_test_index_ts from './demo/logic-advanced/rollback-test/index'
 import _src_interface_demo_plugin_advanced_custom_cors_index_ts from './demo/plugin-advanced/custom-cors/index'
 import _src_interface_demo_plugin_advanced_custom_type_export_index_ts from './demo/plugin-advanced/custom-type-export/index'
@@ -77,6 +78,7 @@ export let interfaceApiList: 任意接口[] = [
   _src_interface_demo_file_stream_file_index_ts,
   _src_interface_demo_file_upload_file_index_ts,
   _src_interface_demo_form_form_submit_index_ts,
+  _src_interface_demo_logic_advanced_cleanup_order_index_ts,
   _src_interface_demo_logic_advanced_rollback_test_index_ts,
   _src_interface_demo_plugin_advanced_custom_cors_index_ts,
   _src_interface_demo_plugin_advanced_custom_type_export_index_ts,

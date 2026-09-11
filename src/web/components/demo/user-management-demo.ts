@@ -6,6 +6,7 @@ import { 警告提示 } from '../../global/manager/toast-manager'
 import { 创建元素 } from '../../global/tools/create-element'
 import { 主要按钮, 普通按钮 } from '../general/base/base-button'
 import { 表单 } from '../general/form/form'
+import { 复选框 } from '../general/form/form-checkbox'
 import { 密码输入框, 普通输入框 } from '../general/form/form-input'
 import { 表格组件 } from '../general/table/table'
 import { 数据表加载数据参数 } from '../general/table/types'
@@ -94,12 +95,14 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
     let 用户名输入框 = new 普通输入框({ 占位符: '请输入用户名' })
 
     let 密码框 = new 密码输入框({ 占位符: '请输入密码' })
+    let 管理员账号复选框 = new 复选框({ 标签: '允许访问管理员功能', 可访问名称: '管理员账号' })
 
     // 创建表单
-    let 表单实例 = new 表单<{ username: string; password: string }>({
+    let 表单实例 = new 表单<{ username: string; password: string; isAdmin: boolean }>({
       项列表: [
         { 键: 'username', 组件: 用户名输入框, 宽度: 2, 标签: '用户名' },
         { 键: 'password', 组件: 密码框, 宽度: 2, 标签: '密码' },
+        { 键: 'isAdmin', 组件: 管理员账号复选框, 宽度: 2, 标签: '账号权限' },
       ],
       元素样式: { gap: '12px' },
     })
@@ -142,6 +145,7 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
         await API管理器.请求postJson并处理错误('/api/demo/crud/user/create', {
           name: 表单数据.username,
           pwd: 表单数据.password,
+          isAdmin: 表单数据.isAdmin,
         })
 
         // 关闭模态框

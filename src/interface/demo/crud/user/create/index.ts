@@ -23,7 +23,10 @@ let 接口逻辑实现 = 接口逻辑
   .绑定(new 检查管理员登录([jwt插件.解析器, kysely插件], () => ({ 表名: 'user', id字段: 'id', 标识字段: 'is_admin' })))
   .绑定(
     接口逻辑.构造(
-      [new JSON参数解析插件(z.object({ name: z.string(), pwd: z.string() }), {}), kysely插件],
+      [
+        new JSON参数解析插件(z.object({ name: z.string(), pwd: z.string(), isAdmin: z.boolean().default(false) }), {}),
+        kysely插件,
+      ],
       async (参数, 逻辑附加参数, 请求附加参数) => {
         let log = 请求附加参数.log
         return 参数.kysely.执行事务Either(async (trx) => {
@@ -39,7 +42,7 @@ let 接口逻辑实现 = 接口逻辑
                     id: userId,
                     name: 参数.json.name,
                     pwd: await bcrypt.hash(参数.json.pwd, 环境变量.BCRYPT_ROUNDS),
-                    is_admin: 0,
+                    is_admin: 参数.json.isAdmin ? 1 : 0,
                   },
                 }),
                 async () => ({}),

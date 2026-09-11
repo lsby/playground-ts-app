@@ -1,9 +1,8 @@
 import { expect, type Page } from '@playwright/test'
-import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { 演示_点击, 演示_确认, 演示_输入 } from '../../../src/model/test-interactive'
+import { 演示_勾选, 演示_点击, 演示_确认, 演示_输入 } from '../../../src/model/test-interactive'
 import {
   标签维度,
   流程,
@@ -20,6 +19,7 @@ import {
   验收点,
   type 流程上下文,
 } from '../../../src/model/test-requirement'
+import { 创建演示快照配置 } from './snapshot-fixture'
 
 export enum 演示需求依赖 {
   浏览器 = '浏览器',
@@ -58,7 +58,7 @@ export let 账号类型选择 = new 选择({
   说明: '指定新增用户的身份类型，将决定用户名生成规则及安全策略。',
   选项们: [
     { 值: '普通用户', 标签: '普通用户', 说明: '具备基本业务权限的常规用户。' },
-    { 值: '审计用户', 标签: '审计用户', 说明: '具备系统审计和只读查看权限的高权限账号。' },
+    { 值: '管理员用户', 标签: '管理员用户', 说明: '可访问用户管理与系统配置等管理员功能的高权限账号。' },
   ] as const,
 })
 
@@ -71,13 +71,13 @@ export let 密码安全级别选择 = new 选择({
   ] as const,
 })
 
-export let 审计用户密码约束 = new 选择约束({
-  描述: '审计用户必须使用高强密码',
+export let 管理员用户密码约束 = new 选择约束({
+  描述: '管理员用户必须使用高强密码',
   涉及选择们: [账号类型选择, 密码安全级别选择],
   检查: (选择读取器): boolean => {
     let 账号类型 = 选择读取器.读取(账号类型选择)
     let 密码级别 = 选择读取器.读取(密码安全级别选择)
-    if (账号类型 === '审计用户') {
+    if (账号类型 === '管理员用户') {
       return 密码级别 === 'strong'
     }
     return true
@@ -110,9 +110,9 @@ export let 管理员可更新已有用户安全凭据 = new 验收点<演示需�
   依赖方案们: [[演示需求依赖.浏览器]],
 })
 
-export let 管理员人工核验用户管理操作入口完备 = new 验收点<演示需求依赖>({
-  描述: '管理员人工核验用户管理操作入口完备',
-  验收手段: '人工',
+export let 管理员可核验用户管理操作入口完备 = new 验收点<演示需求依赖>({
+  描述: '管理员可核验用户管理操作入口完备',
+  验收手段: '自动',
   依赖方案们: [[演示需求依赖.浏览器]],
 })
 
@@ -130,7 +130,7 @@ export let 管理员维护用户需求 = new 需求({
     管理员可提交新用户资料,
     新用户按预期规则出现在用户列表,
     管理员可更新已有用户安全凭据,
-    管理员人工核验用户管理操作入口完备,
+    管理员可核验用户管理操作入口完备,
     管理员交互式人工核验用户管理界面,
   ],
 })
@@ -175,22 +175,34 @@ export let 管理员已在用户管理页状态 = 管理员已登录状态.施�
 
 // ==================== 4. 业务流程定义 ====================
 
-export let 管理员访问用户管理模块流程 = new 流程<演示需求流程上下文, 演示需求依赖>({
-  名称: '管理员访问用户管理模块',
+export let 管理员访问并自动核验用户管理模块流程 = new 流程<演示需求流程上下文, 演示需求依赖>({
+  名称: '管理员访问并自动核验用户管理模块',
   给定状态: 初始状态,
   步骤们: [
     管理员登录行为,
     导航至用户管理页行为,
-    new 观察('观察用户管理主界面可用', async ({ 系统 }) => {
-      await expect(系统.page.getByRole('heading', { name: '可运行的组件示例' })).toBeVisible()
-      await expect(系统.page.getByRole('button', { name: '添加数据' })).toBeVisible()
+    new 观察('自动核对用户管理主界面与操作入口', async ({ 系统 }) => {
+      let 主界面 = await 系统.page.getByRole('heading', { name: '可运行的组件示例' }).isVisible()
+      let 添加数据按钮 = await 系统.page.getByRole('button', { name: '添加数据' }).isVisible()
+      let 编辑按钮 = await 系统.page.getByRole('button', { name: '编辑' }).first().isVisible()
+      let 删除按钮 = await 系统.page.getByRole('button', { name: '删除' }).first().isVisible()
+      let 修改密码按钮 = await 系统.page.getByRole('button', { name: '修改密码' }).first().isVisible()
+      let 通过 = 主界面 && 添加数据按钮 && 编辑按钮 && 删除按钮 && 修改密码按钮
+      let 内容 = { 主界面, 添加数据按钮, 编辑按钮, 删除按钮, 修改密码按钮 }
+      if (通过 === false) {
+        return {
+          通过: false,
+          原因: '用户管理主界面或操作入口不齐备',
+          证据们: [{ 手段: '页面', 描述: '核对用户管理主界面与操作入口存在缺失', 内容 }],
+        }
+      }
       return {
         通过: true,
-        证据们: [{ 手段: '页面', 描述: '登录后用户管理模块入口及核心操作按钮可用', 内容: 系统.page.url() }],
+        证据们: [{ 手段: '页面', 描述: '登录后用户管理模块及添加、编辑、删除、修改密码入口均可用', 内容 }],
       }
     }),
   ],
-  覆盖验收点们: [管理员可登录并访问用户管理模块],
+  覆盖验收点们: [管理员可登录并访问用户管理模块, 管理员可核验用户管理操作入口完备],
   选择结果: new 选择结果([选择值(账号类型选择, '普通用户'), 选择值(密码安全级别选择, 'standard')]),
   标签字典: { 功能领域: '系统门户', 场景类型: '冒烟验证' },
 })
@@ -199,29 +211,30 @@ export let 管理员全流程维护用户资料与安全凭据流程 = new 流�
   名称: '管理员全流程维护用户资料与安全凭据',
   给定状态: 管理员已在用户管理页状态,
   步骤们: [
-    new 行为('管理员打开新增用户表单', async ({ 系统, 快照 }): Promise<void> => {
+    new 行为('管理员打开新增用户表单', async ({ 系统 }): Promise<void> => {
       await 演示_点击(系统.page.getByRole('button', { name: '添加数据' }))
       await expect(系统.page.getByRole('dialog', { name: '添加用户' })).toBeVisible()
-      // 在稳定检查点请求保存快照
-      快照.保存('打开新增用户弹窗完成')
     }),
     new 行为('管理员填写并提交符合安全策略的用户资料', async ({ 系统, 选择 }): Promise<void> => {
       let 账号类型 = 选择.读取(账号类型选择)
       let 密码级别 = 选择.读取(密码安全级别选择)
       let 实际用户名 = `${账号类型}-${系统.新用户名后缀}`
       let 实际密码 = 密码级别 === 'strong' ? 'Pass#2026_Secure' : 'pass-123456'
+      let 是管理员账号 = 账号类型 === '管理员用户'
 
       await 演示_输入(系统.page.getByRole('textbox', { name: '用户名' }), 实际用户名)
       await 演示_输入(系统.page.getByRole('textbox', { name: '密码' }), 实际密码)
+      if (是管理员账号) await 演示_勾选(系统.page.getByRole('checkbox', { name: '账号权限' }))
       await 演示_点击(系统.page.getByRole('button', { name: '确认', exact: true }))
     }),
-    new 观察('观察列表显示符合策略的新增用户', async ({ 系统, 选择 }) => {
+    new 观察('观察列表显示符合策略的新增用户', async ({ 系统, 选择, 快照 }) => {
       let 账号类型 = 选择.读取(账号类型选择)
       let 实际用户名 = `${账号类型}-${系统.新用户名后缀}`
       await expect(系统.page.getByRole('cell', { name: 实际用户名 })).toBeVisible()
+      快照.保存('新增用户已持久化并显示在列表中')
       return {
         通过: true,
-        证据们: [{ 手段: '页面', 描述: '新增审计用户已成功持久化并展示在业务列表中', 内容: 实际用户名 }],
+        证据们: [{ 手段: '页面', 描述: '新增管理员用户已成功持久化并展示在业务列表中', 内容: 实际用户名 }],
       }
     }),
     new 行为('管理员为新增用户修改安全凭据', async ({ 系统, 选择 }): Promise<void> => {
@@ -240,50 +253,29 @@ export let 管理员全流程维护用户资料与安全凭据流程 = new 流�
         证据们: [{ 手段: '页面', 描述: '用户新密码更新成功且修改密码对话框顺利关闭', 内容: '修改密码完成' }],
       }
     }),
-  ],
-  覆盖验收点们: [管理员可提交新用户资料, 新用户按预期规则出现在用户列表, 管理员可更新已有用户安全凭据],
-  选择结果: new 选择结果([选择值(账号类型选择, '审计用户'), 选择值(密码安全级别选择, 'strong')]),
-  标签字典: { 功能领域: '用户管理', 场景类型: '核心业务' },
-})
-
-export let 管理员核验用户管理操作入口流程 = new 流程<演示需求流程上下文, 演示需求依赖>({
-  名称: '管理员核验用户管理操作入口',
-  给定状态: 管理员已在用户管理页状态,
-  步骤们: [
-    new 观察('人工核对用户管理操作入口与布局', async ({ 系统 }) => {
-      let 添加数据按钮 = await 系统.page.getByRole('button', { name: '添加数据' }).isVisible()
-      let 编辑按钮 = await 系统.page.getByRole('button', { name: '编辑' }).first().isVisible()
-      let 删除按钮 = await 系统.page.getByRole('button', { name: '删除' }).first().isVisible()
-      let 修改密码按钮 = await 系统.page.getByRole('button', { name: '修改密码' }).first().isVisible()
-      let 通过 = 添加数据按钮 && 编辑按钮 && 删除按钮 && 修改密码按钮
-      if (通过 === false) {
-        return {
-          通过: false,
-          原因: '用户列表操作列入口不齐备',
-          证据们: [
-            {
-              手段: '人工检查',
-              描述: '核对用户列表操作列入口存在缺失',
-              内容: { 添加数据按钮, 编辑按钮, 删除按钮, 修改密码按钮 },
-            },
-          ],
-        }
-      }
+    new 行为('新增用户使用更新后的密码重新登录', async ({ 系统, 选择 }): Promise<void> => {
+      let 账号类型 = 选择.读取(账号类型选择)
+      let 实际用户名 = `${账号类型}-${系统.新用户名后缀}`
+      await 系统.page.goto('/demo/login.html')
+      await 演示_输入(系统.page.getByRole('textbox', { name: '用户名' }), 实际用户名)
+      await 演示_输入(系统.page.getByRole('textbox', { name: '密码' }), 'Pass#2026_NewSecret!')
+      await 演示_点击(系统.page.getByRole('button', { name: '登录演示系统' }))
+      await 系统.page.waitForURL('**/demo/index.html')
+    }),
+    new 观察('观察新增用户可使用新密码进入演示系统', async ({ 系统 }) => {
+      await expect(系统.page.getByRole('heading', { name: '可运行的组件示例' })).toBeVisible()
+      await 演示_点击(系统.page.getByRole('button', { name: '业务示例', exact: true }))
+      await expect(系统.page.getByRole('button', { name: '添加数据' })).toBeVisible()
+      await expect(系统.page.getByText('非管理员', { exact: false })).not.toBeVisible()
       return {
         通过: true,
-        证据们: [
-          {
-            手段: '人工检查',
-            描述: '人工核对用户列表操作列入口完备（添加数据、编辑、删除、修改密码均可见）',
-            内容: { 添加数据按钮, 编辑按钮, 删除按钮, 修改密码按钮 },
-          },
-        ],
+        证据们: [{ 手段: '页面', 描述: '新增管理员使用更新后的密码登录并正常访问管理员功能', 内容: 系统.page.url() }],
       }
     }),
   ],
-  覆盖验收点们: [管理员人工核验用户管理操作入口完备],
-  选择结果: new 选择结果([选择值(账号类型选择, '普通用户'), 选择值(密码安全级别选择, 'standard')]),
-  标签字典: { 功能领域: '用户管理', 场景类型: '人工核验' },
+  覆盖验收点们: [管理员可提交新用户资料, 新用户按预期规则出现在用户列表, 管理员可更新已有用户安全凭据],
+  选择结果: new 选择结果([选择值(账号类型选择, '管理员用户'), 选择值(密码安全级别选择, 'strong')]),
+  标签字典: { 功能领域: '用户管理', 场景类型: '核心业务' },
 })
 
 export let 管理员交互式人工核验用户管理界面流程 = new 流程<演示需求流程上下文, 演示需求依赖>({
@@ -329,28 +321,15 @@ export let 演示业务需求模型 = new 测试模型({
     初始状态,
     依赖条件们: Object.values(演示需求依赖),
     选择们: [账号类型选择, 密码安全级别选择],
-    选择约束们: [审计用户密码约束],
+    选择约束们: [管理员用户密码约束],
     标签维度们: [功能领域维度, 场景类型维度],
     证据策略: { 允许手段们: ['页面', '人工检查'] },
-    快照: {
-      根目录: 快照根目录,
-      创建: async ({ 快照目录, 清单 }): Promise<void> => {
-        await fs.writeFile(
-          path.join(快照目录, 'checkpoint-data.json'),
-          JSON.stringify({ 清单, 记录时间: new Date().toISOString() }, undefined, 2),
-          'utf8',
-        )
-      },
-      恢复: async (): Promise<void> => {
-        // 演示恢复逻辑
-      },
-    },
+    快照: 创建演示快照配置(快照根目录),
   },
   需求们: [管理员维护用户需求],
   流程们: [
-    管理员访问用户管理模块流程,
+    管理员访问并自动核验用户管理模块流程,
     管理员全流程维护用户资料与安全凭据流程,
-    管理员核验用户管理操作入口流程,
     管理员交互式人工核验用户管理界面流程,
   ],
 })

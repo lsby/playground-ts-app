@@ -13,6 +13,8 @@ import {
   演示_选择,
 } from '../../src/model/test-interactive'
 
+type 用户表格行 = { id: string; 名称: string }
+
 async function 登录演示页(page: Page): Promise<void> {
   if (page.url().includes('/demo/login.html') === false) {
     await page.goto('/demo/login.html')
@@ -27,6 +29,35 @@ async function 登录演示页(page: Page): Promise<void> {
 async function 切换演示标签(page: Page, 标签: string): Promise<void> {
   await 演示_说明_右下角(page, `切换演示标签页至：“${标签}”`)
   await 演示_点击(page.getByRole('button', { name: 标签, exact: true }))
+}
+
+async function 添加演示用户(page: Page, 用户名: string): Promise<void> {
+  await 演示_点击(page.getByRole('button', { name: '添加数据' }))
+  await 演示_输入(page.getByRole('textbox', { name: '用户名' }), 用户名)
+  await 演示_输入(page.getByRole('textbox', { name: '密码' }), 'sort-password')
+  await 演示_点击(page.getByRole('button', { name: '确认', exact: true }))
+  await expect(page.getByRole('cell', { name: 用户名, exact: true })).toBeVisible()
+}
+
+async function 读取用户表格行(page: Page): Promise<用户表格行[]> {
+  await expect(page.getByRole('table')).toHaveAttribute('aria-busy', 'false')
+  let 行列表 = page.getByRole('row').filter({ has: page.getByRole('button', { name: '编辑', exact: true }) })
+  let 行数量 = await 行列表.count()
+  let 结果: 用户表格行[] = []
+  for (let 索引 = 0; 索引 < 行数量; 索引 += 1) {
+    let 单元格列表 = 行列表.nth(索引).getByRole('cell')
+    let id = (await 单元格列表.nth(0).textContent())?.trim()
+    let 名称 = (await 单元格列表.nth(1).textContent())?.trim()
+    if (id === undefined || 名称 === undefined) throw new Error(`无法读取第 ${String(索引 + 1)} 行的用户数据`)
+    结果.push({ id, 名称 })
+  }
+  return 结果
+}
+
+function 比较文本(左值: string, 右值: string): number {
+  if (左值 < 右值) return -1
+  if (左值 > 右值) return 1
+  return 0
 }
 
 test.describe('演示组件 E2E', (): void => {
@@ -233,20 +264,48 @@ test.describe('演示组件 E2E', (): void => {
     await 演示_点击(page.getByRole('button', { name: '关闭' }))
     await expect(自适应模态框).toBeHidden()
 
-    // 3. 业务示例：表格多重排序
-    await 演示_说明_右下角(page, '点击“ID”表头列，按 ID 升序排序')
-    await 演示_点击(page.getByRole('button', { name: 'ID', exact: true }))
-    await expect(page.getByRole('button', { name: 'ID ▲0', exact: true })).toBeVisible()
+    // 3. 业务示例：先创建足够的数据，再验证表格的实际排序结果与多列优先级
+    await 演示_说明_右下角(page, '依次创建三个名称顺序被打乱的用户，为排序验证准备可观察的数据')
+    await 添加演示用户(page, 'sort-user-c')
+    await 添加演示用户(page, 'sort-user-a')
+    await 添加演示用户(page, 'sort-user-b')
+    await expect(
+      page.getByRole('row').filter({ has: page.getByRole('button', { name: '编辑', exact: true }) }),
+    ).toHaveCount(4)
 
-    await 演示_说明_右下角(page, '点击“名称”表头列，添加二级排序（优先级 1）')
+    await 演示_说明_右下角(page, '点击“名称”表头列，验证用户数据确实按名称升序重新排列')
     await 演示_点击(page.getByRole('button', { name: '名称', exact: true }))
-    await expect(page.getByRole('button', { name: 'ID ▲0', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: '名称 ▲1', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '名称 ▲0', exact: true })).toBeVisible()
+    let 名称升序行 = await 读取用户表格行(page)
+    expect(名称升序行.map((行) => 行.名称)).toEqual(['admin', 'sort-user-a', 'sort-user-b', 'sort-user-c'])
 
-    await 演示_说明_右下角(page, '再次点击“ID ▲0”，将一级排序切换为降序 (ID ▼0)')
+    await 演示_说明_右下角(page, '点击“ID”表头列，添加 ID 二级排序并保持名称为首要排序条件')
+    await 演示_点击(page.getByRole('button', { name: 'ID', exact: true }))
+    await expect(page.getByRole('button', { name: '名称 ▲0', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'ID ▲1', exact: true })).toBeVisible()
+    expect((await 读取用户表格行(page)).map((行) => 行.名称)).toEqual(名称升序行.map((行) => 行.名称))
+
+    await 演示_说明_右下角(page, '再次点击“名称 ▲0”，验证首要排序切换为名称降序')
+    await 演示_点击(page.getByRole('button', { name: '名称 ▲0', exact: true }))
+    await expect(page.getByRole('button', { name: '名称 ▼0', exact: true })).toBeVisible()
+    expect((await 读取用户表格行(page)).map((行) => 行.名称)).toEqual([
+      'sort-user-c',
+      'sort-user-b',
+      'sort-user-a',
+      'admin',
+    ])
+
+    await 演示_说明_右下角(page, '第三次点击名称表头移除该排序，使 ID 成为首要升序条件')
+    await 演示_点击(page.getByRole('button', { name: '名称 ▼0', exact: true }))
+    await expect(page.getByRole('button', { name: 'ID ▲0', exact: true })).toBeVisible()
+    let ID升序行 = await 读取用户表格行(page)
+    expect(ID升序行.map((行) => 行.id)).toEqual([...ID升序行.map((行) => 行.id)].sort(比较文本))
+
+    await 演示_说明_右下角(page, '再次点击“ID ▲0”，验证数据行按 ID 降序重新排列')
     await 演示_点击(page.getByRole('button', { name: 'ID ▲0', exact: true }))
     await expect(page.getByRole('button', { name: 'ID ▼0', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: '名称 ▲1', exact: true })).toBeVisible()
+    let ID降序行 = await 读取用户表格行(page)
+    expect(ID降序行.map((行) => 行.id)).toEqual([...ID降序行.map((行) => 行.id)].sort(比较文本).reverse())
 
     // 4. 定格在当前最终排好序的业务表格界面上，展示最终成果
     await 演示_完成(

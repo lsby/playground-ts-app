@@ -1,8 +1,55 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 
 import { 检查非空文本 } from './model'
+
+let 快照Uuid模式 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+let 临时快照目录模式 = /^\.creating-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+type 快照目录项 = { 名称: string; 路径: string; 修改时间: number }
+
+function 解析快照根目录(根目录: string): string {
+  if (!isAbsolute(根目录)) throw new Error(`快照根目录必须是绝对路径：${根目录}`)
+  return resolve(根目录)
+}
+
+async function 列出快照目录项(根目录: string, 包含临时目录: boolean): Promise<快照目录项[]> {
+  let 实际根目录 = 解析快照根目录(根目录)
+  let 根目录信息 = await stat(实际根目录).catch(() => undefined)
+  if (根目录信息 === undefined) return []
+  if (根目录信息.isDirectory() === false) throw new Error(`快照根目录不是目录：${实际根目录}`)
+
+  let 结果: 快照目录项[] = []
+  for (let 目录项 of await readdir(实际根目录, { withFileTypes: true })) {
+    let 是最终快照 = 目录项.isDirectory() && 快照Uuid模式.test(目录项.name)
+    let 是临时快照 = 目录项.isDirectory() && 包含临时目录 && 临时快照目录模式.test(目录项.name)
+    if (是最终快照 === false && 是临时快照 === false) continue
+    let 目录路径 = resolve(实际根目录, 目录项.name)
+    let 目录信息 = await stat(目录路径)
+    结果.push({ 名称: 目录项.name, 路径: 目录路径, 修改时间: 目录信息.mtimeMs })
+  }
+  return 结果
+}
+
+export async function 清理快照根目录(根目录: string): Promise<number> {
+  let 快照目录项们 = await 列出快照目录项(根目录, true)
+  for (let 目录项 of 快照目录项们) await rm(目录项.路径, { recursive: true, force: true })
+  return 快照目录项们.length
+}
+
+export async function 保留最近快照(根目录: string, 保留数量: number): Promise<number> {
+  if (!Number.isSafeInteger(保留数量) || 保留数量 < 0) throw new Error('快照保留数量必须是非负安全整数')
+  let 快照目录项们 = await 列出快照目录项(根目录, false)
+  快照目录项们.sort((左, 右) => {
+    let 时间差 = 右.修改时间 - 左.修改时间
+    if (时间差 !== 0) return 时间差
+    return 右.名称.localeCompare(左.名称)
+  })
+  let 待删除目录项们 = 快照目录项们.slice(保留数量)
+  for (let 目录项 of 待删除目录项们) await rm(目录项.路径, { recursive: true, force: true })
+  return 待删除目录项们.length
+}
 
 export type 快照运行位置 = {
   流程名称: string
@@ -32,12 +79,13 @@ export type 快照配置<上下文> = {
 
 export class 快照管理器<上下文> {
   public static readonly 清单文件名 = 'snapshot.json'
+  public static readonly 默认保留数量 = 10
 
   private readonly 配置: 快照配置<上下文>
   private readonly 上下文: 上下文
 
   public constructor(配置: 快照配置<上下文>, 上下文: 上下文) {
-    if (!isAbsolute(配置.根目录)) throw new Error(`快照根目录必须是绝对路径：${配置.根目录}`)
+    解析快照根目录(配置.根目录)
     this.配置 = 配置
     this.上下文 = 上下文
   }
@@ -75,11 +123,12 @@ export class 快照管理器<上下文> {
       await this.配置.创建({ 上下文: this.上下文, 快照目录: 临时目录, 清单 })
       await writeFile(resolve(临时目录, 快照管理器.清单文件名), `${JSON.stringify(清单, undefined, 2)}\n`, 'utf8')
       await rename(临时目录, 最终目录)
-      return 清单
     } catch (错误) {
       await rm(临时目录, { recursive: true, force: true })
       throw 错误
     }
+    await 保留最近快照(根目录, 快照管理器.默认保留数量)
+    return 清单
   }
 
   public async 读取(uuid: string): Promise<{ 清单: 快照清单; 快照目录: string }> {
@@ -108,8 +157,7 @@ export class 快照管理器<上下文> {
   }
 
   private 检查Uuid(uuid: string): void {
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uuid))
-      throw new Error(`快照 UUID 格式无效：${uuid}`)
+    if (快照Uuid模式.test(uuid) === false) throw new Error(`快照 UUID 格式无效：${uuid}`)
   }
 
   private 解析清单(值: unknown): 快照清单 {
