@@ -58,10 +58,11 @@ export class 加载指示器 extends 组件基类<{}, {}> {
         borderRadius: '50%',
       },
     })
-    圆环.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], {
-      duration: 700,
-      iterations: Infinity,
-    })
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches === false)
+      圆环.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], {
+        duration: 700,
+        iterations: Infinity,
+      })
     this.shadow.append(圆环)
   }
 }

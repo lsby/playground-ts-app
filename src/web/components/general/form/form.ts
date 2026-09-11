@@ -60,7 +60,10 @@ type 运行项 = {
   错误元素: HTMLDivElement | null
   已触碰: boolean
   已修改: boolean
+  校验代次: number
 }
+
+type 项校验结果 = { 已过期: boolean; 错误: string | null }
 
 type 表单事件<数据类型 extends 表单数据> = {
   变化: 数据类型
@@ -75,6 +78,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
   private 运行项映射 = new Map<string, 运行项>()
   private 默认值映射 = new Map<string, 基础值结构>()
   private 正在提交 = false
+  private 数据代次 = 0
 
   public constructor(配置: 表单配置<数据类型>) {
     super()
@@ -150,7 +154,10 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
     for (let 键 of Object.keys(数据)) {
       let 值 = 数据[键]
       let 运行项 = this.运行项映射.get(键)
-      if (值 !== undefined && 运行项 !== undefined) 运行项.设置值(值)
+      if (值 !== undefined && 运行项 !== undefined) {
+        this.使校验过期(运行项)
+        运行项.设置值(值)
+      }
     }
   }
 
@@ -163,6 +170,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
   public 设置项值<键 extends Extract<keyof 数据类型, string>>(键: 键, 值: 数据类型[键]): void {
     let 运行项 = this.运行项映射.get(键)
     if (运行项 === undefined) throw new Error(`表单项不存在: ${键}`)
+    this.使校验过期(运行项)
     运行项.设置值(值)
   }
 
@@ -176,7 +184,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
     let 错误们: Partial<Record<keyof 数据类型, string>> = {}
     let 第一个错误: 运行项 | null = null
     for (let 运行项 of this.运行项映射.values()) {
-      let 错误 = await this.校验项(运行项)
+      let 错误 = await this.校验最新值(运行项)
       if (错误 !== null) {
         错误们[运行项.键 as keyof 数据类型] = 错误
         第一个错误 ??= 运行项
@@ -214,6 +222,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
 
   public 重置(): void {
     for (let [键, 运行项] of this.运行项映射) {
+      this.使校验过期(运行项)
       let 默认值 = this.默认值映射.get(键)
       if (默认值 !== undefined) 运行项.设置值(默认值)
       运行项.已触碰 = false
@@ -251,6 +260,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
       错误元素: null,
       已触碰: false,
       已修改: false,
+      校验代次: 0,
     }
     if (项.组件.设置禁用 !== undefined) 运行项.设置禁用 = (值: boolean): void => 项.组件.设置禁用?.(值)
     if (项.组件.获得禁用 !== undefined) 运行项.获得禁用 = (): boolean => 项.组件.获得禁用?.() ?? false
@@ -262,6 +272,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
     if (event.target === this || event.target instanceof HTMLElement === false) return
     let 运行项 = [...this.运行项映射.values()].find((项) => 项.组件 === event.target)
     if (运行项 === undefined) return
+    this.使校验过期(运行项)
     运行项.已修改 = true
     if (运行项.变化时校验 === true || 运行项.已触碰 === true) await this.校验项(运行项)
     this.派发事件('变化', this.获得数据())
@@ -275,15 +286,31 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
     await this.校验项(运行项)
   }
 
-  private async 校验项(运行项: 运行项): Promise<string | null> {
+  private async 校验项(运行项: 运行项): Promise<项校验结果> {
+    运行项.校验代次 += 1
+    let 本次代次 = 运行项.校验代次
+    let 本次数据代次 = this.数据代次
     运行项.组件.setAttribute('aria-busy', 'true')
     try {
       let 错误 = await 运行项.校验()
-      this.显示项错误(运行项, 错误)
-      return 错误
+      let 已过期 = 本次代次 !== 运行项.校验代次 || 本次数据代次 !== this.数据代次
+      if (已过期 === false) this.显示项错误(运行项, 错误)
+      return { 已过期, 错误 }
     } finally {
-      运行项.组件.removeAttribute('aria-busy')
+      if (本次代次 === 运行项.校验代次) 运行项.组件.removeAttribute('aria-busy')
     }
+  }
+
+  private async 校验最新值(运行项: 运行项): Promise<string | null> {
+    let 结果 = await this.校验项(运行项)
+    while (结果.已过期 === true) 结果 = await this.校验项(运行项)
+    return 结果.错误
+  }
+
+  private 使校验过期(运行项: 运行项): void {
+    this.数据代次 += 1
+    运行项.校验代次 += 1
+    运行项.组件.removeAttribute('aria-busy')
   }
 
   private 显示项错误(运行项: 运行项, 错误: string | null): void {

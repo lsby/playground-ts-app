@@ -38,7 +38,7 @@ export class 用户设置组件 extends 组件基类<设置事件, 监听设置�
 
   protected async 当加载时(): Promise<void> {
     // 获取用户信息
-    let 结果 = await API管理器.请求postJson('/api/user/get-user-info', {})
+    let 结果 = await API管理器.请求postJson('/api/user/get-user-info', {}, { 信号: this.渲染信号 })
     if (结果.status !== 'success') {
       return
     }
@@ -188,7 +188,7 @@ export class 用户设置组件 extends 组件基类<设置事件, 监听设置�
     this.shadow.appendChild(容器)
 
     // 加载数据
-    await this.加载数据()
+    await this.加载数据(this.渲染信号)
   }
 
   private 创建系统配置表单(): 表单<系统配置表单数据> {
@@ -214,14 +214,14 @@ export class 用户设置组件 extends 组件基类<设置事件, 监听设置�
     return 表单实例
   }
 
-  private async 加载数据(): Promise<void> {
+  private async 加载数据(信号: AbortSignal): Promise<void> {
     if (this.用户信息 !== undefined && this.用户信息.is_admin && this.系统配置表单 !== undefined) {
-      let 系统配置 = await API管理器.请求postJson并处理错误('/api/system/get-system-config', {})
+      let 系统配置 = await API管理器.请求postJson并处理错误('/api/system/get-system-config', {}, { 信号 })
       this.系统配置表单.设置数据(系统配置)
     }
 
     if (this.用户配置表单 !== undefined) {
-      let 用户配置 = await API管理器.请求postJson并处理错误('/api/user/get-user-config', {})
+      let 用户配置 = await API管理器.请求postJson并处理错误('/api/user/get-user-config', {}, { 信号 })
       this.用户配置表单.设置数据(用户配置)
     }
   }

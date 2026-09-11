@@ -55,14 +55,14 @@ export class 数据库信息组件 extends 组件基类<发出事件类型, 监�
     this.shadow.appendChild(标题)
     this.shadow.appendChild(this.版本标签)
 
-    await this.刷新数据()
+    await this.刷新数据(this.渲染信号)
   }
 
-  private async 刷新数据(): Promise<void> {
+  private async 刷新数据(信号: AbortSignal): Promise<void> {
     if (this.版本标签 === null) return
     let 版本标签 = this.版本标签
     try {
-      let 结果 = await API管理器.请求postJson('/api/admin-sqlite/get-database-info', {})
+      let 结果 = await API管理器.请求postJson('/api/admin-sqlite/get-database-info', {}, { 信号 })
       switch (结果.status) {
         case 'success':
           版本标签.textContent = `SQLite版本: ${结果.data.version}`
@@ -73,6 +73,7 @@ export class 数据库信息组件 extends 组件基类<发出事件类型, 监�
           break
       }
     } catch (错误) {
+      if (信号.aborted === true) throw 错误
       console.error('获取数据库信息失败:', 错误)
       版本标签.textContent = '获取版本失败'
     }

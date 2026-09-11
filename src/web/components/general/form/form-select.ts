@@ -162,7 +162,6 @@ export class 普通下拉框 extends 下拉框基类 {
       color: 'var(--文字颜色)',
       cursor: 禁用 ? 'not-allowed' : 'pointer',
       opacity: 禁用 ? '0.6' : '1',
-      outline: 'none',
       boxSizing: 'border-box',
     }
   }

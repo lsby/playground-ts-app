@@ -11,6 +11,7 @@ export type 图标名称 =
   | 'menu'
   | 'copy'
   | 'plus'
+  | 'chevron-down'
 
 let 路径映射: Record<图标名称, string[]> = {
   close: ['M6 6l12 12M18 6L6 18'],
@@ -23,6 +24,7 @@ let 路径映射: Record<图标名称, string[]> = {
   menu: ['M4 7h16M4 12h16M4 17h16'],
   copy: ['M9 9h11v11H9z', 'M5 15H4V4h11v1'],
   plus: ['M12 5v14M5 12h14'],
+  'chevron-down': ['M6 9l6 6 6-6'],
 }
 
 export function 创建图标(名称: 图标名称, 尺寸: number = 18): SVGSVGElement {

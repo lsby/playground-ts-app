@@ -41,7 +41,7 @@ class 提示管理器内部 {
     this.位置监听.abort()
     let 句柄 = this.句柄
     this.句柄 = null
-    if (句柄 !== null) void 句柄.关闭()
+    if (句柄 !== null) void 句柄.关闭().catch((错误: unknown): void => console.error('关闭提示浮层失败:', 错误))
   }
 
   private 更新位置(浮窗: HTMLElement, 目标: HTMLElement): void {

@@ -59,7 +59,7 @@ export class 分页组件 extends 组件基类<发出事件类型, 监听事件�
     // 页码显示
     let 页码显示 = 创建元素('span', {
       textContent: `第 ${当前页码} 页 / 共 ${总页数} 页 (总共 ${总数量} 条)`,
-      style: { margin: '0 8px', color: 'var(--color-text-secondary)' },
+      style: { margin: '0 8px', color: 'var(--次要文字颜色)' },
     })
     分页容器.appendChild(页码显示)
 

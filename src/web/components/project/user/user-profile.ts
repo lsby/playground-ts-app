@@ -12,7 +12,7 @@ export class 用户信息组件 extends 组件基类<发出事件类型, 监听�
   }
 
   protected override async 当加载时(): Promise<void> {
-    let 结果 = await API管理器.请求postJson('/api/user/get-user-info', {})
+    let 结果 = await API管理器.请求postJson('/api/user/get-user-info', {}, { 信号: this.渲染信号 })
     if (结果.status !== 'success') {
       return
     }

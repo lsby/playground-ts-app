@@ -46,7 +46,6 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
         borderRadius: '8px',
         backgroundColor: 'var(--输入框背景)',
         color: 'var(--文字颜色)',
-        outline: 'none',
         boxSizing: 'border-box',
         resize: this.配置.自动伸缩 === true ? 'none' : 'vertical',
         minHeight: this.配置.最小高度,
@@ -70,15 +69,15 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
           e.preventDefault()
           let 值 = this.获得值()
           if (值.trim() !== '') {
-            void this.配置.提交处理函数?.(值)
+            this.安全执行(async (): Promise<void> => await this.配置.提交处理函数?.(值))
             this.派发事件('提交', 值)
           }
         }
       },
       onfocus: (): void => {
         if (this.文本框元素 !== undefined) {
-          this.文本框元素.style.borderColor = 'var(--主题颜色, #007aff)'
-          this.文本框元素.style.boxShadow = '0 0 0 2px rgba(0, 122, 255, 0.1)'
+          this.文本框元素.style.borderColor = 'var(--主色调)'
+          this.文本框元素.style.boxShadow = 'var(--聚焦环)'
         }
         this.派发事件('焦点', undefined)
       },

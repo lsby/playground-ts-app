@@ -1,5 +1,6 @@
 import { globalWebLog } from '../global/manager/log-manager'
 import { 获得滚动条样式 } from '../global/style/scrollbar'
+import { 是中止错误, 等待可取消任务 } from '../global/tools/abort'
 
 type 清理函数 = () => void | Promise<void>
 
@@ -28,7 +29,19 @@ export abstract class 组件基类<
   public constructor() {
     super()
     this.基础样式元素.dataset['componentBaseStyle'] = 'true'
-    this.基础样式元素.textContent = 获得滚动条样式(':host') + 获得滚动条样式('*')
+    this.基础样式元素.textContent = `${获得滚动条样式(':host')}${获得滚动条样式('*')}
+:host(:focus-visible), :focus-visible {
+  outline: 2px solid var(--主色调) !important;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}`
     this._shadow.appendChild(this.基础样式元素)
   }
 
@@ -38,6 +51,10 @@ export abstract class 组件基类<
 
   protected get 渲染信号(): AbortSignal {
     return this.渲染控制器.signal
+  }
+
+  protected 等待渲染任务<结果类型>(任务: Promise<结果类型>): Promise<结果类型> {
+    return 等待可取消任务(任务, this.渲染信号)
   }
 
   public 获得宿主样式(): CSSStyleDeclaration {
@@ -129,7 +146,7 @@ export abstract class 组件基类<
   private connectedCallback(): void {
     void this.log.debug('connectedCallback, 对象: %O', this)
     void this.请求渲染().catch((错误: unknown): void => {
-      this.报告错误(错误)
+      if (是中止错误(错误) === false) this.报告错误(错误)
     })
   }
 
@@ -172,6 +189,9 @@ export abstract class 组件基类<
         this.初始化完毕 = true
         this.初始化完成解析器?.()
         this.初始化完成解析器 = null
+      })
+      .catch((错误: unknown): void => {
+        if (是中止错误(错误) === false) throw 错误
       })
     this.渲染队列 = 任务
     return 任务

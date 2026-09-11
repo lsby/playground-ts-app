@@ -92,7 +92,6 @@ abstract class 输入框基类 extends 表单组件基类<输入框事件, 监�
       boxSizing: 'border-box',
       border: '1px solid var(--边框颜色)',
       borderRadius: 'var(--圆角-中)',
-      outline: 'none',
       backgroundColor: 禁用 ? 'var(--禁用背景)' : 'var(--输入框背景)',
       color: 'var(--文字颜色)',
       cursor: 禁用 ? 'not-allowed' : 'text',

@@ -101,7 +101,7 @@ export class 开关组件 extends 表单组件基类<开关事件, {}, boolean> 
     this.配置.值 = 值
     if (this.输入元素 !== undefined) {
       this.输入元素.checked = 值
-      void this.刷新()
+      this.安全执行(async (): Promise<void> => await this.刷新())
     }
   }
   public 设置禁用(值: boolean): void {

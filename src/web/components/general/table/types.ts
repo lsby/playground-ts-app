@@ -2,6 +2,11 @@ import { 增强样式类型 } from '../../../global/types/style'
 
 export type 数据表行键 = string | number
 
+export function 创建数据表单元格键(行键: 数据表行键, 列: number): string {
+  if (typeof 行键 === 'number') return `number:${行键}:${列}`
+  return `string:${行键.length}:${行键}:${列}`
+}
+
 export type 数据表列配置<数据项> = {
   字段名: keyof 数据项
   显示名: string

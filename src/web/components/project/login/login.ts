@@ -18,7 +18,7 @@ export class 登录组件 extends 组件基类<发出事件类型, 监听事件�
   }
 
   protected override async 当加载时(): Promise<void> {
-    let 允许注册 = await this.获得允许注册()
+    let 允许注册 = await this.获得允许注册(this.渲染信号)
     let 模式: 认证模式 =
       允许注册 === true && new URLSearchParams(window.location.search).get('register') === 'true' ? 'register' : 'login'
     let 登录用户名 = new 普通输入框({ 占位符: '请输入用户名', 自动完成: 'username' })
@@ -151,11 +151,12 @@ export class 登录组件 extends 组件基类<发出事件类型, 监听事件�
     更新模式()
   }
 
-  private async 获得允许注册(): Promise<boolean> {
+  private async 获得允许注册(信号: AbortSignal): Promise<boolean> {
     try {
-      let 响应 = await API管理器.请求postJson并处理错误('/api/system/get-enable-registration', {})
+      let 响应 = await API管理器.请求postJson并处理错误('/api/system/get-enable-registration', {}, { 信号 })
       return 响应.enable_register
-    } catch {
+    } catch (错误) {
+      if (信号.aborted === true) throw 错误
       return false
     }
   }

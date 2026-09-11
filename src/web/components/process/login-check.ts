@@ -10,11 +10,11 @@ export class 检查登录组件 extends 组件基类<发出事件类型, 监听�
   }
 
   protected override async 当加载时(): Promise<void> {
-    let 结果 = await API管理器.请求postJson并处理错误('/api/project/is-login', {})
+    let 结果 = await API管理器.请求postJson并处理错误('/api/project/is-login', {}, { 信号: this.渲染信号 })
     if (结果.isLogin === true) return
 
     // 尝试本地免密码登录
-    let 本地登录结果 = await API管理器.请求postJson('/api/project/local-login', {})
+    let 本地登录结果 = await API管理器.请求postJson('/api/project/local-login', {}, { 信号: this.渲染信号 })
     if (本地登录结果.status === 'success') {
       API管理器.设置token(本地登录结果.data.token)
       return

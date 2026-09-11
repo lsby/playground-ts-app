@@ -32,15 +32,15 @@ export class 数据库结构组件 extends 组件基类<发出事件类型, 监�
 
     this.shadow.appendChild(this.结构容器)
 
-    await this.初始化表格()
+    await this.初始化表格(this.渲染信号)
   }
 
   public 设置表名(表名: string): void {
     this.表名值 = 表名
-    void this.初始化表格()
+    this.安全执行(async (): Promise<void> => await this.初始化表格(this.渲染信号))
   }
 
-  private async 初始化表格(): Promise<void> {
+  private async 初始化表格(信号: AbortSignal): Promise<void> {
     if (this.结构容器 === null) return
     let 任务ID = ++this.初始化任务ID
     let 表名 = this.表名值
@@ -77,7 +77,11 @@ export class 数据库结构组件 extends 组件基类<发出事件类型, 监�
         }
 
         try {
-          let 结果 = await API管理器.请求postJson('/api/admin-sqlite/get-table-schema', { tableName: 表名 })
+          let 结果 = await API管理器.请求postJson(
+            '/api/admin-sqlite/get-table-schema',
+            { tableName: 表名 },
+            { 信号: 参数.信号 },
+          )
           if (结果.status === 'success') {
             let 数据: 表结构数据项[] = (
               结果.data.columns as Array<{
@@ -103,6 +107,7 @@ export class 数据库结构组件 extends 组件基类<发出事件类型, 监�
           }
           return { 数据: [], 总数: 0 }
         } catch (错误) {
+          if (参数.信号.aborted === true || 信号.aborted === true) throw 错误
           console.error('获取表结构失败:', 错误)
           return { 数据: [], 总数: 0 }
         }

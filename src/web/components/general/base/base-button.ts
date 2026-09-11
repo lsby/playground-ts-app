@@ -104,7 +104,7 @@ export abstract class 按钮基类 extends 组件基类<按钮事件, 监听按�
   public 设置加载中(值: boolean): void {
     if (this.配置.加载中 === 值) return
     this.配置.加载中 = 值
-    void this.刷新()
+    this.安全执行(async (): Promise<void> => await this.刷新())
   }
 
   public 获得加载中(): boolean {
@@ -122,7 +122,7 @@ export abstract class 按钮基类 extends 组件基类<按钮事件, 监听按�
   public 设置文本(文本: string): void {
     this.配置.文本 = 文本
     if (this.文本元素 !== undefined) this.文本元素.textContent = 文本
-    else void this.刷新()
+    else this.安全执行(async (): Promise<void> => await this.刷新())
   }
 
   public 设置标题(标题: string): void {
@@ -133,7 +133,7 @@ export abstract class 按钮基类 extends 组件基类<按钮事件, 监听按�
   public 设置图标(图标: Node | undefined): void {
     if (图标 === undefined) delete this.配置.图标
     else this.配置.图标 = 图标
-    void this.刷新()
+    this.安全执行(async (): Promise<void> => await this.刷新())
   }
 
   private async 执行点击(event: MouseEvent): Promise<void> {
@@ -172,10 +172,11 @@ export abstract class 按钮基类 extends 组件基类<按钮事件, 监听按�
         display: 'inline-block',
       },
     })
-    指示器.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], {
-      duration: 700,
-      iterations: Infinity,
-    })
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches === false)
+      指示器.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], {
+        duration: 700,
+        iterations: Infinity,
+      })
     return 指示器
   }
 }

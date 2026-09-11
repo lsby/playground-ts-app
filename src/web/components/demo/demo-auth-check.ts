@@ -10,7 +10,7 @@ export class 演示登录检查组件 extends 组件基类<发出事件类型, �
   }
 
   protected override async 当加载时(): Promise<void> {
-    let 结果 = await API管理器.请求postJson并处理错误('/api/demo/auth/is-login', {})
+    let 结果 = await API管理器.请求postJson并处理错误('/api/demo/auth/is-login', {}, { 信号: this.渲染信号 })
     if (结果.isLogin === false) window.location.assign('/demo/login.html')
   }
 }

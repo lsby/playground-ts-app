@@ -1,7 +1,7 @@
 import { 显示输入对话框 } from '../../../global/manager/dialog-manager'
 import { 创建元素 } from '../../../global/tools/create-element'
 import { 文本按钮, 普通按钮 } from '../base/base-button'
-import { 数据表列配置, 数据表操作配置, 数据表行键, 顶部操作配置 } from './types'
+import { 创建数据表单元格键, 数据表列配置, 数据表操作配置, 数据表行键, 顶部操作配置 } from './types'
 
 export type 表格渲染上下文<数据项> = {
   列配置: 数据表列配置<数据项>[]
@@ -189,7 +189,7 @@ export function 渲染表体<数据项>(上下文: 表格渲染上下文<数据�
       else if (渲染结果 instanceof Node) td.append(渲染结果)
       else td.textContent = 列.格式化?.(值) ?? (值 === null || 值 === undefined ? 'NULL' : String(值))
       td.title = td.textContent
-      let 单元格键 = `${String(行键)}::${列索引}`
+      let 单元格键 = 创建数据表单元格键(行键, 列索引)
       上下文.表格单元格元素映射.set(单元格键, td)
       let 列单元格们 = 上下文.列单元格映射.get(列索引) ?? []
       列单元格们.push(td)

@@ -17,7 +17,7 @@ export class 右键菜单管理器 {
   private constructor() {}
 
   public 显示菜单(x: number, y: number, 菜单项列表: 右键菜单项[], 关闭回调?: () => void): void {
-    void this.隐藏菜单()
+    void this.隐藏菜单().catch((错误: unknown): void => console.error('隐藏右键菜单失败:', 错误))
     this.当前关闭回调 = 关闭回调 ?? null
     let 菜单 = 创建元素('div', {
       role: 'menu',
@@ -79,7 +79,9 @@ export class 右键菜单管理器 {
       }
       按钮.onclick = (): void => {
         if (按钮.disabled === true) return
-        void this.隐藏菜单().then(async (): Promise<void> => await 菜单项.回调())
+        void this.隐藏菜单()
+          .then(async (): Promise<void> => await 菜单项.回调())
+          .catch((错误: unknown): void => console.error('执行右键菜单操作失败:', 错误))
       }
       菜单.append(按钮)
       if (按钮.disabled === false) 按钮们.push(按钮)

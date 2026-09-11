@@ -102,9 +102,13 @@ export class 即时任务管理组件 extends 组件基类<发出事件类型, �
     }
   }
 
-  private async 刷新任务列表(): Promise<void> {
+  private async 刷新任务列表(信号?: AbortSignal): Promise<void> {
     try {
-      let 结果 = await API管理器.请求postJson并处理错误('/api/admin-job/instant/list', {})
+      let 结果 = await API管理器.请求postJson并处理错误(
+        '/api/admin-job/instant/list',
+        {},
+        信号 === undefined ? undefined : { 信号 },
+      )
       this.所有任务数据 = 结果.任务列表.map((任务) => ({
         id: 任务.id,
         名称: 任务.名称,
@@ -121,6 +125,7 @@ export class 即时任务管理组件 extends 组件基类<发出事件类型, �
 
       await this.数据表格组件.刷新数据()
     } catch (错误) {
+      if (信号?.aborted === true) throw 错误
       console.error('获取任务列表失败:', 错误)
     }
   }
@@ -219,7 +224,7 @@ export class 即时任务管理组件 extends 组件基类<发出事件类型, �
     this.shadow.appendChild(主容器)
 
     // 初始加载数据
-    await this.刷新任务列表()
+    await this.刷新任务列表(this.渲染信号)
 
     // 检查 URL 参数，如果有 type=instant 和 id，自动显示详情
     let urlParams = new URLSearchParams(window.location.search)

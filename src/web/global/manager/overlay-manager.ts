@@ -74,7 +74,7 @@ class 浮层管理器类 {
         if (event.key === 'Escape' && 顶层.允许Escape关闭 !== false) {
           event.preventDefault()
           event.stopPropagation()
-          void this.请求关闭(顶层.id)
+          void this.请求关闭(顶层.id).catch((错误: unknown): void => console.error('关闭浮层失败:', 错误))
           return
         }
         if (event.key === 'Tab' && 顶层.模态 === true) this.约束焦点(event, 顶层.内容元素)
@@ -90,7 +90,7 @@ class 浮层管理器类 {
         let 是内部 = 顶层.内容元素.contains(event.target)
         let 是遮罩 = event.target === 顶层.根元素
         if ((策略 === '任意外部' && 是内部 === false) || (策略 === '仅遮罩' && 是遮罩 === true)) {
-          void this.请求关闭(顶层.id)
+          void this.请求关闭(顶层.id).catch((错误: unknown): void => console.error('关闭浮层失败:', 错误))
         }
       },
       { capture: true, signal: this.全局监听器.signal },

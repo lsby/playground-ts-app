@@ -26,6 +26,7 @@
   --按钮背景: #f0f0f0;
   --按钮文字: black;
   --主色调: #409eff;
+  --主色调-极淡: color-mix(in srgb, var(--主色调) 10%, transparent);
   --成功颜色: #52c41a;
   --错误颜色: #ff4d4f;
   --警告颜色: #faad14;
@@ -74,6 +75,7 @@ html[data-theme='light'] {
   --按钮背景: #f0f0f0;
   --按钮文字: black;
   --主色调: #409eff;
+  --主色调-极淡: color-mix(in srgb, var(--主色调) 10%, transparent);
   --成功颜色: #52c41a;
   --错误颜色: #ff4d4f;
   --警告颜色: #faad14;
@@ -113,6 +115,7 @@ html[data-theme='dark'] {
   --按钮背景: #333;
   --按钮文字: #ffffff;
   --主色调: #1890ff;
+  --主色调-极淡: color-mix(in srgb, var(--主色调) 14%, transparent);
   --成功颜色: #49aa19;
   --错误颜色: #d32029;
   --警告颜色: #d89614;
@@ -153,6 +156,7 @@ html[data-theme='dark'] {
     --按钮背景: #333;
     --按钮文字: #ffffff;
     --主色调: #1890ff;
+    --主色调-极淡: color-mix(in srgb, var(--主色调) 14%, transparent);
     --成功颜色: #49aa19;
     --错误颜色: #d32029;
     --警告颜色: #d89614;

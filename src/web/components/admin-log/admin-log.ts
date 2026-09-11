@@ -25,10 +25,10 @@ export class 系统日志页面组件 extends 组件基类<发出事件类型, �
     this.shadow.appendChild(this.日志组件)
 
     // 初始加载日志
-    await this.加载日志()
+    await this.加载日志(this.渲染信号)
   }
 
-  private async 加载日志(): Promise<void> {
+  private async 加载日志(信号: AbortSignal): Promise<void> {
     try {
       // 设置加载状态
       this.日志组件.设置加载状态(true)
@@ -39,6 +39,10 @@ export class 系统日志页面组件 extends 组件基类<发出事件类型, �
         async (ws数据: { 新日志: { 时间: string; 消息: string } }) => {
           this.添加新日志(ws数据.新日志)
         },
+        undefined,
+        undefined,
+        undefined,
+        { 信号 },
       )
 
       // 显示历史日志
@@ -49,6 +53,7 @@ export class 系统日志页面组件 extends 组件基类<发出事件类型, �
       // 隐藏加载状态
       this.日志组件.设置加载状态(false)
     } catch (错误) {
+      if (信号.aborted === true) throw 错误
       console.error('加载日志失败:', 错误)
       this.日志组件.设置加载状态(false)
       this.日志组件.添加日志('加载日志失败')

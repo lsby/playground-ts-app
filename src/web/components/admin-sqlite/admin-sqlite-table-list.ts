@@ -29,14 +29,14 @@ export class 数据库列表组件 extends 组件基类<发出事件类型, 监�
 
     this.shadow.appendChild(this.表列表容器)
 
-    await this.刷新数据()
+    await this.刷新数据(this.渲染信号)
   }
 
-  private async 刷新数据(): Promise<void> {
+  private async 刷新数据(信号: AbortSignal): Promise<void> {
     if (this.表列表容器 === undefined) return
     let 表列表容器 = this.表列表容器
     try {
-      let 结果 = await API管理器.请求postJson('/api/admin-sqlite/get-tables', {})
+      let 结果 = await API管理器.请求postJson('/api/admin-sqlite/get-tables', {}, { 信号 })
       switch (结果.status) {
         case 'success':
           this.渲染表列表(结果.data.tables)
@@ -49,6 +49,7 @@ export class 数据库列表组件 extends 组件基类<发出事件类型, 监�
           break
       }
     } catch (错误) {
+      if (信号.aborted === true) throw 错误
       console.error('获取表列表失败:', 错误)
       表列表容器.innerHTML = ''
       let 错误消息 = 创建元素('div', { textContent: '获取表列表失败' })
@@ -77,7 +78,14 @@ export class 数据库列表组件 extends 组件基类<发出事件类型, 监�
           fontSize: '14px',
         },
       })
-      表项.onclick = async (): Promise<void> => this.选择表(表名)
+      表项.tabIndex = 0
+      表项.setAttribute('role', 'button')
+      表项.onclick = (): void => this.选择表(表名)
+      表项.onkeydown = (事件: KeyboardEvent): void => {
+        if (事件.key !== 'Enter' && 事件.key !== ' ') return
+        事件.preventDefault()
+        this.选择表(表名)
+      }
       表列表容器.appendChild(表项)
     }
   }

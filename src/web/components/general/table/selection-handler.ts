@@ -1,5 +1,5 @@
 import { 成功提示, 错误提示 } from '../../../global/manager/toast-manager'
-import { 数据表列配置, 数据表行键 } from './types'
+import { 创建数据表单元格键, 数据表列配置, 数据表行键 } from './types'
 
 export type 选择处理器上下文<数据项> = {
   数据列表: 数据项[]
@@ -111,7 +111,7 @@ export class 表格选择管理器<数据项> {
     }
     for (let [键, 单元格] of this.上下文.表格单元格元素映射) {
       let 强调键 =
-        this.最后点击的单元格 === null ? '' : `${String(this.最后点击的单元格.行键)}::${this.最后点击的单元格.列}`
+        this.最后点击的单元格 === null ? '' : 创建数据表单元格键(this.最后点击的单元格.行键, this.最后点击的单元格.列)
       单元格.style.backgroundColor = 键 === 强调键 && this.获得是否为多选模式() === false ? 'var(--强调背景颜色)' : ''
     }
   }

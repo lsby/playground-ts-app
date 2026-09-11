@@ -1,12 +1,28 @@
 import { 组件基类 } from '../../../base/base'
 import { 创建元素 } from '../../../global/tools/create-element'
+import { 创建标签页标识前缀, 同步标签页路由, type 标签方向, 计算键盘目标索引, 读取标签页索引 } from './tabs-common'
 
 type App导航配置 = { 路由键?: string | undefined }
 export type appNavigation发出事件类型 = { 切换: { 当前索引: number } }
 type 监听事件类型 = {}
 
-type 标签页项 = { 标签: string; 图标?: string | undefined; 标识?: string | undefined; 内容: HTMLElement }
+type 标签页项 = {
+  标签: string
+  图标?: string | undefined
+  标识?: string | undefined
+  内容: HTMLElement
+  已挂载: boolean
+}
 
+/**
+ * 页面采用首次访问懒挂载：添加页面时内容实例已经创建，但不会立即连接 DOM；
+ * 初始化时只挂载当前页面，其他页面在首次访问时才挂载，访问过的页面会保留 DOM 和页面状态。
+ *
+ * 页面组件的构造函数只应用于初始化字段和创建不会产生副作用的对象。网络请求、定时器、
+ * WebSocket、观察器及依赖 DOM 的事件监听应放在 `当加载时` 中，并通过 `注册清理` 或
+ * `当卸载时` 释放。构造函数中的副作用会在未访问页面时提前执行，从而绕过懒挂载机制。
+ * `当加载时` 可能因刷新或重新连接再次执行，因此其中的逻辑还应保持可重复执行。
+ */
 export class App导航组件 extends 组件基类<appNavigation发出事件类型, 监听事件类型> {
   static {
     this.注册组件('lsby-app-navigation', this)
@@ -18,6 +34,8 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
   private 内容容器: HTMLDivElement = 创建元素('div')
   private 是移动端: boolean = false
   private 标签页列表: 标签页项[] = []
+  private 标签按钮列表: HTMLButtonElement[] = []
+  private readonly 标签页标识前缀 = 创建标签页标识前缀()
 
   public constructor(配置: App导航配置 = {}) {
     super()
@@ -28,34 +46,23 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
     配置: { 标签: string; 图标?: string | undefined; 标识?: string | undefined },
     内容: HTMLElement,
   ): void {
-    this.标签页列表.push({ 标签: 配置.标签, 图标: 配置.图标, 标识: 配置.标识, 内容 })
-    this.appendChild(内容)
+    this.标签页列表.push({ 标签: 配置.标签, 图标: 配置.图标, 标识: 配置.标识, 内容, 已挂载: false })
   }
 
   protected override async 当加载时(): Promise<void> {
-    let 路由键 = this.配置.路由键
-    if (typeof 路由键 === 'string') {
-      let params = new URLSearchParams(window.location.search)
-      let 标识字符串 = params.get(路由键)
-      if (标识字符串 !== null) {
-        let 索引 = this.标签页列表.findIndex((项) => 项.标识 === 标识字符串)
-        if (索引 === -1) {
-          let 解析索引 = parseInt(标识字符串)
-          if (Number.isNaN(解析索引) === false) 索引 = 解析索引
-        }
-        if (索引 !== -1 && 索引 >= 0 && 索引 < this.标签页列表.length) {
-          this.当前索引 = 索引
-        }
-      }
-    }
+    this.当前索引 = 读取标签页索引(this.配置.路由键, this.标签页列表, this.当前索引)
 
-    this.是移动端 = window.matchMedia('(max-width: 768px)').matches
-    window.matchMedia('(max-width: 768px)').onchange = (e): void => {
-      this.是移动端 = e.matches
+    let 移动端查询 = window.matchMedia('(max-width: 768px)')
+    this.是移动端 = 移动端查询.matches
+    let 处理布局变化 = (事件: MediaQueryListEvent): void => {
+      this.是移动端 = 事件.matches
       this.更新布局()
     }
+    移动端查询.addEventListener('change', 处理布局变化)
+    this.注册清理((): void => 移动端查询.removeEventListener('change', 处理布局变化))
 
     this.初始化结构()
+    this.确保标签页已挂载(this.当前索引)
     this.更新布局()
     this.更新UI()
   }
@@ -70,6 +77,8 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
     this.导航栏容器.style.display = 'flex'
     this.导航栏容器.style.backgroundColor = 'var(--背景颜色)'
     this.导航栏容器.style.zIndex = '10'
+    this.导航栏容器.setAttribute('role', 'navigation')
+    this.导航栏容器.setAttribute('aria-label', '应用导航')
 
     this.内容容器.style.flex = '1'
     this.内容容器.style.display = 'flex'
@@ -109,12 +118,14 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
   }
 
   private 更新UI(): void {
-    this.导航栏容器.innerHTML = ''
+    this.导航栏容器.replaceChildren()
+    this.标签按钮列表 = []
 
     this.标签页列表.forEach((项, idx) => {
       let 选中 = idx === this.当前索引
 
       let 按钮 = 创建元素('button', {
+        type: 'button',
         style: {
           padding: this.是移动端 ? '8px 0' : '10px 20px',
           border: 'none',
@@ -132,11 +143,20 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
           alignItems: 'center',
           justifyContent: this.是移动端 ? 'center' : 'flex-start',
           gap: this.是移动端 ? '2px' : '12px',
-          transition: 'all 0.2s',
-          outline: 'none',
+          transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
           fontFamily: 'inherit',
         },
       })
+      let 标签标识 = `${this.标签页标识前缀}-tab-${idx}`
+      let 面板标识 = `${this.标签页标识前缀}-panel-${idx}`
+      按钮.id = 标签标识
+      按钮.setAttribute('aria-controls', 面板标识)
+      if (选中 === true) 按钮.setAttribute('aria-current', 'page')
+      按钮.tabIndex = 选中 ? 0 : -1
+      项.内容.id = 面板标识
+      项.内容.setAttribute('role', 'region')
+      项.内容.setAttribute('aria-labelledby', 标签标识)
+      项.内容.hidden = 选中 === false
 
       if (项.图标 !== undefined && 项.图标 !== '') {
         let 图标元素 = 创建元素('span', {
@@ -152,11 +172,13 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
       })
       按钮.appendChild(文字元素)
 
-      按钮.onclick = async (): Promise<void> => {
-        await this.切换标签(idx)
+      按钮.onclick = (): void => {
+        this.安全执行(async (): Promise<void> => await this.切换标签(idx))
       }
+      按钮.onkeydown = (事件: KeyboardEvent): void => this.处理标签键盘(事件, idx)
 
       this.导航栏容器.appendChild(按钮)
+      this.标签按钮列表.push(按钮)
     })
 
     this.标签页列表.forEach((项, idx) => {
@@ -175,27 +197,33 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
 
   private async 切换标签(index: number): Promise<void> {
     let 目标项 = this.标签页列表[index]
+    if (目标项 === undefined) return
 
     if (this.当前索引 !== index) {
       this.当前索引 = index
+      this.确保标签页已挂载(index)
       this.更新UI()
-
-      let 路由键 = this.配置.路由键
-      if (typeof 路由键 === 'string') {
-        let params = new URLSearchParams(window.location.search)
-        let 值 = 目标项?.标识 ?? index.toString()
-        params.set(路由键, 值)
-        let newUrl = `${window.location.pathname}?${params.toString()}${window.location.hash}`
-        window.history.replaceState(null, '', newUrl)
-      }
+      同步标签页路由(this.配置.路由键, 目标项, index)
       this.派发事件('切换', { 当前索引: index })
-
-      if (目标项 !== undefined) {
-        let 内容 = 目标项.内容
-        if (内容 instanceof 组件基类) await 内容.刷新()
-        for (let 子 of Array.from(内容.children)) if (子 instanceof 组件基类) await 子.刷新()
-      }
     }
+  }
+
+  private 确保标签页已挂载(index: number): void {
+    let 目标项 = this.标签页列表[index]
+    if (this.isConnected === false || 目标项 === undefined || 目标项.已挂载 === true) return
+    this.appendChild(目标项.内容)
+    目标项.已挂载 = true
+  }
+
+  private 处理标签键盘(事件: KeyboardEvent, 当前索引: number): void {
+    let 方向: 标签方向 = this.是移动端 ? 'horizontal' : 'vertical'
+    let 目标索引 = 计算键盘目标索引(事件, 当前索引, this.标签页列表.length, 方向)
+    if (目标索引 === null) return
+    事件.preventDefault()
+    this.安全执行(async (): Promise<void> => {
+      await this.切换标签(目标索引)
+      this.标签按钮列表[目标索引]?.focus()
+    })
   }
 
   public async 设置当前索引(index: number): Promise<void> {

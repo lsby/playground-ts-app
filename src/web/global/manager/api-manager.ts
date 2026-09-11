@@ -4,6 +4,9 @@ import { 环境变量 } from '../../../global/env'
 import { 已审阅的any } from '../../../tools/types'
 import { InterfaceType } from '../../../types/interface-type'
 import { 错误提示 } from '../manager/toast-manager'
+import { 是中止错误, 等待可取消任务 } from '../tools/abort'
+
+export type API请求选项 = { 信号?: AbortSignal }
 
 export type 取接口<
   P extends InterfaceType[number]['path'],
@@ -100,13 +103,16 @@ export class API管理器类 {
   public async 请求postJson<接口路径 extends 所有POST_JSON路径>(
     接口路径: 接口路径,
     参数: 取JSON输入<取接口<接口路径>>,
-    ws输出回调?: (data: 取ws输出<取接口<接口路径>>) => Promise<void>,
+    请求选项或ws输出回调?: API请求选项 | ((data: 取ws输出<取接口<接口路径>>) => Promise<void>),
     ws连接回调?: (发送消息: (data: 取ws输入<取接口<接口路径>>) => void, ws: WebSocket) => Promise<void>,
     ws关闭回调?: (e: CloseEvent) => Promise<void>,
     ws错误回调?: (e: Event) => Promise<void>,
+    附加请求选项?: API请求选项,
   ): Promise<
     取http错误输出<取接口<接口路径>> | 取http正确输出<取接口<接口路径>> | { status: 'unexpected'; data: string }
   > {
+    let 请求选项 = typeof 请求选项或ws输出回调 === 'function' ? 附加请求选项 : 请求选项或ws输出回调
+    let ws输出回调 = typeof 请求选项或ws输出回调 === 'function' ? 请求选项或ws输出回调 : undefined
     return (await this.通用请求(
       接口路径,
       { 'Content-Type': 'application/json' },
@@ -116,20 +122,30 @@ export class API管理器类 {
       ws连接回调,
       ws关闭回调,
       ws错误回调,
+      请求选项,
     )) as 已审阅的any
   }
   public async 请求postJson并处理错误<接口路径 extends 所有POST_JSON路径>(
     接口路径: 接口路径,
     参数: 取JSON输入<取接口<接口路径>>,
-    ws输出回调?: (data: 取ws输出<取接口<接口路径>>) => Promise<void>,
+    请求选项或ws输出回调?: API请求选项 | ((data: 取ws输出<取接口<接口路径>>) => Promise<void>),
     ws连接回调?: (发送消息: (data: 取ws输入<取接口<接口路径>>) => void, ws: WebSocket) => Promise<void>,
     ws关闭回调?: (e: CloseEvent) => Promise<void>,
     ws错误回调?: (e: Event) => Promise<void>,
+    附加请求选项?: API请求选项,
   ): Promise<取http正确输出数据<取接口<接口路径>>> {
     return (await this.通用请求并处理错误(
       接口路径,
       async () =>
-        (await this.请求postJson(接口路径, 参数, ws输出回调, ws连接回调, ws关闭回调, ws错误回调)) as 已审阅的any,
+        (await this.请求postJson(
+          接口路径,
+          参数,
+          请求选项或ws输出回调,
+          ws连接回调,
+          ws关闭回调,
+          ws错误回调,
+          附加请求选项,
+        )) as 已审阅的any,
     )) as 已审阅的any
   }
 
@@ -188,6 +204,7 @@ export class API管理器类 {
     ws连接回调?: (发送消息: (data: 已审阅的any) => void, ws: WebSocket) => Promise<void>,
     ws关闭回调?: (e: CloseEvent) => Promise<void>,
     ws错误回调?: (e: Event) => Promise<void>,
+    请求选项?: API请求选项,
   ): Promise<object | { status: 'unexpected'; data: string }> {
     let 请求结果: string | null = null
     try {
@@ -205,13 +222,23 @@ export class API管理器类 {
           : {}),
         ...(ws关闭回调 !== undefined ? { ws关闭回调: ws关闭回调 } : {}),
         ...(ws错误回调 !== undefined ? { ws错误回调: ws错误回调 } : {}),
-        ...(ws连接回调 !== undefined
+        ...(ws连接回调 !== undefined || 请求选项?.信号 !== undefined
           ? {
               ws连接回调: async (ws: WebSocket): Promise<void> => {
+                let 信号 = 请求选项?.信号
+                if (信号 !== undefined) {
+                  let 取消连接 = (): void => ws.close()
+                  if (信号.aborted === true) {
+                    取消连接()
+                    return
+                  }
+                  信号.addEventListener('abort', 取消连接, { once: true })
+                  ws.addEventListener('close', (): void => 信号.removeEventListener('abort', 取消连接), { once: true })
+                }
                 let 发送消息 = (data: 已审阅的any): void => {
                   ws.send(JSON.stringify(data))
                 }
-                await ws连接回调(发送消息, ws)
+                await ws连接回调?.(发送消息, ws)
               },
             }
           : {}),
@@ -219,22 +246,26 @@ export class API管理器类 {
 
       // console.log('请求:\n路径: %o\n头: %o\n方法: %o\nbody: %o\n结果: %o', 接口路径, 头, 方法, body, 请求结果)
       if (环境变量.BUILD_TARGET === 'pure-frontend') {
-        return await requestPureFrontendApi(接口路径, 头, 方法, body)
+        return await 等待可取消任务(requestPureFrontendApi(接口路径, 头, 方法, body), 请求选项?.信号)
       }
-      if (serviceWorkerReady !== undefined) await serviceWorkerReady
+      if (serviceWorkerReady !== undefined) await 等待可取消任务(serviceWorkerReady, 请求选项?.信号)
 
-      请求结果 = await web请求({
-        url: API前缀 + 接口路径,
-        body: body,
-        headers: 头,
-        method: 方法,
-        ws路径: '/ws',
-        wsId参数键: 'id',
-        wsId头键: 'ws-client-id',
-        ...ws回调选项,
-      })
+      请求结果 = await 等待可取消任务(
+        web请求({
+          url: API前缀 + 接口路径,
+          body: body,
+          headers: 头,
+          method: 方法,
+          ws路径: '/ws',
+          wsId参数键: 'id',
+          wsId头键: 'ws-client-id',
+          ...ws回调选项,
+        }),
+        请求选项?.信号,
+      )
       return JSON.parse(请求结果)
     } catch (e) {
+      if (是中止错误(e, 请求选项?.信号) === true) throw e
       console.error('请求错误:\n路径: %o\n头: %o\n方法: %o\nbody: %o\n结果: %o', 接口路径, 头, 方法, body, 请求结果)
       return { status: 'unexpected', data: String(e) }
     }
