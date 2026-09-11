@@ -438,6 +438,7 @@ invoke_raw_migration() {
 
   ELECTRON_RUN_AS_NODE=1 \
   DB_PATH_PRISMA="file:$DB_DIR/prod-electron.db" \
+  PRISMA_ROOT_DIR="$app_resources" \
   "$electron_bin" "$push_prod_js" "$@"
 }
 

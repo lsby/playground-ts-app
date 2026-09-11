@@ -257,6 +257,7 @@ async function 执行构建(): Promise<void> {
       let Prisma环境 = {
         ...process.env,
         DB_PATH_PRISMA: `file:${path.join(生成目录, 'data/db/prod-electron.db').replaceAll('\\', '/')}`,
+        PRISMA_ROOT_DIR: appPrisma目标目录,
       }
       console.log('正在验证默认数据库的原生 SQL migrations...')
       execFileSync(process.execPath, [PushProdCli路径], { cwd: appPrisma目标目录, env: Prisma环境, stdio: 'inherit' })
@@ -269,21 +270,17 @@ async function 执行构建(): Promise<void> {
       let runExe路径 = path.join(生成目录, 'lsby-playground-ts-app.exe')
 
       if (cscPath === null || fs.existsSync(cscPath) === false) {
-        console.warn(`⚠️ 未找到 C# 编译器，跳过 lsby-playground-ts-app.exe 的编译。`)
+        throw new Error(`未找到 C# 编译器 csc.exe，无法编译引导器 lsby-playground-ts-app.exe`)
       } else if (fs.existsSync(launcher源文件) === false) {
-        console.warn(`⚠️ 未找到引导器源码: ${launcher源文件}，跳过 lsby-playground-ts-app.exe 的编译。`)
+        throw new Error(`未找到引导器源码: ${launcher源文件}，无法编译 lsby-playground-ts-app.exe`)
       } else {
         console.log('✅ 正在编译引导器 lsby-playground-ts-app.exe ...')
-        try {
-          // 使用 Windows GUI 子系统，默认只显示托盘图标；控制台由引导器按需创建
-          execSync(
-            `"${cscPath}" /nologo /target:winexe /out:"${runExe路径}" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll "${launcher源文件}"`,
-            { stdio: 'inherit' },
-          )
-          console.log(`✅ 已生成 ${runExe路径}`)
-        } catch (error) {
-          console.error(`❌ 引导器 run.exe 编译失败:`, error)
-        }
+        // 使用 Windows GUI 子系统，默认只显示托盘图标；控制台由引导器按需创建
+        execSync(
+          `"${cscPath}" /nologo /target:winexe /out:"${runExe路径}" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll "${launcher源文件}"`,
+          { stdio: 'inherit' },
+        )
+        console.log(`✅ 已生成 ${runExe路径}`)
       }
     }
 

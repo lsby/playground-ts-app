@@ -8,7 +8,27 @@ import path from 'path'
 type 迁移 = { 名称: string; SQL内容: string; 校验和: string }
 type 已完成迁移记录 = { 名称: string; 校验和: string }
 
-let 项目根目录 = path.resolve(import.meta.dirname, '../..')
+function 解析项目根目录(): string {
+  let 显式指定根目录 = process.env['PRISMA_ROOT_DIR']
+  if (显式指定根目录 !== undefined && 显式指定根目录 !== '') {
+    return path.resolve(显式指定根目录)
+  }
+  let 当前目录 = import.meta.dirname
+  // 1. Windows Electron 产物结构: .../resources/app/dist/scripts/db -> 向上 5 层至 app 目录
+  let electronWindows特征 = path.join('resources', 'app', 'dist', 'scripts', 'db')
+  if (当前目录.includes(electronWindows特征) === true) {
+    return path.resolve(当前目录, '../../../../..')
+  }
+  // 2. 标准 Node / Docker 编译产物结构: .../dist/scripts/db -> 向上 3 层至应用根目录
+  let dist特征 = path.join('dist', 'scripts', 'db')
+  if (当前目录.includes(dist特征) === true) {
+    return path.resolve(当前目录, '../../..')
+  }
+  // 3. 源码开发态结构: .../scripts/db -> 向上 2 层至项目根目录
+  return path.resolve(当前目录, '../..')
+}
+
+let 项目根目录 = 解析项目根目录()
 let 获得错误消息 = (错误: unknown): string => (错误 instanceof Error ? 错误.message : String(错误))
 
 let 获得项目路径 = (目标路径: string): string => path.resolve(项目根目录, 目标路径)

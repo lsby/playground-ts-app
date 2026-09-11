@@ -248,9 +248,11 @@ function Invoke-RawMigration([string]$ProgramDir, [string[]]$Arguments) {
   if (-not (Test-Path -LiteralPath $pushProdJsPath -PathType Leaf)) { throw '新程序缺少 db/push-prod.js' }
   $oldElectronRunAsNode = $env:ELECTRON_RUN_AS_NODE
   $oldDatabaseUrl = $env:DB_PATH_PRISMA
+  $oldPrismaRootDir = $env:PRISMA_ROOT_DIR
   try {
     $env:ELECTRON_RUN_AS_NODE = '1'
     $env:DB_PATH_PRISMA = 'file:' + ([System.IO.Path]::GetFullPath((Join-Path $DbDir 'prod-electron.db')).Replace('\', '/'))
+    $env:PRISMA_ROOT_DIR = $ProgramDir
     $processArguments = @($pushProdJsPath) + $Arguments | ForEach-Object { '"' + $_.Replace('"', '\"') + '"' }
     $migrationProcess = Start-Process -FilePath $electronPath -ArgumentList $processArguments -WorkingDirectory $ProgramDir -NoNewWindow -Wait -PassThru
     if ($migrationProcess.ExitCode -ne 0) { throw "原生 SQL 迁移脚本执行失败，退出码: $($migrationProcess.ExitCode)" }
@@ -259,6 +261,8 @@ function Invoke-RawMigration([string]$ProgramDir, [string[]]$Arguments) {
     else { $env:ELECTRON_RUN_AS_NODE = $oldElectronRunAsNode }
     if ($null -eq $oldDatabaseUrl) { Remove-Item Env:DB_PATH_PRISMA -ErrorAction SilentlyContinue }
     else { $env:DB_PATH_PRISMA = $oldDatabaseUrl }
+    if ($null -eq $oldPrismaRootDir) { Remove-Item Env:PRISMA_ROOT_DIR -ErrorAction SilentlyContinue }
+    else { $env:PRISMA_ROOT_DIR = $oldPrismaRootDir }
   }
 }
 
