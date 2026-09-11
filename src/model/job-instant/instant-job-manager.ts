@@ -3,7 +3,7 @@ import { 已审阅的any } from '../../tools/types'
 import { 即时任务上下文, 即时任务抽象类 } from './instant-job'
 
 export class 即时任务管理器类 {
-  private log = new Log('即时任务管理器')
+  private log: Log
   private 任务映射表: Map<string, 即时任务抽象类<unknown>> = new Map()
   private 运行中任务集合: Set<string> = new Set()
   private 运行中任务Promise集合: Set<Promise<void>> = new Set()
@@ -13,14 +13,15 @@ export class 即时任务管理器类 {
   private 是否已关闭 = false
   private 关闭Promise: Promise<void> | null = null
 
-  public constructor(参数: { 最大并发数: number; 历史记录保留天数: number }) {
-    let { 最大并发数, 历史记录保留天数 } = 参数
+  public constructor(参数: { 最大并发数: number; 历史记录保留天数: number; 日志: Log }) {
+    let { 最大并发数, 历史记录保留天数, 日志 } = 参数
 
     if (最大并发数 <= 0) throw new Error('最大并发数必须大于0')
     if (历史记录保留天数 <= 0) throw new Error('历史记录保留天数必须大于0')
 
     this.最大并发数 = 最大并发数
     this.历史记录保留天数 = 历史记录保留天数
+    this.log = 日志
 
     // 设置定时器，每隔保留天数自动清理
     this.清理定时器 = setInterval(

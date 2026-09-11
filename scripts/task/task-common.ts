@@ -5,7 +5,7 @@ import { 命令 } from './task-runner'
 export let 项目根目录 = path.resolve(import.meta.dirname, '../..')
 export let 完整调试环境 = { DEBUG: '@lsby:*,@lsby:playground-ts-app:*,-@lsby:ts-env*' }
 export let 生成调试环境 = { DEBUG: '@lsby:*' }
-export let 测试调试环境 = { DEBUG: '@lsby:*,-@lsby:ts-env*,-*:trace' }
+export let 测试调试环境 = { DEBUG: '@lsby:*,@lsby:playground-ts-app:*,-@lsby:ts-env*,-*:trace' }
 export let Web开发环境文件 = 获得环境文件(项目根目录, { NODE_ENV: 'development', BUILD_TARGET: 'web' })
 export let Electron开发环境文件 = 获得环境文件(项目根目录, { NODE_ENV: 'development', BUILD_TARGET: 'electron' })
 export let 纯前端开发环境文件 = 获得环境文件(项目根目录, { NODE_ENV: 'development', BUILD_TARGET: 'pure-frontend' })
