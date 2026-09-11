@@ -193,9 +193,9 @@ async function 执行构建(): Promise<void> {
       } else {
         console.log('✅ 正在编译引导器 lsby-playground-ts-app.exe ...')
         try {
-          // 使用 /target:exe 避免控制台流异常
+          // 使用 Windows GUI 子系统，默认只显示托盘图标；控制台由引导器按需创建
           execSync(
-            `"${cscPath}" /nologo /target:exe /out:"${runExe路径}" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll "${launcher源文件}"`,
+            `"${cscPath}" /nologo /target:winexe /out:"${runExe路径}" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll "${launcher源文件}"`,
             { stdio: 'inherit' },
           )
           console.log(`✅ 已生成 ${runExe路径}`)

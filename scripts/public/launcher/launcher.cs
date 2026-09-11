@@ -1,26 +1,121 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Forms;
 
 namespace LsbyLauncher
 {
     static class Program
     {
-        // 去除 AllocConsole，因为我们现在用 target:exe 编译，系统会自动分配
-        // [DllImport("kernel32.dll")]
-        // static extern bool AllocConsole();
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool AllocConsole();
 
-        [DllImport("kernel32.dll")]
-        static extern IntPtr GetConsoleWindow();
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool FreeConsole();
 
-        [DllImport("user32.dll")]
-        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+        static readonly object consoleLock = new object();
+        static readonly Queue<string> pendingLogs = new Queue<string>();
+        static bool isConsoleVisible = false;
+        static StreamWriter consoleWriter = null;
+        static StreamReader consoleReader = null;
 
-        const int SW_HIDE = 0;
-        const int SW_SHOW = 5;
+        static void WriteLog(string message)
+        {
+            lock (consoleLock)
+            {
+                if (isConsoleVisible)
+                {
+                    try
+                    {
+                        Console.WriteLine(message);
+                        return;
+                    }
+                    catch
+                    {
+                        isConsoleVisible = false;
+                    }
+                }
+
+                pendingLogs.Enqueue(message);
+                while (pendingLogs.Count > 2000)
+                {
+                    pendingLogs.Dequeue();
+                }
+            }
+        }
+
+        static bool ShowConsole()
+        {
+            lock (consoleLock)
+            {
+                if (isConsoleVisible)
+                {
+                    return true;
+                }
+                if (!AllocConsole())
+                {
+                    return false;
+                }
+
+                consoleWriter = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false));
+                consoleWriter.AutoFlush = true;
+                consoleReader = new StreamReader(Console.OpenStandardInput(), Encoding.UTF8);
+                Console.SetOut(consoleWriter);
+                Console.SetError(consoleWriter);
+                Console.SetIn(consoleReader);
+                Console.OutputEncoding = Encoding.UTF8;
+                isConsoleVisible = true;
+
+                while (pendingLogs.Count > 0)
+                {
+                    Console.WriteLine(pendingLogs.Dequeue());
+                }
+                return true;
+            }
+        }
+
+        static void HideConsole()
+        {
+            lock (consoleLock)
+            {
+                if (!isConsoleVisible)
+                {
+                    return;
+                }
+
+                Console.SetOut(TextWriter.Null);
+                Console.SetError(TextWriter.Null);
+                Console.SetIn(TextReader.Null);
+                if (consoleWriter != null)
+                {
+                    consoleWriter.Dispose();
+                    consoleWriter = null;
+                }
+                if (consoleReader != null)
+                {
+                    consoleReader.Dispose();
+                    consoleReader = null;
+                }
+                FreeConsole();
+                isConsoleVisible = false;
+            }
+        }
+
+        static void ToggleConsole()
+        {
+            if (isConsoleVisible)
+            {
+                HideConsole();
+            }
+            else
+            {
+                ShowConsole();
+            }
+        }
 
         [STAThread]
         static void Main()
@@ -31,25 +126,22 @@ namespace LsbyLauncher
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string appPath = Path.Combine(baseDir, "app", "lsby-playground-ts-app.exe");
             string markerPath = Path.Combine(baseDir, "data", "update-in-progress");
-            IntPtr consoleWindow = GetConsoleWindow();
-            ShowWindow(consoleWindow, SW_HIDE);
-            bool isConsoleVisible = false;
-
-            // 解决中文乱码
-            Console.OutputEncoding = System.Text.Encoding.UTF8;
 
             if (File.Exists(markerPath))
             {
-                ShowWindow(consoleWindow, SW_SHOW);
-                Console.WriteLine("检测到未完成的更新，请先运行 update.cmd 恢复旧版本。");
-                Console.WriteLine("按任意键关闭...");
-                Console.ReadKey();
+                ShowConsole();
+                WriteLog("检测到未完成的更新，请先运行 update.cmd 恢复旧版本。");
+                WriteLog("按任意键关闭...");
+                if (isConsoleVisible)
+                {
+                    Console.ReadKey();
+                }
                 return;
             }
 
-            Console.WriteLine("==================================================");
-            Console.WriteLine("lsby-playground-ts-app 启动引导器");
-            Console.WriteLine("==================================================");
+            WriteLog("==================================================");
+            WriteLog("lsby-playground-ts-app 启动引导器");
+            WriteLog("==================================================");
 
             // 2. 准备托盘图标
             NotifyIcon trayIcon = new NotifyIcon();
@@ -72,14 +164,12 @@ namespace LsbyLauncher
 
             toggleMenuItem.Click += (s, e) =>
             {
-                isConsoleVisible = !isConsoleVisible;
-                ShowWindow(consoleWindow, isConsoleVisible ? SW_SHOW : SW_HIDE);
+                ToggleConsole();
             };
 
             trayIcon.DoubleClick += (s, e) =>
             {
-                isConsoleVisible = !isConsoleVisible;
-                ShowWindow(consoleWindow, isConsoleVisible ? SW_SHOW : SW_HIDE);
+                ToggleConsole();
             };
 
             // 3. 准备启动进程
@@ -106,7 +196,25 @@ namespace LsbyLauncher
             Process appProcess = new Process();
             appProcess.StartInfo.FileName = appPath;
             appProcess.StartInfo.WorkingDirectory = baseDir;
-            appProcess.StartInfo.UseShellExecute = false; // 继承当前引导器的控制台句柄，这样日志会打印到我们的黑框里
+            appProcess.StartInfo.UseShellExecute = false;
+            appProcess.StartInfo.CreateNoWindow = true;
+            appProcess.StartInfo.RedirectStandardOutput = true;
+            appProcess.StartInfo.RedirectStandardError = true;
+
+            appProcess.OutputDataReceived += (s, e) =>
+            {
+                if (e.Data != null)
+                {
+                    WriteLog(e.Data);
+                }
+            };
+            appProcess.ErrorDataReceived += (s, e) =>
+            {
+                if (e.Data != null)
+                {
+                    WriteLog(e.Data);
+                }
+            };
 
             exitMenuItem.Click += (s, e) =>
             {
@@ -126,26 +234,34 @@ namespace LsbyLauncher
                 if (appProcess.ExitCode != 0)
                 {
                     // 异常退出兜底：强制弹出黑框框显示报错
-                    ShowWindow(consoleWindow, SW_SHOW);
-                    Console.WriteLine("\n[引导器拦截] 程序异常退出 (ExitCode: " + appProcess.ExitCode + ")");
-                    Console.WriteLine("按任意键关闭...");
-                    Console.ReadKey();
+                    ShowConsole();
+                    WriteLog("\n[引导器拦截] 程序异常退出 (ExitCode: " + appProcess.ExitCode + ")");
+                    WriteLog("按任意键关闭...");
+                    if (isConsoleVisible)
+                    {
+                        Console.ReadKey();
+                    }
                 }
                 Application.Exit();
             };
 
             try
             {
-                Console.WriteLine("正在启动...");
+                WriteLog("正在启动...");
                 appProcess.Start();
+                appProcess.BeginOutputReadLine();
+                appProcess.BeginErrorReadLine();
             }
             catch (Exception ex)
             {
-                ShowWindow(consoleWindow, SW_SHOW);
-                Console.WriteLine("\n[引导器错误] 启动失败: " + ex.Message);
-                Console.WriteLine("确保 app/lsby-playground-ts-app.exe 存在。");
-                Console.WriteLine("按任意键关闭...");
-                Console.ReadKey();
+                ShowConsole();
+                WriteLog("\n[引导器错误] 启动失败: " + ex.Message);
+                WriteLog("确保 app/lsby-playground-ts-app.exe 存在。");
+                WriteLog("按任意键关闭...");
+                if (isConsoleVisible)
+                {
+                    Console.ReadKey();
+                }
                 trayIcon.Visible = false;
                 Application.Exit();
                 return;
