@@ -6,7 +6,7 @@ type 单选框组事件 = { 变化: string; 失焦: void }
 
 type 监听单选框组事件 = {}
 
-type 单选框组配置<值类型 extends string> = {
+export type 单选框组配置<值类型 extends string> = {
   选项列表?: 值类型[]
   选项翻译?: Partial<Record<值类型, string>>
   值?: 值类型

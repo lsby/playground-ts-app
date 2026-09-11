@@ -4,15 +4,15 @@ import { 创建元素 } from '../tools/create-element'
 export type 吐司类型 = 'success' | 'error' | 'warning' | 'info'
 export type 吐司位置 = 'top' | 'bottom' | 'center'
 export type 吐司选项 = { 类型?: 吐司类型; 持续时间?: number; 位置?: 吐司位置 }
-type 吐司样式 = { 背景色变量: string; 图标: 图标名称 }
+type 吐司样式 = { 背景色变量: string; 文字色变量: string; 图标: 图标名称 }
 
 class 吐司管理器类 {
   private 容器映射 = new Map<吐司位置, HTMLDivElement>()
   private 样式配置: Record<吐司类型, 吐司样式> = {
-    success: { 背景色变量: 'var(--成功颜色)', 图标: 'check' },
-    error: { 背景色变量: 'var(--错误颜色)', 图标: 'error' },
-    warning: { 背景色变量: 'var(--警告颜色)', 图标: 'warning' },
-    info: { 背景色变量: 'var(--信息颜色)', 图标: 'info' },
+    success: { 背景色变量: 'var(--成功颜色)', 文字色变量: 'var(--成功文字)', 图标: 'check' },
+    error: { 背景色变量: 'var(--错误颜色)', 文字色变量: 'var(--错误文字)', 图标: 'error' },
+    warning: { 背景色变量: 'var(--警告颜色)', 文字色变量: 'var(--警告文字)', 图标: 'warning' },
+    info: { 背景色变量: 'var(--信息颜色)', 文字色变量: 'var(--信息文字)', 图标: 'info' },
   }
 
   public 显示(消息: string, 选项: 吐司选项 = {}): void {
@@ -34,7 +34,7 @@ class 吐司管理器类 {
         boxSizing: 'border-box',
         borderRadius: 'var(--圆角-中)',
         backgroundColor: 样式.背景色变量,
-        color: 'var(--吐司文字颜色)',
+        color: 样式.文字色变量,
         boxShadow: 'var(--深阴影)',
         pointerEvents: 'auto',
         opacity: '0',

@@ -162,8 +162,22 @@ test.describe('演示组件 E2E', (): void => {
     await 演示_点击(page.getByText('前端', { exact: true }))
     await expect(多选下拉).toContainText('已选 1 项')
 
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Space')
+    await expect(page.getByRole('option', { name: '后端', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await expect(多选下拉).toContainText('已选 2 项')
+
     await 演示_勾选(page.getByRole('switch', { name: '布尔开关演示' }))
-    await 演示_输入(page.getByRole('textbox', { name: '自动伸缩文本框演示' }), '多行文本示例')
+    let 表单 = page.locator('lsby-form')
+    await 表单.evaluate((元素): void => {
+      元素.addEventListener('变化', (事件): void => {
+        if (事件.target === 元素) 元素.setAttribute('data-observed-change', 'true')
+      })
+    })
+    let 自动伸缩文本框 = page.getByRole('textbox', { name: '自动伸缩文本框演示' })
+    await 演示_输入(自动伸缩文本框, '多行文本示例')
+    await 自动伸缩文本框.blur()
+    await expect(表单).toHaveAttribute('data-observed-change', 'true')
 
     // 3. 提交并展示数据模态框
     await 演示_说明_右下角(page, '表单填写完毕，点击“验证并提交”查看解析后的强类型结构化数据')
@@ -177,6 +191,7 @@ test.describe('演示组件 E2E', (): void => {
     await expect(数据模态框).toContainText('"mode": "紧凑"')
     await expect(数据模态框).toContainText('"confirmed": true')
     await expect(数据模态框).toContainText('"frontend"')
+    await expect(数据模态框).toContainText('"backend"')
     await expect(数据模态框).toContainText('"description": "多行文本示例"')
     await expect(数据模态框).toContainText('"switchDemo": true')
 
@@ -273,21 +288,36 @@ test.describe('演示组件 E2E', (): void => {
       page.getByRole('row').filter({ has: page.getByRole('button', { name: '编辑', exact: true }) }),
     ).toHaveCount(4)
 
+    let 用户表格 = page.locator('lsby-table')
+    await 用户表格.evaluate((元素): void => {
+      元素.addEventListener('操作点击', (事件): void => {
+        if (事件.target === 元素 && 事件 instanceof CustomEvent) {
+          let 详情: unknown = 事件.detail
+          if (typeof 详情 === 'object' && 详情 !== null && '操作名' in 详情 && 详情.操作名 === '编辑') {
+            元素.setAttribute('data-observed-operation', '编辑')
+          }
+        }
+      })
+    })
+    await 演示_点击(page.getByRole('button', { name: '编辑', exact: true }).first())
+    await expect(用户表格).toHaveAttribute('data-observed-operation', '编辑')
+    await 演示_点击(page.getByRole('button', { name: '取消', exact: true }))
+
     await 演示_说明_右下角(page, '点击“名称”表头列，验证用户数据确实按名称升序重新排列')
     await 演示_点击(page.getByRole('button', { name: '名称', exact: true }))
-    await expect(page.getByRole('button', { name: '名称 ▲0', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '名称 ▲1', exact: true })).toBeVisible()
     let 名称升序行 = await 读取用户表格行(page)
     expect(名称升序行.map((行) => 行.名称)).toEqual(['admin', 'sort-user-a', 'sort-user-b', 'sort-user-c'])
 
     await 演示_说明_右下角(page, '点击“ID”表头列，添加 ID 二级排序并保持名称为首要排序条件')
     await 演示_点击(page.getByRole('button', { name: 'ID', exact: true }))
-    await expect(page.getByRole('button', { name: '名称 ▲0', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'ID ▲1', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '名称 ▲1', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'ID ▲2', exact: true })).toBeVisible()
     expect((await 读取用户表格行(page)).map((行) => 行.名称)).toEqual(名称升序行.map((行) => 行.名称))
 
-    await 演示_说明_右下角(page, '再次点击“名称 ▲0”，验证首要排序切换为名称降序')
-    await 演示_点击(page.getByRole('button', { name: '名称 ▲0', exact: true }))
-    await expect(page.getByRole('button', { name: '名称 ▼0', exact: true })).toBeVisible()
+    await 演示_说明_右下角(page, '再次点击“名称 ▲1”，验证首要排序切换为名称降序')
+    await 演示_点击(page.getByRole('button', { name: '名称 ▲1', exact: true }))
+    await expect(page.getByRole('button', { name: '名称 ▼1', exact: true })).toBeVisible()
     expect((await 读取用户表格行(page)).map((行) => 行.名称)).toEqual([
       'sort-user-c',
       'sort-user-b',
@@ -296,14 +326,14 @@ test.describe('演示组件 E2E', (): void => {
     ])
 
     await 演示_说明_右下角(page, '第三次点击名称表头移除该排序，使 ID 成为首要升序条件')
-    await 演示_点击(page.getByRole('button', { name: '名称 ▼0', exact: true }))
-    await expect(page.getByRole('button', { name: 'ID ▲0', exact: true })).toBeVisible()
+    await 演示_点击(page.getByRole('button', { name: '名称 ▼1', exact: true }))
+    await expect(page.getByRole('button', { name: 'ID ▲1', exact: true })).toBeVisible()
     let ID升序行 = await 读取用户表格行(page)
     expect(ID升序行.map((行) => 行.id)).toEqual([...ID升序行.map((行) => 行.id)].sort(比较文本))
 
-    await 演示_说明_右下角(page, '再次点击“ID ▲0”，验证数据行按 ID 降序重新排列')
-    await 演示_点击(page.getByRole('button', { name: 'ID ▲0', exact: true }))
-    await expect(page.getByRole('button', { name: 'ID ▼0', exact: true })).toBeVisible()
+    await 演示_说明_右下角(page, '再次点击“ID ▲1”，验证数据行按 ID 降序重新排列')
+    await 演示_点击(page.getByRole('button', { name: 'ID ▲1', exact: true }))
+    await expect(page.getByRole('button', { name: 'ID ▼1', exact: true })).toBeVisible()
     let ID降序行 = await 读取用户表格行(page)
     expect(ID降序行.map((行) => 行.id)).toEqual([...ID降序行.map((行) => 行.id)].sort(比较文本).reverse())
 
@@ -312,5 +342,44 @@ test.describe('演示组件 E2E', (): void => {
       page,
       '浮层与业务表格演示完成！\n已成功验证浮层最大化/自适应缩放机制，以及表格多重排序（多方向与多优先级协同更新）。当前页面为多重排序生效后的最终展示。',
     )
+  })
+
+  test('任务管理组件重新连接时保持标签唯一', async ({ page }): Promise<void> => {
+    await page.goto('/demo/login.html')
+    await 登录演示页(page)
+    await page.goto('/admin-job.html')
+
+    let 任务管理组件 = page.locator('lsby-admin-job')
+    await expect(page.getByRole('tab', { name: '即时任务', exact: true })).toHaveCount(1)
+    await expect(page.getByRole('tab', { name: '定时任务', exact: true })).toHaveCount(1)
+
+    let 滚动容器 = page.locator('lsby-scroll-container').first()
+    let 刷新后滚动条状态 = await 滚动容器.evaluate(async (元素) => {
+      if ('刷新' in 元素 === false || typeof 元素.刷新 !== 'function') throw new Error('滚动容器缺少刷新方法')
+      await 元素.刷新()
+      let 影子根 = 元素.shadowRoot
+      if (影子根 === null) throw new Error('滚动容器缺少 Shadow DOM')
+      let 基础样式数量 = [...影子根.children].filter(
+        (子元素): boolean => 子元素 instanceof HTMLStyleElement && 子元素.dataset['componentBaseStyle'] === 'true',
+      ).length
+      let 滚动区域 = [...影子根.children].find(
+        (子元素): 子元素 is HTMLDivElement =>
+          子元素 instanceof HTMLDivElement && 子元素.classList.contains('scroll-container'),
+      )
+      if (滚动区域 === undefined) throw new Error('滚动容器缺少内部滚动区域')
+      return { 基础样式数量, 滚动条宽度: getComputedStyle(滚动区域, '::-webkit-scrollbar').width }
+    })
+    expect(刷新后滚动条状态).toEqual({ 基础样式数量: 1, 滚动条宽度: '6px' })
+
+    await 任务管理组件.evaluate(async (元素): Promise<void> => {
+      let 父元素 = 元素.parentElement
+      if (父元素 === null) throw new Error('任务管理组件缺少父元素')
+      元素.remove()
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      父元素.append(元素)
+    })
+
+    await expect(page.getByRole('tab', { name: '即时任务', exact: true })).toHaveCount(1)
+    await expect(page.getByRole('tab', { name: '定时任务', exact: true })).toHaveCount(1)
   })
 })

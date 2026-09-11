@@ -35,8 +35,8 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
       顶部操作列表: [
         {
           名称: '添加数据',
-          回调: async (): Promise<void> => {
-            await this.显示添加用户模态框()
+          回调: (): void => {
+            this.显示添加用户模态框()
           },
         },
       ],
@@ -63,8 +63,8 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
         },
         {
           名称: '修改密码',
-          回调: async (数据项: 数据项): Promise<void> => {
-            await this.显示修改密码模态框(数据项)
+          回调: (数据项: 数据项): void => {
+            this.显示修改密码模态框(数据项)
           },
         },
       ],
@@ -90,7 +90,7 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
     this.shadow.appendChild(容器)
   }
 
-  private async 显示添加用户模态框(): Promise<void> {
+  private 显示添加用户模态框(): void {
     // 创建表单元素
     let 用户名输入框 = new 普通输入框({ 占位符: '请输入用户名' })
 
@@ -168,10 +168,10 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
     内容容器.appendChild(按钮容器)
 
     // 显示模态框
-    await 显示模态框({ 标题: '添加用户', 可关闭: true }, 内容容器)
+    显示模态框({ 标题: '添加用户', 可关闭: true }, 内容容器)
   }
 
-  private async 显示修改密码模态框(数据项: 数据项): Promise<void> {
+  private 显示修改密码模态框(数据项: 数据项): void {
     // 创建表单元素
     let 新密码输入框 = new 密码输入框({ 占位符: '请输入新密码' })
 
@@ -237,6 +237,6 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
     内容容器.appendChild(按钮容器)
 
     // 显示模态框
-    await 显示模态框({ 标题: '修改密码', 可关闭: true }, 内容容器)
+    显示模态框({ 标题: '修改密码', 可关闭: true }, 内容容器)
   }
 }

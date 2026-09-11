@@ -2,7 +2,7 @@ import { 组件基类 } from '../../../base/base'
 import { 创建元素 } from '../../../global/tools/create-element'
 import { 创建标签页标识前缀, 同步标签页路由, type 标签方向, 计算键盘目标索引, 读取标签页索引 } from './tabs-common'
 
-type App导航配置 = { 路由键?: string | undefined }
+export type App导航配置 = { 路由键?: string | undefined }
 export type appNavigation发出事件类型 = { 切换: { 当前索引: number } }
 type 监听事件类型 = {}
 

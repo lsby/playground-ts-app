@@ -106,7 +106,7 @@ export abstract class 组件基类<
   ): boolean {
     void this.log.debug('派发事件: %o', k)
     return this.dispatchEvent(
-      new CustomEvent(k.toString(), { detail: v, bubbles: true, cancelable: true, composed: true, ...o }),
+      new CustomEvent(k.toString(), { detail: v, bubbles: true, cancelable: false, composed: true, ...o }),
     )
   }
 
@@ -115,7 +115,7 @@ export abstract class 组件基类<
     f: (e: CustomEvent<监听事件类型[K]>) => void | Promise<void>,
     o?: AddEventListenerOptions,
   ): void {
-    this.注册事件监听(k.toString(), f as (e: CustomEvent<unknown>) => void | Promise<void>, o)
+    this.注册事件监听(k.toString(), f, o)
   }
 
   public 监听发出事件<K extends keyof 发出事件类型>(
@@ -123,7 +123,7 @@ export abstract class 组件基类<
     f: (e: CustomEvent<发出事件类型[K]>) => void | Promise<void>,
     o?: AddEventListenerOptions,
   ): void {
-    this.注册事件监听(k.toString(), f as (e: CustomEvent<unknown>) => void | Promise<void>, o)
+    this.注册事件监听(k.toString(), f, o)
   }
 
   protected 注册清理(函数: 清理函数): void {
@@ -216,14 +216,15 @@ export abstract class 组件基类<
     return 任务
   }
 
-  private 注册事件监听(
+  private 注册事件监听<详情>(
     类型: string,
-    函数: (e: CustomEvent<unknown>) => void | Promise<void>,
+    函数: (e: CustomEvent<详情>) => void | Promise<void>,
     选项?: AddEventListenerOptions,
   ): void {
     let 处理器 = (event: Event): void => {
       if (event instanceof CustomEvent === false) return
-      this.安全执行(async (): Promise<void> => await 函数(event))
+      let 类型化事件 = event as CustomEvent<详情>
+      this.安全执行(async (): Promise<void> => await 函数(类型化事件))
     }
     let 最终选项: AddEventListenerOptions = { capture: false, once: false, passive: false, ...选项 }
     this.addEventListener(类型, 处理器, 最终选项)

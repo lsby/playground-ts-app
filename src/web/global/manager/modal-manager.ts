@@ -12,6 +12,8 @@ export type 模态框选项 = {
   高度?: string
 }
 
+export type 模态框句柄 = { 关闭: () => Promise<void>; 切换最大化: () => void }
+
 type 模态框记录 = {
   句柄: 浮层句柄
   选项: 模态框选项
@@ -29,7 +31,7 @@ let 默认模态框高度 = 'auto'
 class 模态框管理器 {
   private 栈: 模态框记录[] = []
 
-  public 显示(选项: 模态框选项, 内容: HTMLElement): void {
+  public 显示(选项: 模态框选项, 内容: HTMLElement): 模态框句柄 {
     let 记录: 模态框记录 | null = null
     let 请求关闭 = async (): Promise<void> => {
       if (记录 !== null) await this.关闭记录(记录)
@@ -111,6 +113,7 @@ class 模态框管理器 {
     记录 = { 句柄, 选项, 框, 遮罩, 最大化按钮, 已最大化: 选项.最大化 ?? false, 已关闭: false }
     this.栈.push(记录)
     if (记录.已最大化 === true) this.应用最大化(记录)
+    return { 关闭: async (): Promise<void> => await this.关闭记录(记录), 切换最大化: (): void => this.切换最大化(记录) }
   }
 
   public async 关闭(): Promise<void> {
@@ -163,8 +166,8 @@ class 模态框管理器 {
 
 let 模态框实例 = new 模态框管理器()
 
-export async function 显示模态框(选项: 模态框选项, 内容: HTMLElement): Promise<void> {
-  模态框实例.显示(选项, 内容)
+export function 显示模态框(选项: 模态框选项, 内容: HTMLElement): 模态框句柄 {
+  return 模态框实例.显示(选项, 内容)
 }
 
 export async function 关闭模态框(): Promise<void> {

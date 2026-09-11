@@ -155,7 +155,7 @@ export class 即时任务管理组件 extends 组件基类<发出事件类型, �
     详情内容.appendChild(日志组件实例)
 
     // 显示模态框
-    await 显示模态框(
+    显示模态框(
       {
         标题: '任务详情',
         最大化: true,

@@ -37,7 +37,7 @@ function 添加子元素(父元素: HTMLElement, 子元素: 子元素类型): vo
 }
 
 export function 应用样式(元素: HTMLElement, 样式: 增强样式类型): void {
-  for (let 键 in 样式) {
+  for (let 键 of Object.keys(样式)) {
     let 值 = 样式[键 as keyof 增强样式类型]
     if (值 !== undefined) 设置样式值(元素.style, 键, String(值))
   }
@@ -53,13 +53,14 @@ export function 创建元素<K extends keyof HTMLElementTagNameMap>(
 
   let { children, style, ...其他属性 } = 属性
 
-  for (let 键 in 其他属性) {
+  for (let 键 of Object.keys(其他属性)) {
     let 值 = 其他属性[键 as keyof typeof 其他属性]
     if (值 !== undefined) {
       if (键.includes('-') || 键.includes(':')) {
         元素.setAttribute(键, String(值))
       } else {
-        ;(元素 as any)[键] = 值
+        let 设置成功 = Reflect.set(元素, 键, 值)
+        if (设置成功 === false) throw new Error(`无法设置 ${标签} 元素属性: ${键}`)
       }
     }
   }
@@ -77,7 +78,7 @@ export function 创建元素<K extends keyof HTMLElementTagNameMap>(
 
 export function 应用宿主样式(样式对象: CSSStyleDeclaration, 样式?: 增强样式类型): void {
   if (样式 !== undefined) {
-    for (let 键 in 样式) {
+    for (let 键 of Object.keys(样式)) {
       let 值 = 样式[键 as keyof 增强样式类型]
       if (值 !== undefined) 设置样式值(样式对象, 键, String(值))
     }

@@ -20,7 +20,7 @@ export class 悬浮管理组件 extends 组件基类<发出事件类型, 监听�
         height: '60px',
         borderRadius: '50%',
         backgroundColor: 'var(--主色调)',
-        color: 'white',
+        color: 'var(--主色调文字)',
         border: 'none',
         fontSize: '14px',
         fontWeight: 'bold',

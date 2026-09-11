@@ -6,7 +6,7 @@ type 复选框事件 = { 变化: boolean; 失焦: void }
 
 type 监听复选框事件 = {}
 
-type 复选框配置 = {
+export type 复选框配置 = {
   标签?: string
   值?: boolean
   禁用?: boolean

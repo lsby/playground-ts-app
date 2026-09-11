@@ -6,9 +6,9 @@ type 下拉框事件 = { 变化: string; 焦点: void; 失焦: void }
 
 type 监听下拉框事件 = {}
 
-type 选项类型 = { 值: string; 文本: string; 禁用?: boolean }
+export type 选项类型 = { 值: string; 文本: string; 禁用?: boolean }
 
-type 下拉框配置 = {
+export type 下拉框配置 = {
   选项列表?: 选项类型[]
   值?: string
   禁用?: boolean

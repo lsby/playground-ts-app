@@ -1,15 +1,20 @@
 import { 创建元素 } from '../tools/create-element'
 import { 浮层管理器, type 浮层句柄 } from './overlay-manager'
 
-export type 提示数据 = { 文本?: string; 内容?: Node; html?: string }
+export type 提示数据 = { 文本?: string; 内容?: Node }
+
+let 提示序号 = 0
 
 class 提示管理器内部 {
   private 句柄: 浮层句柄 | null = null
   private 位置监听 = new AbortController()
+  private 当前目标: HTMLElement | null = null
+  private 当前提示标识: string | null = null
 
   public 显示(数据: 提示数据, 目标: HTMLElement): void {
     this.隐藏()
     let 浮窗 = 创建元素('div', {
+      id: `lsby-tooltip-${String(++提示序号)}`,
       role: 'tooltip',
       style: {
         position: 'fixed',
@@ -27,7 +32,11 @@ class 提示管理器内部 {
       },
     })
     if (数据.内容 !== undefined) 浮窗.append(数据.内容)
-    else 浮窗.textContent = 数据.文本 ?? 数据.html ?? ''
+    else 浮窗.textContent = 数据.文本 ?? ''
+    let 原描述标识们 = (目标.getAttribute('aria-describedby') ?? '').split(/\s+/).filter((标识): boolean => 标识 !== '')
+    目标.setAttribute('aria-describedby', [...new Set([...原描述标识们, 浮窗.id])].join(' '))
+    this.当前目标 = 目标
+    this.当前提示标识 = 浮窗.id
     this.句柄 = 浮层管理器.打开({ 根元素: 浮窗, 内容元素: 浮窗, 外部关闭: '不关闭', 允许Escape关闭: false })
     let 更新 = (): void => this.更新位置(浮窗, 目标)
     更新()
@@ -39,9 +48,23 @@ class 提示管理器内部 {
 
   public 隐藏(): void {
     this.位置监听.abort()
+    this.移除目标描述关联()
     let 句柄 = this.句柄
     this.句柄 = null
     if (句柄 !== null) void 句柄.关闭().catch((错误: unknown): void => console.error('关闭提示浮层失败:', 错误))
+  }
+
+  private 移除目标描述关联(): void {
+    let 目标 = this.当前目标
+    let 提示标识 = this.当前提示标识
+    this.当前目标 = null
+    this.当前提示标识 = null
+    if (目标 === null || 提示标识 === null) return
+    let 保留标识们 = (目标.getAttribute('aria-describedby') ?? '')
+      .split(/\s+/)
+      .filter((标识): boolean => 标识 !== '' && 标识 !== 提示标识)
+    if (保留标识们.length === 0) 目标.removeAttribute('aria-describedby')
+    else 目标.setAttribute('aria-describedby', 保留标识们.join(' '))
   }
 
   private 更新位置(浮窗: HTMLElement, 目标: HTMLElement): void {

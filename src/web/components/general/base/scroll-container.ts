@@ -1,10 +1,9 @@
 import { 组件基类 } from '../../../base/base'
-import { 获得滚动条样式 } from '../../../global/style/scrollbar'
 import { 创建元素 } from '../../../global/tools/create-element'
 
 export type 滚动方向 = 'vertical' | 'horizontal' | 'both'
 
-type 滚动容器配置 = { 方向?: 滚动方向 }
+export type 滚动容器配置 = { 方向?: 滚动方向 }
 type 滚动容器发出事件类型 = {}
 type 滚动容器监听事件类型 = {}
 
@@ -57,7 +56,6 @@ export class 滚动容器 extends 组件基类<滚动容器发出事件类型, �
     }
 
     this.滚动区域.replaceChildren(创建元素('slot'))
-    let 样式 = 创建元素('style', { textContent: 获得滚动条样式('.scroll-container') })
-    this.shadow.append(样式, this.滚动区域)
+    this.shadow.append(this.滚动区域)
   }
 }

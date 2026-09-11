@@ -40,7 +40,7 @@ export class 管理中心页面组件 extends 组件基类<发出事件类型, �
           padding: '20px 40px',
           fontSize: '18px',
           backgroundColor: 'var(--主色调)',
-          color: 'white',
+          color: 'var(--主色调文字)',
           border: 'none',
           borderRadius: '8px',
           cursor: 'pointer',

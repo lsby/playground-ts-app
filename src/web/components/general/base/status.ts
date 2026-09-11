@@ -2,7 +2,7 @@ import { 组件基类 } from '../../../base/base'
 import { 创建元素 } from '../../../global/tools/create-element'
 
 export type 状态类型 = '默认' | '成功' | '警告' | '错误' | '信息'
-type 状态配置 = { 文本?: string; 类型?: 状态类型 }
+export type 状态配置 = { 文本?: string; 类型?: 状态类型 }
 let 颜色映射: Record<状态类型, string> = {
   默认: 'var(--次要文字颜色)',
   成功: 'var(--成功颜色)',

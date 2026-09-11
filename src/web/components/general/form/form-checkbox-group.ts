@@ -6,7 +6,7 @@ type 复选框组事件 = { 变化: string[]; 失焦: void }
 
 type 监听复选框组事件 = {}
 
-type 复选框组配置 = {
+export type 复选框组配置 = {
   选项列表?: string[]
   选中值列表?: string[]
   禁用?: boolean

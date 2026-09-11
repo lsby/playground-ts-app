@@ -2,7 +2,7 @@ import { 组件基类 } from '../../../base/base'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
 import { 增强样式类型 } from '../../../global/types/style'
 
-type 卡片配置 = {
+export type 卡片配置 = {
   标题?: string
   描述?: string
   内容?: Node

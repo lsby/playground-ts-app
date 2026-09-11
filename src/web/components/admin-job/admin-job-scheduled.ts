@@ -163,7 +163,7 @@ export class 定时任务管理组件 extends 组件基类<发出事件类型, �
     let ws数据缓存: { 时间: number; 消息: string }[] = []
 
     // 显示模态框
-    await 显示模态框(
+    显示模态框(
       {
         标题: '定时任务详情',
         最大化: true,

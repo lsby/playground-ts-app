@@ -128,8 +128,8 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
       操作列表: [
         {
           名称: '编辑',
-          回调: async (数据项: 数据项): Promise<void> => {
-            await this.显示编辑模态框(数据项)
+          回调: (数据项: 数据项): void => {
+            this.显示编辑模态框(数据项)
           },
         },
         {
@@ -144,8 +144,8 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
       顶部操作列表: [
         {
           名称: '添加',
-          回调: async (): Promise<void> => {
-            await this.显示添加模态框()
+          回调: (): void => {
+            this.显示添加模态框()
           },
         },
       ],
@@ -220,7 +220,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
     this.表格内容容器.appendChild(this.表格组件)
   }
 
-  private async 显示添加模态框(): Promise<void> {
+  private 显示添加模态框(): void {
     let 表名 = this.表名值
     if (表名 === null) return
 
@@ -274,10 +274,10 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
     按钮容器.appendChild(确认按钮)
     内容容器.appendChild(按钮容器)
 
-    await 显示模态框({ 标题: '添加数据', 可关闭: true, 宽度: '500px' }, 内容容器)
+    显示模态框({ 标题: '添加数据', 可关闭: true, 宽度: '500px' }, 内容容器)
   }
 
-  private async 显示编辑模态框(行数据: 数据项): Promise<void> {
+  private 显示编辑模态框(行数据: 数据项): void {
     let 表名 = this.表名值
     if (表名 === null) return
 
@@ -333,7 +333,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
     按钮容器.appendChild(确认按钮)
     内容容器.appendChild(按钮容器)
 
-    await 显示模态框({ 标题: '编辑数据', 可关闭: true, 宽度: '500px' }, 内容容器)
+    显示模态框({ 标题: '编辑数据', 可关闭: true, 宽度: '500px' }, 内容容器)
   }
 
   private async 保存新行(表单实例: 动态表单): Promise<void> {

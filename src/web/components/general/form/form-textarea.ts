@@ -5,7 +5,7 @@ import { 同步表单控件校验状态, 表单组件基类 } from './form'
 type 事件类型 = { 输入: string; 变化: string; 焦点: void; 失焦: void; 提交: string }
 type 监听事件类型 = {}
 
-type 配置类型 = {
+export type 自动伸缩文本框配置 = {
   占位符?: string
   值?: string
   禁用?: boolean
@@ -14,6 +14,7 @@ type 配置类型 = {
   回车提交?: boolean
   自动伸缩?: boolean
   额外提示?: string
+  变化处理函数?: (值: string) => void | Promise<void>
   提交处理函数?: (值: string) => void | Promise<void>
   宿主样式?: 增强样式类型
   可访问名称?: string
@@ -24,11 +25,11 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
     this.注册组件('lsby-form-auto-scaling-textarea', this)
   }
 
-  private 配置: 配置类型
+  private 配置: 自动伸缩文本框配置
   private 文本框元素: HTMLTextAreaElement | undefined
   private 自适应动画帧: number | null = null
 
-  public constructor(配置: 配置类型 = {}) {
+  public constructor(配置: 自动伸缩文本框配置 = {}) {
     super()
     this.配置 = { 回车提交: true, 自动伸缩: true, 最小高度: '40px', ...配置 }
   }
@@ -66,6 +67,12 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
           this.自适应高度()
         }
         this.派发事件('输入', this.获得值())
+      },
+      onchange: (): void => {
+        let 值 = this.获得值()
+        this.配置.值 = 值
+        this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(值))
+        this.派发事件('变化', 值)
       },
       onkeydown: (e: KeyboardEvent): void => {
         if (this.配置.回车提交 === true && e.key === 'Enter' && !e.shiftKey && !e.isComposing) {

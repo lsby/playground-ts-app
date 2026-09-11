@@ -3,7 +3,7 @@ import { 创建元素 } from '../../../global/tools/create-element'
 import { 滚动容器 } from '../base/scroll-container'
 import { 创建标签页标识前缀, 刷新标签页内容, 同步标签页路由, 计算键盘目标索引, 读取标签页索引 } from './tabs-common'
 
-type 横向tab配置 = { 路由键?: string | undefined }
+export type 横向tab配置 = { 路由键?: string | undefined }
 export type tabHorizontal发出事件类型 = { 切换: { 当前索引: number } }
 type 监听事件类型 = {}
 

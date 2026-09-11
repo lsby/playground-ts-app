@@ -3,7 +3,7 @@ import { 增强样式类型 } from '../../../global/types/style'
 import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
 type 开关事件 = { 变化: boolean; 失焦: void }
-type 开关配置 = {
+export type 开关配置 = {
   标签?: string
   值?: boolean
   禁用?: boolean

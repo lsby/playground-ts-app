@@ -3,7 +3,7 @@ import { 创建元素 } from '../../../global/tools/create-element'
 import { 图标组件 } from '../base/icon'
 import { 创建标签页标识前缀, 刷新标签页内容, 同步标签页路由, 计算键盘目标索引, 读取标签页索引 } from './tabs-common'
 
-type 纵向tab配置 = { 路由键?: string | undefined }
+export type 纵向tab配置 = { 路由键?: string | undefined }
 export type tabVertical发出事件类型 = { 切换: { 当前索引: number } }
 type 监听事件类型 = {}
 
@@ -167,7 +167,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
         justifyContent: 'center',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         border: 'none',
-        color: 'var(--吐司文字颜色)',
+        color: 'var(--主色调文字)',
       },
     })
     移动端菜单按钮.setAttribute('aria-label', '打开标签页菜单')

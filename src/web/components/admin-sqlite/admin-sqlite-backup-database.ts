@@ -32,7 +32,7 @@ export class 数据库备份组件 extends 组件基类<发出事件类型, 监�
 
     let 备份按钮 = new 普通按钮({
       文本: '开始备份',
-      点击处理函数: async (): Promise<void> => {
+      点击处理函数: (): void => {
         let splitLog = new 日志分栏组件()
 
         let 左侧内容 = 创建元素('div', {
@@ -71,7 +71,7 @@ export class 数据库备份组件 extends 组件基类<发出事件类型, 监�
         左侧内容.appendChild(开始备份按钮)
         splitLog.appendChild(左侧内容)
 
-        await 显示模态框({ 标题: '备份数据库' }, splitLog)
+        显示模态框({ 标题: '备份数据库' }, splitLog)
       },
     })
 

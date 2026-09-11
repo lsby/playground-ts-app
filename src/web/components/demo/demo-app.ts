@@ -168,7 +168,7 @@ export class 演示应用组件 extends 组件基类<发出事件类型, 监听�
       new 主要按钮({
         文本: '验证并提交',
         点击处理函数: async (): Promise<void> => {
-          await 表单实例.提交(async (数据): Promise<void> => {
+          await 表单实例.提交((数据): void => {
             let 数据内容 = 创建元素('pre', {
               textContent: JSON.stringify(数据, null, 2),
               style: {
@@ -183,7 +183,7 @@ export class 演示应用组件 extends 组件基类<发出事件类型, 监听�
                 wordBreak: 'break-word',
               },
             })
-            await 显示模态框({ 标题: '表单提交数据', 可关闭: true, 宽度: '560px', 高度: '480px' }, 数据内容)
+            显示模态框({ 标题: '表单提交数据', 可关闭: true, 宽度: '560px', 高度: '480px' }, 数据内容)
           })
         },
       }),
@@ -237,11 +237,12 @@ export class 演示应用组件 extends 组件基类<发出事件类型, 监听�
       }),
       new 普通按钮({
         文本: '打开模态框',
-        点击处理函数: async (): Promise<void> =>
-          await 显示模态框(
+        点击处理函数: (): void => {
+          显示模态框(
             { 标题: '模态框示例', 宽度: '520px', 高度: '320px' },
             创建元素('div', { textContent: '模态框支持堆叠、最大化和安全关闭。' }),
-          ),
+          )
+        },
       }),
       new 普通按钮({ 文本: '顶部通知', 点击处理函数: (): void => 显示吐司('顶部通知', { 位置: 'top' }) }),
       new 普通按钮({ 文本: '底部通知', 点击处理函数: (): void => 显示吐司('底部通知', { 位置: 'bottom' }) }),

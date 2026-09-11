@@ -25,6 +25,7 @@ export type 表格渲染上下文<数据项> = {
   处理行点击: (行索引: number, ctrl键: boolean, shift键: boolean) => void
   处理单元格点击: (行索引: number, 列索引: number, ctrl键: boolean, shift键: boolean) => void
   更新选中状态: () => void
+  派发操作点击: (操作名: string, 数据项: 数据项) => void
   显示右键菜单: (x: number, y: number) => void
   开始调整列宽: (列索引: number, event: PointerEvent, 表头: HTMLElement, 调整柄: HTMLElement) => void
   键盘调整列宽: (列索引: number, 变化量: number, 表头: HTMLElement) => void
@@ -71,7 +72,7 @@ export function 渲染表头<数据项>(上下文: 表格渲染上下文<数据�
     }
     上下文.表头元素映射.set(列索引, th)
     let 内容 = 创建元素('div', { style: { display: 'flex', alignItems: 'center', gap: 'var(--间距-1)' } })
-    let 排序标识 = 排序项 === undefined ? '' : ` ${排序项.direction === 'asc' ? '▲' : '▼'}${排序索引}`
+    let 排序标识 = 排序项 === undefined ? '' : ` ${排序项.direction === 'asc' ? '▲' : '▼'}${String(排序索引 + 1)}`
     let 标签 = new 文本按钮({
       文本: `${列.显示名}${排序标识}`,
       禁用: 列.可排序 !== true,
@@ -226,6 +227,7 @@ export function 渲染表体<数据项>(上下文: 表格渲染上下文<数据�
           尺寸: '紧凑',
           点击处理函数: async (event): Promise<void> => {
             event.stopPropagation()
+            上下文.派发操作点击(操作.名称, 数据项)
             await 操作.回调(数据项)
             await 上下文.刷新数据()
           },

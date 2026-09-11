@@ -189,25 +189,25 @@ export class 普通按钮 extends 按钮基类 {
 
 export class 主要按钮 extends 按钮基类 {
   protected 获得颜色(): { 背景: string; 文字: string; 边框: string } {
-    return { 背景: 'var(--主色调)', 文字: 'white', 边框: 'var(--主色调)' }
+    return { 背景: 'var(--主色调)', 文字: 'var(--主色调文字)', 边框: 'var(--主色调)' }
   }
 }
 
 export class 危险按钮 extends 按钮基类 {
   protected 获得颜色(): { 背景: string; 文字: string; 边框: string } {
-    return { 背景: 'var(--错误颜色)', 文字: 'white', 边框: 'var(--错误颜色)' }
+    return { 背景: 'var(--错误颜色)', 文字: 'var(--错误文字)', 边框: 'var(--错误颜色)' }
   }
 }
 
 export class 成功按钮 extends 按钮基类 {
   protected 获得颜色(): { 背景: string; 文字: string; 边框: string } {
-    return { 背景: 'var(--成功颜色)', 文字: 'white', 边框: 'var(--成功颜色)' }
+    return { 背景: 'var(--成功颜色)', 文字: 'var(--成功文字)', 边框: 'var(--成功颜色)' }
   }
 }
 
 export class 警告按钮 extends 按钮基类 {
   protected 获得颜色(): { 背景: string; 文字: string; 边框: string } {
-    return { 背景: 'var(--警告颜色)', 文字: 'white', 边框: 'var(--警告颜色)' }
+    return { 背景: 'var(--警告颜色)', 文字: 'var(--警告文字)', 边框: 'var(--警告颜色)' }
   }
 }
 
