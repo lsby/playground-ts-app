@@ -1,6 +1,7 @@
 import { 组件基类 } from '../../base/base'
 import { API管理器 } from '../../global/manager/api-manager'
 import { 显示模态框 } from '../../global/manager/modal-manager'
+import { 是中止错误 } from '../../global/tools/abort'
 import { 创建元素 } from '../../global/tools/create-element'
 import { 普通按钮 } from '../general/base/base-button'
 import { 日志组件 } from '../general/log/log'
@@ -30,7 +31,6 @@ export class 即时任务管理组件 extends 组件基类<发出事件类型, �
 
   private 数据表格组件: 表格组件<任务数据项>
   private 所有任务数据: 任务数据项[] = []
-  private 当前任务详情WS: WebSocket | null = null
 
   public constructor() {
     super()
@@ -141,6 +141,10 @@ export class 即时任务管理组件 extends 组件基类<发出事件类型, �
     let 日志组件实例 = new 日志组件()
     日志组件实例.style.height = '400px'
     日志组件实例.style.width = '100%'
+    let 详情控制器 = new AbortController()
+    let 详情WS: WebSocket | null = null
+    let 历史日志已加载 = false
+    let 实时日志缓存: { 时间: number; 消息: string }[] = []
 
     // 更新日志显示的函数
     let 更新日志显示 = (日志: { 时间: number; 消息: string }): void => {
@@ -161,9 +165,10 @@ export class 即时任务管理组件 extends 组件基类<发出事件类型, �
           url.searchParams.delete('id')
           window.history.replaceState(null, '', url.pathname + url.search)
 
-          if (this.当前任务详情WS !== null) {
-            this.当前任务详情WS.close()
-            this.当前任务详情WS = null
+          详情控制器.abort()
+          if (详情WS !== null) {
+            详情WS.close()
+            详情WS = null
           }
         },
       },
@@ -178,23 +183,29 @@ export class 即时任务管理组件 extends 组件基类<发出事件类型, �
       '/api/admin-job/instant/get-log',
       { 任务id: 任务.id },
       async (ws数据) => {
-        // 收到WebSocket消息，实时更新单条新日志
-        更新日志显示(ws数据.新日志)
+        if (历史日志已加载 === true) 更新日志显示(ws数据.新日志)
+        else 实时日志缓存.push(ws数据.新日志)
       },
       async (_, ws) => {
-        // WS连接成功时存储WS对象
-        this.当前任务详情WS = ws
+        详情WS = ws
       },
+      undefined,
+      undefined,
+      { 信号: 详情控制器.signal },
     )
       .then((结果) => {
         // 显示历史日志
         结果.日志列表.forEach((日志) => {
           更新日志显示(日志)
         })
+        实时日志缓存.forEach(更新日志显示)
+        实时日志缓存 = []
+        历史日志已加载 = true
         // 隐藏加载状态
         日志组件实例.设置加载状态(false)
       })
       .catch((错误) => {
+        if (是中止错误(错误, 详情控制器.signal) === true) return
         console.error('获取任务日志失败:', 错误)
         // 即使出错也要隐藏加载状态
         日志组件实例.设置加载状态(false)

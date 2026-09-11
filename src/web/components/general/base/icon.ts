@@ -11,6 +11,8 @@ export type 图标名称 =
   | 'menu'
   | 'copy'
   | 'plus'
+  | 'file'
+  | 'upload-cloud'
   | 'chevron-down'
 
 let 路径映射: Record<图标名称, string[]> = {
@@ -24,6 +26,8 @@ let 路径映射: Record<图标名称, string[]> = {
   menu: ['M4 7h16M4 12h16M4 17h16'],
   copy: ['M9 9h11v11H9z', 'M5 15H4V4h11v1'],
   plus: ['M12 5v14M5 12h14'],
+  file: ['M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z', 'M13 2v7h7'],
+  'upload-cloud': ['M4 15a7 7 0 1111.7-5.2H17a4 4 0 010 8h-2', 'M12 12v9', 'M8 16l4-4 4 4'],
   'chevron-down': ['M6 9l6 6 6-6'],
 }
 

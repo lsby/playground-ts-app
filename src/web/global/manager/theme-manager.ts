@@ -49,15 +49,17 @@ export let 主题管理器 = {
   },
 
   async 设置主题(主题: 主题类型): Promise<void> {
+    let 原主题 = this.当前主题
     this.当前主题 = 主题
     this.应用主题()
 
     // 更新数据库中的用户配置
     try {
       await API管理器.请求postJson并处理错误('/api/user/update-user-config', { theme: 主题 })
-    } catch (_e) {
-      // 如果更新失败，回滚到之前的主题
-      await this.初始化()
+    } catch (错误) {
+      this.当前主题 = 原主题
+      this.应用主题()
+      throw 错误
     }
   },
 }

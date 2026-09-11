@@ -6,6 +6,7 @@ import { 主题管理器 } from '../../../global/manager/theme-manager'
 import { 成功提示 } from '../../../global/manager/toast-manager'
 import { 创建元素 } from '../../../global/tools/create-element'
 import { 主要按钮, 危险按钮 } from '../../general/base/base-button'
+import { 卡片组件 } from '../../general/base/card'
 import { 表单 } from '../../general/form/form'
 import { 复选框 } from '../../general/form/form-checkbox'
 import { 单选框组 } from '../../general/form/form-radio-group'
@@ -46,106 +47,23 @@ export class 用户设置组件 extends 组件基类<设置事件, 监听设置�
 
     let 容器 = 创建元素('div', { style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' } })
 
-    // 如果是管理员，显示系统配置
     if (this.用户信息.is_admin) {
-      let 系统配置容器 = 创建元素('div', {
-        style: {
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          padding: '24px',
-          backgroundColor: 'var(--面板背景颜色, rgba(128, 128, 128, 0.05))',
-          border: '1px solid var(--边框颜色, rgba(128, 128, 128, 0.1))',
-          borderRadius: '8px',
-        },
-      })
-
-      let 系统头部容器 = 创建元素('div', {
-        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-      })
-
-      let 系统配置标题 = 创建元素('h2', {
-        textContent: '系统配置',
-        style: { margin: '0', fontSize: '18px', color: 'var(--文字颜色)', fontWeight: 'bold' },
-      })
-      系统头部容器.appendChild(系统配置标题)
-
       let 系统保存按钮 = new 主要按钮({
         文本: '保存配置',
-        点击处理函数: async (): Promise<void> => {
-          await this.保存系统配置()
-        },
+        点击处理函数: async (): Promise<void> => await this.保存系统配置(),
       })
-      系统头部容器.appendChild(系统保存按钮)
-      系统配置容器.appendChild(系统头部容器)
-
       this.系统配置表单 = this.创建系统配置表单()
-      系统配置容器.appendChild(this.系统配置表单)
-
-      容器.appendChild(系统配置容器)
+      容器.append(new 卡片组件({ 标题: '系统配置', 操作区: 系统保存按钮, 内容: this.系统配置表单 }))
     }
-
-    // 用户配置
-    let 用户配置容器 = 创建元素('div', {
-      style: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px',
-        padding: '24px',
-        backgroundColor: 'var(--面板背景颜色, rgba(128, 128, 128, 0.05))',
-        border: '1px solid var(--边框颜色, rgba(128, 128, 128, 0.1))',
-        borderRadius: '8px',
-      },
-    })
-
-    let 用户头部容器 = 创建元素('div', {
-      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-    })
-
-    let 用户配置标题 = 创建元素('h2', {
-      textContent: '用户配置',
-      style: { margin: '0', fontSize: '18px', color: 'var(--文字颜色)', fontWeight: 'bold' },
-    })
-    用户头部容器.appendChild(用户配置标题)
 
     let 用户保存按钮 = new 主要按钮({
       文本: '保存配置',
-      点击处理函数: async (): Promise<void> => {
-        await this.保存用户配置()
-      },
+      点击处理函数: async (): Promise<void> => await this.保存用户配置(),
     })
-    用户头部容器.appendChild(用户保存按钮)
-    用户配置容器.appendChild(用户头部容器)
-
     this.用户配置表单 = this.创建用户配置表单()
-    用户配置容器.appendChild(this.用户配置表单)
+    容器.append(new 卡片组件({ 标题: '用户配置', 操作区: 用户保存按钮, 内容: this.用户配置表单 }))
 
-    容器.appendChild(用户配置容器)
-
-    // 系统重置（危险操作）
     if (this.用户信息.is_admin) {
-      let 系统重置容器 = 创建元素('div', {
-        style: {
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          padding: '24px',
-          backgroundColor: 'var(--面板背景颜色, rgba(128, 128, 128, 0.05))',
-          border: '1px solid var(--错误颜色, #f44336)',
-          borderRadius: '8px',
-        },
-      })
-
-      let 系统重置头部容器 = 创建元素('div', {
-        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-      })
-
-      let 系统重置标题 = 创建元素('h2', {
-        textContent: '系统重置',
-        style: { margin: '0', fontSize: '18px', color: 'var(--错误颜色, #f44336)', fontWeight: 'bold' },
-      })
-      系统重置头部容器.appendChild(系统重置标题)
-
       let 重置按钮 = new 危险按钮({
         文本: '彻底重置并初始化',
         点击处理函数: async (): Promise<void> => {
@@ -172,17 +90,12 @@ export class 用户设置组件 extends 组件基类<设置事件, 监听设置�
           }
         },
       })
-      系统重置头部容器.appendChild(重置按钮)
-      系统重置容器.appendChild(系统重置头部容器)
-
       let 警告文字 = 创建元素('div', {
         textContent:
           '警告：点击上方按钮将暴力删除所有表中的数据（包括你现在的账号密码），并重新执行初始化脚本。如果你没有配置 DEFAULT_SYSTEM_PWD，请务必准备好查看控制台输出的新密码。',
-        style: { color: 'var(--文字颜色, #ccc)', fontSize: '14px' },
+        style: { color: 'var(--文字颜色)', fontSize: 'var(--字号-正文)' },
       })
-      系统重置容器.appendChild(警告文字)
-
-      容器.appendChild(系统重置容器)
+      容器.append(new 卡片组件({ 标题: '系统重置', 强调: '危险', 操作区: 重置按钮, 内容: 警告文字 }))
     }
 
     this.shadow.appendChild(容器)

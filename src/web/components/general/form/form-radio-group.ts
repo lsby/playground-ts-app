@@ -96,16 +96,20 @@ class 单选框组<值类型 extends string = string> extends 表单组件基类
           this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(值))
           this.派发事件('变化', 值)
         }
-        单选框.onblur = (): void => {
-          this.派发事件('失焦', undefined)
-        }
-
         选项容器.appendChild(单选框)
         选项容器.appendChild(文本)
         容器.appendChild(选项容器)
         this.单选框元素们.push(单选框)
       }
     }
+
+    let 处理失焦 = (事件: FocusEvent): void => {
+      let 下一焦点 = 事件.relatedTarget
+      if (下一焦点 instanceof Node && 容器.contains(下一焦点) === true) return
+      this.派发事件('失焦', undefined)
+    }
+    容器.addEventListener('focusout', 处理失焦)
+    this.注册清理((): void => 容器.removeEventListener('focusout', 处理失焦))
 
     this.shadow.appendChild(容器)
     this.容器元素 = 容器
@@ -135,7 +139,9 @@ class 单选框组<值类型 extends string = string> extends 表单组件基类
     return this.配置.禁用 ?? false
   }
   public 聚焦(): void {
-    this.单选框元素们[0]?.focus()
+    let 选中项 = this.单选框元素们.find((单选框): boolean => 单选框.checked)
+    let 目标 = 选中项 ?? this.单选框元素们[0]
+    目标?.focus()
   }
   public 设置可访问名称(名称: string): void {
     this.配置.可访问名称 = 名称

@@ -48,6 +48,24 @@ type GET查询参数组<接口路径 extends 所有GET文本路径> = [取QUERY�
 let API前缀 = ''
 let serviceWorkerReady: Promise<void> | undefined
 
+function 脱敏请求头(头: Record<string, string>): Record<string, string> {
+  let 结果: Record<string, string> = {}
+  for (let [键, 值] of Object.entries(头)) {
+    let 小写键 = 键.toLowerCase()
+    结果[键] = 小写键 === 'authorization' || 小写键 === 'cookie' ? '[已隐藏]' : 值
+  }
+  return 结果
+}
+
+function 获得请求体摘要(请求体: string | FormData): Record<string, string | number> {
+  if (请求体 instanceof FormData) return { 类型: 'FormData', 字段数量: [...请求体.keys()].length }
+  return { 类型: '文本', 字符数量: 请求体.length }
+}
+
+function 获得错误摘要(错误: unknown): Record<string, string> {
+  return { 类型: 错误 instanceof Error ? 错误.name : typeof 错误 }
+}
+
 export class API管理器类 {
   private 本地存储名称 = 'lsby-api-component-base-token'
   private token: string | null = null
@@ -266,7 +284,14 @@ export class API管理器类 {
       return JSON.parse(请求结果)
     } catch (e) {
       if (是中止错误(e, 请求选项?.信号) === true) throw e
-      console.error('请求错误:\n路径: %o\n头: %o\n方法: %o\nbody: %o\n结果: %o', 接口路径, 头, 方法, body, 请求结果)
+      console.error(
+        '请求错误:\n路径: %o\n头: %o\n方法: %o\n请求体: %o\n错误: %o',
+        接口路径,
+        脱敏请求头(头),
+        方法,
+        获得请求体摘要(body),
+        获得错误摘要(e),
+      )
       return { status: 'unexpected', data: String(e) }
     }
   }
@@ -386,19 +411,9 @@ function 打印纯前端HTTP日志(
     'color: #888888;',
   )
 
-  console.log('请求头 (Headers):', 头信息)
-
-  if (typeof 请求体 === 'string' && 请求体.length > 0) {
-    try {
-      console.log('请求体 (Body):', JSON.parse(请求体))
-    } catch {
-      console.log('请求体 (Body):', 请求体)
-    }
-  } else {
-    console.log('请求体 (Body):', 请求体)
-  }
-
-  console.log('响应体 (Response):', 响应结果)
+  console.log('请求头 (Headers):', 脱敏请求头(头信息))
+  console.log('请求体 (Body):', 获得请求体摘要(请求体))
+  console.log('响应状态 (Response Status):', 状态文本)
 
   console.groupEnd()
 }

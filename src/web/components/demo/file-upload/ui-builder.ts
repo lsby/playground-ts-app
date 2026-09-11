@@ -1,16 +1,10 @@
 import { 创建元素, 应用样式 } from '../../../global/tools/create-element'
 import { 主要按钮, 文本按钮 } from '../../general/base/base-button'
+import { 创建图标 } from '../../general/base/icon'
 import { 普通输入框 } from '../../general/form/form-input'
-import {
-  创建Svg节点,
-  图标_云上传,
-  图标_删除,
-  图标_失败,
-  图标_徽章,
-  图标_成功,
-  图标_文件,
-  格式化文件大小,
-} from './utils'
+import { 格式化文件大小 } from './utils'
+
+export type 上传成功结果 = { message: string; files: { name: string; size: number }[] }
 
 export function 构建头部容器(): HTMLDivElement {
   let 头部容器 = 创建元素('div', { style: { display: 'flex', alignItems: 'center', gap: '14px' } })
@@ -27,7 +21,8 @@ export function 构建头部容器(): HTMLDivElement {
       flexShrink: '0',
     },
   })
-  图标徽章.appendChild(创建Svg节点(图标_徽章))
+  图标徽章.style.color = 'var(--主色调)'
+  图标徽章.appendChild(创建图标('upload-cloud', 24))
 
   let 标题文本区 = 创建元素('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px' } })
 
@@ -47,8 +42,9 @@ export function 构建头部容器(): HTMLDivElement {
   return 头部容器
 }
 
-export function 填充拖拽点击区域(拖拽点击区域: HTMLDivElement): void {
-  let 云上传Icon = 创建Svg节点(图标_云上传)
+export function 填充拖拽点击区域(拖拽点击区域: HTMLButtonElement): void {
+  let 云上传Icon = 创建图标('upload-cloud', 42)
+  云上传Icon.style.color = 'var(--主色调)'
 
   let 拖拽主说明 = 创建元素('div', {
     textContent: '点击或将文件拖拽到此处上传',
@@ -80,7 +76,7 @@ export function 构建文件列表头部(清空按钮: 文本按钮): HTMLDivEle
 export function 构建描述表单组(描述输入框: 普通输入框): HTMLDivElement {
   let 描述表单组 = 创建元素('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } })
 
-  let 描述Label = 创建元素('label', {
+  let 描述Label = 创建元素('div', {
     textContent: '文件描述（可选）',
     style: { fontSize: '13px', fontWeight: '500', color: 'var(--次要文字颜色)' },
   })
@@ -119,7 +115,8 @@ export function 创建文件项元素(
     style: { display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' },
   })
 
-  let 文件Icon = 创建Svg节点(图标_文件)
+  let 文件Icon = 创建图标('file', 18)
+  文件Icon.style.color = 'var(--主色调)'
 
   let 文件名文本 = 创建元素('span', {
     textContent: file.name,
@@ -140,33 +137,25 @@ export function 创建文件项元素(
 
   文件信息左侧.append(文件Icon, 文件名文本, 文件大小文本)
 
-  let 删除Icon按钮 = 创建元素('div', {
-    style: {
-      cursor: 'pointer',
-      padding: '4px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      color: 'var(--次要文字颜色)',
-      borderRadius: '4px',
-      transition: 'color 0.2s ease',
+  let 删除Icon按钮 = new 文本按钮({
+    图标: 创建图标('close', 16),
+    标题: `移除文件 ${file.name}`,
+    禁用: 是否正在上传,
+    自动加载: false,
+    元素样式: { width: '28px', padding: '0', color: 'var(--次要文字颜色)' },
+    点击处理函数: (e: MouseEvent): void => {
+      e.stopPropagation()
+      移除回调(索引)
     },
   })
-  删除Icon按钮.appendChild(创建Svg节点(图标_删除))
-
-  删除Icon按钮.onclick = (e: MouseEvent): void => {
-    e.stopPropagation()
-    if (是否正在上传 === false) {
-      移除回调(索引)
-    }
-  }
 
   文件项.append(文件信息左侧, 删除Icon按钮)
   return 文件项
 }
 
-export function 渲染上传成功结果(容器: HTMLDivElement, 结果: any): void {
-  容器.innerHTML = ''
+export function 渲染上传成功结果(容器: HTMLDivElement, 结果: 上传成功结果): void {
+  容器.replaceChildren()
+  容器.setAttribute('role', 'status')
   应用样式(容器, {
     display: 'flex',
     backgroundColor: 'var(--选中背景颜色)',
@@ -177,7 +166,7 @@ export function 渲染上传成功结果(容器: HTMLDivElement, 结果: any): v
   let 成功头部 = 创建元素('div', {
     style: { display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: 'var(--成功颜色)' },
   })
-  成功头部.appendChild(创建Svg节点(图标_成功))
+  成功头部.appendChild(创建图标('check', 20))
   成功头部.appendChild(创建元素('span', { textContent: `上传成功: ${结果.message}` }))
 
   let 文件列表详情 = 创建元素('div', {
@@ -200,10 +189,11 @@ export function 渲染上传成功结果(容器: HTMLDivElement, 结果: any): v
 }
 
 export function 渲染上传失败结果(容器: HTMLDivElement, 错误: unknown): void {
-  容器.innerHTML = ''
+  容器.replaceChildren()
+  容器.setAttribute('role', 'alert')
   应用样式(容器, {
     display: 'flex',
-    backgroundColor: 'rgba(255, 77, 79, 0.1)',
+    backgroundColor: 'color-mix(in srgb, var(--错误颜色) 10%, transparent)',
     border: '1px solid var(--错误颜色)',
     color: 'var(--文字颜色)',
   })
@@ -211,7 +201,7 @@ export function 渲染上传失败结果(容器: HTMLDivElement, 错误: unknown
   let 失败头部 = 创建元素('div', {
     style: { display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: 'var(--错误颜色)' },
   })
-  失败头部.appendChild(创建Svg节点(图标_失败))
+  失败头部.appendChild(创建图标('error', 20))
   失败头部.appendChild(创建元素('span', { textContent: `上传失败` }))
 
   let 错误内容 = 创建元素('div', {

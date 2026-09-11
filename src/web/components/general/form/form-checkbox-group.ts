@@ -63,10 +63,6 @@ class 复选框组 extends 表单组件基类<复选框组事件, 监听复选�
           this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(选中值列表))
           this.派发事件('变化', 选中值列表)
         }
-        复选框.onblur = (): void => {
-          this.派发事件('失焦', undefined)
-        }
-
         选项容器.appendChild(复选框)
         选项容器.appendChild(文本)
         容器.appendChild(选项容器)
@@ -80,13 +76,20 @@ class 复选框组 extends 表单组件基类<复选框组事件, 监听复选�
       提示容器.appendChild(提示图标)
       容器.appendChild(提示容器)
     }
+    let 处理失焦 = (事件: FocusEvent): void => {
+      let 下一焦点 = 事件.relatedTarget
+      if (下一焦点 instanceof Node && 容器.contains(下一焦点) === true) return
+      this.派发事件('失焦', undefined)
+    }
+    容器.addEventListener('focusout', 处理失焦)
+    this.注册清理((): void => 容器.removeEventListener('focusout', 处理失焦))
 
     this.shadow.appendChild(容器)
     this.容器元素 = 容器
   }
 
   public 设置选中值列表(选中值列表: string[]): void {
-    this.配置.选中值列表 = 选中值列表
+    this.配置.选中值列表 = [...选中值列表]
     for (let 复选框 of this.复选框元素们) {
       复选框.checked = 选中值列表.includes(复选框.value)
     }

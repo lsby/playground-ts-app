@@ -76,7 +76,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
           width: 280px !important;
           height: 100% !important;
           z-index: 200;
-          background: var(--主要背景颜色, rgba(10, 11, 14, 0.95)) !important;
+          background: var(--主要背景颜色) !important;
           backdrop-filter: blur(20px) !important;
           box-shadow: 5px 0 25px var(--深阴影颜色) !important;
           transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
@@ -137,7 +137,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
         left: '0',
         width: '100vw',
         height: '100vh',
-        background: 'rgba(0, 0, 0, 0.6)',
+        background: 'var(--遮罩颜色)',
         backdropFilter: 'blur(4px)',
         zIndex: '150',
         opacity: '0',
@@ -159,15 +159,15 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
         width: '56px',
         height: '56px',
         borderRadius: '28px',
-        background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-        boxShadow: '0 4px 20px rgba(124, 58, 237, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+        background: 'var(--主色调)',
+        boxShadow: '0 4px 20px color-mix(in srgb, var(--主色调) 40%, transparent)',
         cursor: 'pointer',
         zIndex: '1000',
         alignItems: 'center',
         justifyContent: 'center',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         border: 'none',
-        color: '#ffffff',
+        color: 'var(--吐司文字颜色)',
       },
     })
     移动端菜单按钮.setAttribute('aria-label', '打开标签页菜单')

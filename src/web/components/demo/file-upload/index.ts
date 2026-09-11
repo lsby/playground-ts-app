@@ -28,7 +28,7 @@ export class 演示文件上传组件 extends 组件基类<发出事件类型, �
     style: { display: 'none' },
   })
 
-  private 描述输入框: 普通输入框 = new 普通输入框({ 占位符: '添加文件说明（可选）...' })
+  private 描述输入框: 普通输入框 = new 普通输入框({ 占位符: '添加文件说明（可选）...', 可访问名称: '文件描述（可选）' })
 
   private 上传按钮: 主要按钮 = new 主要按钮({
     文本: '开始上传文件',
@@ -67,8 +67,10 @@ export class 演示文件上传组件 extends 组件基类<发出事件类型, �
     },
   })
 
-  private 拖拽点击区域: HTMLDivElement = 创建元素('div', {
+  private 拖拽点击区域: HTMLButtonElement = 创建元素('button', {
+    type: 'button',
     style: {
+      width: '100%',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -81,6 +83,8 @@ export class 演示文件上传组件 extends 组件基类<发出事件类型, �
       transition: 'all 0.2s ease-in-out',
       textAlign: 'center',
       gap: '10px',
+      color: 'var(--文字颜色)',
+      fontFamily: 'inherit',
     },
   })
 
@@ -115,10 +119,10 @@ export class 演示文件上传组件 extends 组件基类<发出事件类型, �
   }
 
   private 构建界面结构(): void {
-    this.外层容器.innerHTML = ''
-    this.卡片容器.innerHTML = ''
-    this.拖拽点击区域.innerHTML = ''
-    this.已选文件区.innerHTML = ''
+    this.外层容器.replaceChildren()
+    this.卡片容器.replaceChildren()
+    this.拖拽点击区域.replaceChildren()
+    this.已选文件区.replaceChildren()
 
     let 头部容器 = 构建头部容器()
     填充拖拽点击区域(this.拖拽点击区域)
@@ -230,7 +234,8 @@ export class 演示文件上传组件 extends 组件基类<发出事件类型, �
   }
 
   private 更新界面视图(): void {
-    this.文件列表容器.innerHTML = ''
+    this.文件列表容器.replaceChildren()
+    this.拖拽点击区域.disabled = this.是否正在上传
     if (this.已选文件列表.length === 0) {
       应用样式(this.已选文件区, { display: 'none' })
     } else {

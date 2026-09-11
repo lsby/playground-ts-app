@@ -1,6 +1,6 @@
 import { globalWebLog } from '../global/manager/log-manager'
 import { 获得滚动条样式 } from '../global/style/scrollbar'
-import { 是中止错误, 等待可取消任务 } from '../global/tools/abort'
+import { 创建中止错误, 是中止错误, 等待可取消任务 } from '../global/tools/abort'
 
 type 清理函数 = () => void | Promise<void>
 
@@ -23,6 +23,9 @@ export abstract class 组件基类<
   private 初始化完毕 = false
   private 初始化完成事件: Promise<void> | null = null
   private 初始化完成解析器: (() => void) | null = null
+  private 初始化完成拒绝器: ((错误: unknown) => void) | null = null
+  private 初始化失败 = false
+  private 初始化错误: unknown = undefined
   private 渲染监听器列表: Array<{ type: string; handler: EventListener; options?: AddEventListenerOptions }> = []
   private 清理函数列表: 清理函数[] = []
   private 渲染队列: Promise<void> = Promise.resolve()
@@ -86,9 +89,11 @@ export abstract class 组件基类<
   /** 只有组件挂载并完成当前轮渲染后，该 Promise 才会完成。 */
   public 等待初始化(): Promise<void> {
     if (this.初始化完毕 === true) return Promise.resolve()
+    if (this.初始化失败 === true) return Promise.reject(this.初始化错误)
     if (this.初始化完成事件 === null) {
-      this.初始化完成事件 = new Promise<void>((resolve) => {
+      this.初始化完成事件 = new Promise<void>((resolve, reject) => {
         this.初始化完成解析器 = resolve
+        this.初始化完成拒绝器 = reject
       })
     }
     return this.初始化完成事件
@@ -99,7 +104,7 @@ export abstract class 组件基类<
     v: 发出事件类型[K],
     o?: Omit<CustomEventInit<发出事件类型[K]>, 'detail'>,
   ): boolean {
-    void this.log.debug('派发事件: %o, 数据: %O', k, v)
+    void this.log.debug('派发事件: %o', k)
     return this.dispatchEvent(
       new CustomEvent(k.toString(), { detail: v, bubbles: true, cancelable: true, composed: true, ...o }),
     )
@@ -159,7 +164,7 @@ export abstract class 组件基类<
     void this.log.debug('disconnectedCallback, 对象: %O', this)
     this.渲染代次 += 1
     this.渲染控制器.abort()
-    this.重置初始化事件()
+    this.拒绝初始化(创建中止错误(this.渲染控制器.signal))
     let 任务 = this.渲染队列
       .catch((): void => {})
       .then(async (): Promise<void> => {
@@ -197,10 +202,14 @@ export abstract class 组件基类<
         }
         if (本次代次 !== this.渲染代次) return
         this.初始化完毕 = true
+        this.初始化失败 = false
+        this.初始化错误 = undefined
         this.初始化完成解析器?.()
         this.初始化完成解析器 = null
+        this.初始化完成拒绝器 = null
       })
       .catch((错误: unknown): void => {
+        if (本次代次 === this.渲染代次) this.拒绝初始化(错误)
         if (是中止错误(错误) === false) throw 错误
       })
     this.渲染队列 = 任务
@@ -228,15 +237,31 @@ export abstract class 组件基类<
     this.渲染监听器列表 = []
     let 待清理列表 = this.清理函数列表
     this.清理函数列表 = []
-    for (let 清理 of 待清理列表.reverse()) await 清理()
+    for (let 清理 of 待清理列表.reverse()) {
+      try {
+        await 清理()
+      } catch (错误) {
+        this.报告错误(错误)
+      }
+    }
   }
 
   private 重置初始化事件(): void {
     this.初始化完毕 = false
+    this.初始化失败 = false
+    this.初始化错误 = undefined
     if (this.初始化完成解析器 !== null) return
-    this.初始化完成事件 = new Promise<void>((resolve) => {
-      this.初始化完成解析器 = resolve
-    })
+    this.初始化完成事件 = null
+    this.初始化完成拒绝器 = null
+  }
+
+  private 拒绝初始化(错误: unknown): void {
+    this.初始化完毕 = false
+    this.初始化失败 = true
+    this.初始化错误 = 错误
+    this.初始化完成拒绝器?.(错误)
+    this.初始化完成解析器 = null
+    this.初始化完成拒绝器 = null
   }
 
   private 报告错误(错误: unknown): void {
