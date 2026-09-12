@@ -12,8 +12,16 @@ export class 用户信息组件 extends 组件基类<发出事件类型, 监听�
   }
 
   protected override async 当加载时(): Promise<void> {
-    let 结果 = await API管理器.请求postJson('/api/user/get-user-info', {}, { 信号: this.渲染信号 })
+    let 结果 = await API管理器.请求postJson('/api/user/get-user-info', {}, { 信号: this.渲染信号 }).catch(
+      (错误: unknown) => {
+        if (this.渲染信号.aborted === true) throw 错误
+        this.显示加载错误(错误)
+        return null
+      },
+    )
+    if (结果 === null) return
     if (结果.status !== 'success') {
+      this.显示加载错误(结果.data)
       return
     }
     let 用户信息 = 结果.data
@@ -41,5 +49,15 @@ export class 用户信息组件 extends 组件基类<发出事件类型, 监听�
     容器.appendChild(退出按钮)
 
     this.shadow.append(容器)
+  }
+
+  private 显示加载错误(错误: unknown): void {
+    this.shadow.append(
+      创建元素('div', {
+        role: 'alert',
+        textContent: `加载用户信息失败：${错误 instanceof Error ? 错误.message : String(错误)}`,
+        style: { color: 'var(--错误前景)' },
+      }),
+    )
   }
 }

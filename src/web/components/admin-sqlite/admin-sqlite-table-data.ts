@@ -69,27 +69,13 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
   private async 获取表结构(信号: AbortSignal): Promise<void> {
     let 表名 = this.表名值
     if (表名 === null) return
-
-    try {
-      let 结果 = await API管理器.请求postJson('/api/admin-sqlite/get-table-schema', { tableName: 表名 }, { 信号 })
-      switch (结果.status) {
-        case 'success':
-          this.主键列 = 结果.data.columns.filter((列) => 列.pk === 1).map((列) => 列.name)
-          this.列列表 = 结果.data.columns
-          break
-        case 'fail':
-        case 'unexpected':
-          console.error('获取表结构失败:', 结果)
-          this.主键列 = []
-          this.列列表 = []
-          break
-      }
-    } catch (错误) {
-      if (信号.aborted === true) throw 错误
-      console.error('获取表结构失败:', 错误)
-      this.主键列 = []
-      this.列列表 = []
-    }
+    let 结果 = await API管理器.请求postJson并处理错误(
+      '/api/admin-sqlite/get-table-schema',
+      { tableName: 表名 },
+      { 信号 },
+    )
+    this.主键列 = 结果.columns.filter((列) => 列.pk === 1).map((列) => 列.name)
+    this.列列表 = 结果.columns
   }
 
   private async 初始化表格(信号: AbortSignal): Promise<void> {
@@ -109,11 +95,23 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
       return
     }
 
-    await this.获取表结构(信号)
+    try {
+      await this.获取表结构(信号)
+    } catch (错误) {
+      if (任务ID !== this.初始化任务ID) return
+      if (信号.aborted === true) throw 错误
+      if (this.消息容器 !== null) {
+        this.消息容器.textContent = `加载表结构失败：${错误 instanceof Error ? 错误.message : String(错误)}`
+        this.消息容器.style.color = 'var(--错误前景)'
+        this.消息容器.style.display = 'flex'
+      }
+      return
+    }
 
     if (任务ID !== this.初始化任务ID) return
 
     if (this.消息容器 !== null) {
+      this.消息容器.style.color = 'var(--文本颜色)'
       this.消息容器.style.display = 'none'
     }
 
@@ -181,15 +179,15 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
 
           // 查询总数
           let 总数sql = `SELECT COUNT(*) as count FROM \`${表名}\`` + 筛选语句
-          let 总数结果 = await API管理器.请求postJson(
+          let 总数结果 = await API管理器.请求postJson并处理错误(
             '/api/admin-sqlite/execute-query',
             { sql: 总数sql, parameters: 筛选参数 },
             { 信号: 参数.信号 },
           )
 
           let 总数 = 0
-          if (总数结果.status === 'success' && 总数结果.data.rows.length > 0 && 总数结果.data.rows[0] !== undefined) {
-            总数 = parseInt(String(总数结果.data.rows[0]['count'] ?? 0))
+          if (总数结果.rows.length > 0 && 总数结果.rows[0] !== undefined) {
+            总数 = parseInt(String(总数结果.rows[0]['count'] ?? 0))
           }
 
           // 查询数据
@@ -197,20 +195,15 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
           let sql = `SELECT * FROM \`${表名}\`` + 筛选语句 + 排序语句 + ` LIMIT ? OFFSET ?`
           筛选参数.push(参数.每页数量, 偏移)
 
-          let 结果 = await API管理器.请求postJson(
+          let 结果 = await API管理器.请求postJson并处理错误(
             '/api/admin-sqlite/execute-query',
             { sql, parameters: 筛选参数 },
             { 信号: 参数.信号 },
           )
-
-          if (结果.status === 'success') {
-            return { 数据: 结果.data.rows, 总数 }
-          }
-          return { 数据: [], 总数: 0 }
+          return { 数据: 结果.rows, 总数 }
         } catch (错误) {
           if (参数.信号.aborted === true || 信号.aborted === true) throw 错误
-          console.error('查询失败:', 错误)
-          return { 数据: [], 总数: 0 }
+          throw 错误
         }
       },
       宿主样式: { margin: '20px' },

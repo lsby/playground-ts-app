@@ -1,6 +1,7 @@
 import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
-import { 同步表单控件校验状态, 表单组件基类 } from './form'
+import { 表单组件基类 } from './form'
+import { 同步表单控件校验状态 } from './form-accessibility'
 
 type 复选框组事件 = { 变化: string[]; 失焦: void }
 

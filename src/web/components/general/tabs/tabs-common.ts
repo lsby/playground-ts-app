@@ -47,6 +47,30 @@ export function 计算键盘目标索引(
   return null
 }
 
+export function 需要重建标签按钮(按钮数量: number, 标签数量: number): boolean {
+  return 按钮数量 !== 标签数量
+}
+
+export function 同步标签页选择状态(
+  按钮: HTMLButtonElement,
+  面板: HTMLElement,
+  选中: boolean,
+  显示方式: 'block' | 'grid',
+): void {
+  按钮.setAttribute('aria-selected', 选中 ? 'true' : 'false')
+  按钮.tabIndex = 选中 ? 0 : -1
+  面板.hidden = 选中 === false
+  面板.style.display = 选中 ? 显示方式 : 'none'
+}
+
+export function 同步导航选择状态(按钮: HTMLButtonElement, 面板: HTMLElement, 选中: boolean): void {
+  if (选中 === true) 按钮.setAttribute('aria-current', 'page')
+  else 按钮.removeAttribute('aria-current')
+  按钮.tabIndex = 选中 ? 0 : -1
+  面板.hidden = 选中 === false
+  面板.style.display = 选中 ? 'grid' : 'none'
+}
+
 export class 标签页状态管理器<项类型 extends 标签页路由项> {
   private readonly 路由键: string | undefined
   private readonly 获得标签页列表: () => readonly 项类型[]

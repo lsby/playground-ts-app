@@ -228,8 +228,8 @@ export function 渲染表体<数据项>(上下文: 表格渲染上下文<数据�
           点击处理函数: async (event): Promise<void> => {
             event.stopPropagation()
             上下文.派发操作点击(操作.名称, 数据项)
-            await 操作.回调(数据项)
-            await 上下文.刷新数据()
+            let 结果 = await 操作.回调(数据项)
+            if (结果?.需要刷新 === true) await 上下文.刷新数据()
           },
         }),
       )

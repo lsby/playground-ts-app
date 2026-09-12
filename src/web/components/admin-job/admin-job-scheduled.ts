@@ -5,6 +5,7 @@ import { 是中止错误 } from '../../global/tools/abort'
 import { 创建元素 } from '../../global/tools/create-element'
 import { 普通按钮 } from '../general/base/base-button'
 import { 日志组件 } from '../general/log/log'
+import { 加载本地表格数据 } from '../general/table/local-data'
 import { 表格组件 } from '../general/table/table'
 import { 数据表加载数据参数 } from '../general/table/types'
 
@@ -27,6 +28,16 @@ export class 定时任务管理组件 extends 组件基类<发出事件类型, �
 
   private 数据表格组件: 表格组件<定时任务数据项>
   private 所有任务数据: 定时任务数据项[] = []
+  private 错误状态元素 = 创建元素('div', {
+    role: 'alert',
+    hidden: true,
+    style: {
+      padding: 'var(--间距-3)',
+      color: 'var(--错误前景)',
+      backgroundColor: 'color-mix(in srgb, var(--错误颜色) 10%, transparent)',
+      borderRadius: 'var(--圆角-中)',
+    },
+  })
 
   public constructor() {
     super()
@@ -68,50 +79,19 @@ export class 定时任务管理组件 extends 组件基类<发出事件类型, �
     参数: 数据表加载数据参数<定时任务数据项>,
   ) => Promise<{ 数据: 定时任务数据项[]; 总数: number }> {
     return async (参数: 数据表加载数据参数<定时任务数据项>) => {
-      let 数据 = this.所有任务数据
-
-      // 应用筛选
-      {
-        for (let [key, value] of Object.entries(参数.筛选条件)) {
-          if (value !== '') {
-            数据 = 数据.filter((项) =>
-              String(项[key as keyof 定时任务数据项])
-                .toLowerCase()
-                .includes(value.toLowerCase()),
-            )
-          }
-        }
-      }
-
-      // 应用排序
-      if (参数.排序列表.length > 0) {
-        let 排序项 = 参数.排序列表[0]
-        if (排序项 !== undefined) {
-          数据 = [...数据].sort((a, b) => {
-            let a值 = a[排序项.field]
-            let b值 = b[排序项.field]
-            if (typeof a值 === 'string' && typeof b值 === 'string') {
-              let 比较 = a值.localeCompare(b值)
-              return 排序项.direction === 'asc' ? 比较 : -比较
-            }
-            if (typeof a值 === 'number' && typeof b值 === 'number') {
-              return 排序项.direction === 'asc' ? a值 - b值 : b值 - a值
-            }
-            return 0
-          })
-        }
-      }
-
-      let 总数 = 数据.length
-      let 开始索引 = (参数.页码 - 1) * 参数.每页数量
-      let 结束索引 = 开始索引 + 参数.每页数量
-      let 分页数据 = 数据.slice(开始索引, 结束索引)
-
-      return { 数据: 分页数据, 总数 }
+      return 加载本地表格数据(this.所有任务数据, 参数, [
+        '名称',
+        '表达式',
+        '状态',
+        '下次执行时间',
+        '最后执行时间',
+        '执行次数',
+      ])
     }
   }
 
   private async 刷新任务列表(信号?: AbortSignal): Promise<void> {
+    this.错误状态元素.hidden = true
     try {
       let 结果 = await API管理器.请求postJson并处理错误(
         '/api/admin-job/scheduled/list',
@@ -131,7 +111,8 @@ export class 定时任务管理组件 extends 组件基类<发出事件类型, �
       await this.数据表格组件.刷新数据()
     } catch (错误) {
       if (信号?.aborted === true) throw 错误
-      console.error('获取定时任务列表失败:', 错误)
+      this.错误状态元素.textContent = `获取定时任务列表失败：${错误 instanceof Error ? 错误.message : String(错误)}`
+      this.错误状态元素.hidden = false
     }
   }
 
@@ -247,8 +228,7 @@ export class 定时任务管理组件 extends 组件基类<发出事件类型, �
     })
     操作区.appendChild(刷新按钮)
 
-    主容器.appendChild(操作区)
-    主容器.appendChild(this.数据表格组件)
+    主容器.append(操作区, this.错误状态元素, this.数据表格组件)
 
     this.shadow.appendChild(主容器)
 

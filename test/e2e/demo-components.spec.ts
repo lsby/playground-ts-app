@@ -201,7 +201,7 @@ test.describe('演示组件 E2E', (): void => {
     await 多选下拉组件.evaluate((元素): void => {
       if ('刷新列表' in 元素 === false || typeof 元素.刷新列表 !== 'function')
         throw new Error('多选下拉未提供刷新列表方法')
-      元素.刷新列表([{ 文字: '后端', value: 'backend' }])
+      元素.刷新列表([{ 文本: '后端', 值: 'backend' }])
     })
     await expect(多选下拉).toContainText('已选 1 项')
     await expect(表单).toHaveAttribute('data-observed-change', 'true')
@@ -209,9 +209,9 @@ test.describe('演示组件 E2E', (): void => {
       if ('刷新列表' in 元素 === false || typeof 元素.刷新列表 !== 'function')
         throw new Error('多选下拉未提供刷新列表方法')
       元素.刷新列表([
-        { 文字: '前端', value: 'frontend' },
-        { 文字: '后端', value: 'backend' },
-        { 文字: '测试', value: 'testing' },
+        { 文本: '前端', 值: 'frontend' },
+        { 文本: '后端', 值: 'backend' },
+        { 文本: '测试', 值: 'testing' },
       ])
     })
     await 演示_点击(page.getByText('前端', { exact: true }))

@@ -1,7 +1,14 @@
 import { 组件基类 } from '../../../base/base'
-import { 创建元素 } from '../../../global/tools/create-element'
+import { 创建元素, 应用样式 } from '../../../global/tools/create-element'
 import { 创建图标, type 图标名称 } from '../base/icon'
-import { 创建标签页标识前缀, 刷新标签页内容, type 标签方向, 标签页状态管理器 } from './tabs-common'
+import {
+  创建标签页标识前缀,
+  刷新标签页内容,
+  同步导航选择状态,
+  type 标签方向,
+  标签页状态管理器,
+  需要重建标签按钮,
+} from './tabs-common'
 
 export type App导航配置 = { 路由键?: string | undefined }
 export type appNavigation发出事件类型 = { 切换: { 当前索引: number } }
@@ -54,6 +61,10 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
     })
     内容面板.append(内容)
     this.标签页列表.push({ 标签: 配置.标签, 图标: 配置.图标, 标识: 配置.标识, 内容, 内容面板, 已挂载: false })
+    if (this.isConnected === true) {
+      this.确保标签页已挂载(this.状态管理器.获得当前索引())
+      this.更新UI()
+    }
   }
 
   public override async 刷新(): Promise<void> {
@@ -131,45 +142,45 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
   }
 
   private 更新UI(): void {
-    this.导航栏容器.replaceChildren()
-    this.标签按钮列表 = []
+    let 重建按钮 = 需要重建标签按钮(this.标签按钮列表.length, this.标签页列表.length)
+    if (重建按钮 === true) {
+      this.导航栏容器.replaceChildren()
+      this.标签按钮列表 = []
+    }
 
     this.标签页列表.forEach((项, idx) => {
       let 选中 = idx === this.状态管理器.获得当前索引()
 
-      let 按钮 = 创建元素('button', {
-        type: 'button',
-        style: {
-          padding: this.是移动端 ? '8px 0' : '10px 20px',
-          border: 'none',
-          borderLeft: this.是移动端 === false && 选中 === true ? '3px solid var(--主色调)' : 'none',
-          borderTop: this.是移动端 === true && 选中 === true ? '3px solid var(--主色调)' : 'none',
-          background: 选中 === true ? 'var(--主色调-极淡)' : 'none',
-          cursor: 'pointer',
-          textAlign: 'center',
-          userSelect: 'none',
-          color: 选中 === true ? 'var(--主色调)' : 'var(--文字颜色)',
-          width: this.是移动端 ? 'auto' : '100%',
-          flex: this.是移动端 ? '1' : 'none',
-          display: 'flex',
-          flexDirection: this.是移动端 ? 'column' : 'row',
-          alignItems: 'center',
-          justifyContent: this.是移动端 ? 'center' : 'flex-start',
-          gap: this.是移动端 ? '2px' : '12px',
-          transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
-          fontFamily: 'inherit',
-        },
+      let 按钮 = this.标签按钮列表[idx] ?? 创建元素('button', { type: 'button' })
+      按钮.replaceChildren()
+      应用样式(按钮, {
+        padding: this.是移动端 ? '8px 0' : '10px 20px',
+        border: 'none',
+        borderLeft: this.是移动端 === false && 选中 === true ? '3px solid var(--主色调)' : 'none',
+        borderTop: this.是移动端 === true && 选中 === true ? '3px solid var(--主色调)' : 'none',
+        background: 选中 === true ? 'var(--主色调-极淡)' : 'none',
+        cursor: 'pointer',
+        textAlign: 'center',
+        userSelect: 'none',
+        color: 选中 === true ? 'var(--主色调)' : 'var(--文字颜色)',
+        width: this.是移动端 ? 'auto' : '100%',
+        flex: this.是移动端 ? '1' : 'none',
+        display: 'flex',
+        flexDirection: this.是移动端 ? 'column' : 'row',
+        alignItems: 'center',
+        justifyContent: this.是移动端 ? 'center' : 'flex-start',
+        gap: this.是移动端 ? '2px' : '12px',
+        transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
+        fontFamily: 'inherit',
       })
       let 标签标识 = `${this.标签页标识前缀}-tab-${idx}`
       let 面板标识 = `${this.标签页标识前缀}-panel-${idx}`
       按钮.id = 标签标识
       按钮.setAttribute('aria-controls', 面板标识)
-      if (选中 === true) 按钮.setAttribute('aria-current', 'page')
-      按钮.tabIndex = 选中 ? 0 : -1
       项.内容面板.id = 面板标识
       项.内容面板.setAttribute('role', 'region')
       项.内容面板.setAttribute('aria-labelledby', 标签标识)
-      项.内容面板.hidden = 选中 === false
+      同步导航选择状态(按钮, 项.内容面板, 选中)
 
       if (项.图标 !== undefined) {
         let 图标元素 = 创建图标(项.图标, this.是移动端 ? 20 : 18)
@@ -187,15 +198,9 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
       }
       按钮.onkeydown = (事件: KeyboardEvent): void => this.处理标签键盘(事件, idx)
 
-      this.导航栏容器.appendChild(按钮)
-      this.标签按钮列表.push(按钮)
-    })
-
-    this.标签页列表.forEach((项, idx) => {
-      if (idx === this.状态管理器.获得当前索引()) {
-        项.内容面板.style.display = 'grid'
-      } else {
-        项.内容面板.style.display = 'none'
+      if (重建按钮 === true) {
+        this.导航栏容器.appendChild(按钮)
+        this.标签按钮列表.push(按钮)
       }
     })
   }

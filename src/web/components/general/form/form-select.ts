@@ -1,9 +1,10 @@
 import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 创建元素, 应用宿主样式, 应用样式 } from '../../../global/tools/create-element'
 import { 获得表单控件基础样式 } from './control-style'
-import { 同步表单控件校验状态, 表单组件基类 } from './form'
+import { 表单组件基类 } from './form'
+import { 同步表单控件校验状态 } from './form-accessibility'
 
-type 下拉框事件 = { 变化: string; 焦点: void; 失焦: string }
+type 下拉框事件 = { 变化: string; 焦点: void; 失焦: void }
 
 type 监听下拉框事件 = {}
 
@@ -73,7 +74,7 @@ abstract class 下拉框基类 extends 表单组件基类<下拉框事件, 监�
       this.派发事件('焦点', undefined)
     }
     下拉框元素.onblur = (): void => {
-      this.派发事件('失焦', 下拉框元素.value)
+      this.派发事件('失焦', undefined)
     }
 
     容器.appendChild(下拉框元素)

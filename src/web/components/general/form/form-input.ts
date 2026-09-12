@@ -1,9 +1,10 @@
 import { 创建元素, 应用宿主样式, 应用样式 } from '../../../global/tools/create-element'
 import { 增强样式类型 } from '../../../global/types/style'
 import { 获得表单控件基础样式 } from './control-style'
-import { 同步表单控件校验状态, 表单组件基类 } from './form'
+import { 表单组件基类 } from './form'
+import { 同步表单控件校验状态 } from './form-accessibility'
 
-type 输入框事件<值类型> = { 输入: 值类型; 变化: 值类型; 焦点: void; 失焦: 值类型; 回车: 值类型 }
+type 输入框事件<值类型> = { 输入: 值类型; 变化: 值类型; 焦点: void; 失焦: void; 回车: 值类型 }
 type 监听输入框事件 = {}
 
 type 基础输入框配置<值类型> = {
@@ -68,8 +69,8 @@ abstract class 输入框基类<值类型 extends string | number | null> extends
       this.派发事件('焦点', undefined)
     }
     输入框.onblur = (): void => {
-      let 值 = this.读取并保存值(输入框)
-      this.派发事件('失焦', 值)
+      this.读取并保存值(输入框)
+      this.派发事件('失焦', undefined)
     }
     输入框.onkeydown = (event: KeyboardEvent): void => {
       if (event.key !== 'Enter' || event.isComposing === true) return

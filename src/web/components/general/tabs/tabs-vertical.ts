@@ -1,8 +1,14 @@
 import { 组件基类 } from '../../../base/base'
 import { 浮层管理器, type 浮层句柄 } from '../../../global/manager/overlay-manager'
-import { 创建元素 } from '../../../global/tools/create-element'
+import { 创建元素, 应用样式 } from '../../../global/tools/create-element'
 import { 图标组件 } from '../base/icon'
-import { 创建标签页标识前缀, 刷新标签页内容, 标签页状态管理器 } from './tabs-common'
+import {
+  创建标签页标识前缀,
+  刷新标签页内容,
+  同步标签页选择状态,
+  标签页状态管理器,
+  需要重建标签按钮,
+} from './tabs-common'
 
 export type 纵向tab配置 = { 路由键?: string | undefined }
 export type tabVertical发出事件类型 = { 切换: { 当前索引: number } }
@@ -56,6 +62,10 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
     })
     内容面板.append(内容)
     this.标签页列表.push({ 标签: 配置.标签, 分组: 配置.分组, 标识: 配置.标识, 内容, 内容面板, 已挂载: false })
+    if (this.isConnected === true) {
+      this.确保标签页已挂载(this.状态管理器.获得当前索引())
+      this.更新UI()
+    }
   }
 
   public override async 刷新(): Promise<void> {
@@ -250,8 +260,11 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
   }
 
   private 更新UI(): void {
-    this.标签头容器.replaceChildren()
-    this.标签按钮列表 = []
+    let 重建按钮 = 需要重建标签按钮(this.标签按钮列表.length, this.标签页列表.length)
+    if (重建按钮 === true) {
+      this.标签头容器.replaceChildren()
+      this.标签按钮列表 = []
+    }
 
     let 上一个分组: string | undefined = undefined
 
@@ -259,7 +272,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
       let 选中 = idx === this.状态管理器.获得当前索引()
 
       // 如果有分组，且与上一个分组不同，则渲染分组标题
-      if (项.分组 !== undefined && 项.分组 !== 上一个分组) {
+      if (重建按钮 === true && 项.分组 !== undefined && 项.分组 !== 上一个分组) {
         let 分组标题 = 创建元素('div', {
           role: 'presentation',
           textContent: 项.分组,
@@ -279,42 +292,38 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
         上一个分组 = 项.分组
       }
 
-      let 按钮 = 创建元素('button', {
-        type: 'button',
-        textContent: 项.标签,
-        style: {
-          padding: '0.7em 1.2em',
-          border: '1px solid transparent',
-          borderLeft: 选中 ? '3px solid var(--tab-指示条)' : '3px solid transparent',
-          borderTop: 选中 ? '1px solid var(--tab-激活边框)' : '1px solid transparent',
-          borderRight: 选中 ? '1px solid var(--tab-激活边框)' : '1px solid transparent',
-          borderBottom: 选中 ? '1px solid var(--tab-激活边框)' : '1px solid transparent',
-          borderRadius: '8px',
-          background: 选中 ? 'var(--tab-激活背景)' : 'transparent',
-          color: 选中 ? 'var(--tab-激活文字)' : 'var(--tab-未激活文字)',
-          fontWeight: '600',
-          fontSize: '0.92em',
-          cursor: 'pointer',
-          userSelect: 'none',
-          textAlign: 'left',
-          transition:
-            'background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: 选中 ? '0 4px 15px var(--tab-阴影)' : 'none',
-          width: '100%',
-          boxSizing: 'border-box',
-        },
+      let 按钮 = this.标签按钮列表[idx] ?? 创建元素('button', { type: 'button' })
+      按钮.textContent = 项.标签
+      应用样式(按钮, {
+        padding: '0.7em 1.2em',
+        border: '1px solid transparent',
+        borderLeft: 选中 ? '3px solid var(--tab-指示条)' : '3px solid transparent',
+        borderTop: 选中 ? '1px solid var(--tab-激活边框)' : '1px solid transparent',
+        borderRight: 选中 ? '1px solid var(--tab-激活边框)' : '1px solid transparent',
+        borderBottom: 选中 ? '1px solid var(--tab-激活边框)' : '1px solid transparent',
+        borderRadius: '8px',
+        background: 选中 ? 'var(--tab-激活背景)' : 'transparent',
+        color: 选中 ? 'var(--tab-激活文字)' : 'var(--tab-未激活文字)',
+        fontWeight: '600',
+        fontSize: '0.92em',
+        cursor: 'pointer',
+        userSelect: 'none',
+        textAlign: 'left',
+        transition:
+          'background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        boxShadow: 选中 ? '0 4px 15px var(--tab-阴影)' : 'none',
+        width: '100%',
+        boxSizing: 'border-box',
       })
       let 标签标识 = `${this.标签页标识前缀}-tab-${idx}`
       let 面板标识 = `${this.标签页标识前缀}-panel-${idx}`
       按钮.id = 标签标识
       按钮.setAttribute('role', 'tab')
       按钮.setAttribute('aria-controls', 面板标识)
-      按钮.setAttribute('aria-selected', 选中 ? 'true' : 'false')
-      按钮.tabIndex = 选中 ? 0 : -1
       项.内容面板.id = 面板标识
       项.内容面板.setAttribute('role', 'tabpanel')
       项.内容面板.setAttribute('aria-labelledby', 标签标识)
-      项.内容面板.hidden = 选中 === false
+      同步标签页选择状态(按钮, 项.内容面板, 选中, 'grid')
 
       if (选中 === false) {
         按钮.onmouseenter = (): void => {
@@ -350,15 +359,9 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
       }
       按钮.onkeydown = (事件: KeyboardEvent): void => this.处理标签键盘(事件, idx)
 
-      this.标签头容器.appendChild(按钮)
-      this.标签按钮列表.push(按钮)
-    })
-
-    this.标签页列表.forEach((项, idx) => {
-      if (idx === this.状态管理器.获得当前索引()) {
-        项.内容面板.style.display = 'grid'
-      } else {
-        项.内容面板.style.display = 'none'
+      if (重建按钮 === true) {
+        this.标签头容器.appendChild(按钮)
+        this.标签按钮列表.push(按钮)
       }
     })
   }

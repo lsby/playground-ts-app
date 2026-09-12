@@ -7,18 +7,24 @@ export function 创建数据表单元格键(行键: 数据表行键, 列: number
   return `string:${行键.length}:${行键}:${列}`
 }
 
-export type 数据表列配置<数据项> = {
-  字段名: keyof 数据项
+type 数据表列配置项<数据项, 字段 extends keyof 数据项> = {
+  字段名: 字段
   显示名: string
-  格式化?: (值: unknown) => string
+  格式化?: (值: 数据项[字段]) => string
   可排序?: boolean
   可筛选?: boolean
   列最小宽度?: string
   列最大宽度?: string
-  渲染函数?: (值: unknown, 行: 数据项) => Node | string
+  渲染函数?: (值: 数据项[字段], 行: 数据项) => Node | string
 }
 
-export type 数据表操作配置<数据项> = { 名称: string; 回调: (数据项: 数据项) => void | Promise<void> }
+export type 数据表列配置<数据项> = { [字段 in keyof 数据项]-?: 数据表列配置项<数据项, 字段> }[keyof 数据项]
+
+export type 数据表操作结果 = { 需要刷新: boolean }
+export type 数据表操作配置<数据项> = {
+  名称: string
+  回调: (数据项: 数据项) => void | 数据表操作结果 | Promise<void | 数据表操作结果>
+}
 export type 顶部操作配置 = { 名称: string; 回调: () => void | Promise<void> }
 
 export type 数据表加载数据参数<数据项> = {

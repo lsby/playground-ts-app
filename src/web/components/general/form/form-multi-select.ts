@@ -4,9 +4,10 @@ import { 浮层管理器, type 浮层句柄 } from '../../../global/manager/over
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
 import { 创建图标 } from '../base/icon'
 import { 获得表单控件基础样式 } from './control-style'
-import { 同步表单控件校验状态, type 表单元素 } from './form'
+import { type 表单元素 } from './form'
+import { 同步表单控件校验状态 } from './form-accessibility'
 
-export type 多选下拉框选项 = { 文字: string; value: string }
+export type 多选下拉框选项 = { 值: string; 文本: string; 禁用?: boolean }
 
 type 多选下拉框事件 = { 打开: void; 变化: string[]; 失焦: void }
 type 监听多选下拉框事件 = {}
@@ -19,6 +20,7 @@ export type 多选下拉框配置 = {
   值?: string[]
   禁用?: boolean
   可访问名称?: string
+  选项列表?: readonly 多选下拉框选项[]
 }
 
 export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听多选下拉框事件> implements 表单元素<string[]> {
@@ -40,6 +42,7 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
     多选下拉框序号 += 1
     this.面板id = `multi-select-panel-${多选下拉框序号}`
     this.配置 = 配置
+    this.选项列表 = [...(配置.选项列表 ?? [])]
   }
 
   protected async 当加载时(): Promise<void> {
@@ -207,9 +210,10 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
     }
   }
 
-  public 刷新列表(选项列表: 多选下拉框选项[]): void {
+  public 刷新列表(选项列表: readonly 多选下拉框选项[]): void {
     let 原值 = this.获得值()
     this.配置.值 = 原值
+    this.配置.选项列表 = 选项列表
     this.选项列表 = [...选项列表]
     this.渲染选项列表()
     let 新值 = this.获得值()
@@ -239,19 +243,20 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
       })
       let input = 创建元素('input', {
         type: 'checkbox',
-        value: 选项.value,
-        disabled: this.配置.禁用 ?? false,
+        value: 选项.值,
+        disabled: this.配置.禁用 === true || 选项.禁用 === true,
         tabIndex: -1,
         style: { display: 'none' },
       })
       input.setAttribute('aria-hidden', 'true')
-      input.checked = 已选值.has(选项.value)
-      行.setAttribute('aria-disabled', this.配置.禁用 === true ? 'true' : 'false')
+      input.dataset['optionDisabled'] = 选项.禁用 === true ? 'true' : 'false'
+      input.checked = 已选值.has(选项.值)
+      行.setAttribute('aria-disabled', input.disabled ? 'true' : 'false')
       行.onpointerdown = (): void => 行.focus()
       let 选中标记 = 创建图标('check', 16)
       选中标记.style.flexShrink = '0'
       let text = 创建元素('span', {
-        textContent: 选项.文字,
+        textContent: 选项.文本,
         style: { fontSize: 'var(--字号-正文)', color: 'var(--文字颜色)' },
       })
       行.appendChild(input)
@@ -259,7 +264,7 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
       行.appendChild(text)
       this.同步选项外观(input, 行, 选中标记)
       行.onclick = (): void => {
-        if (this.配置.禁用 === true) return
+        if (input.disabled === true) return
         this.切换选项(input, 行, 选中标记)
       }
       this.浮动面板.appendChild(行)
@@ -299,10 +304,10 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
       this.触发按钮.style.cursor = 值 ? 'not-allowed' : 'pointer'
     }
     for (let 输入 of this.当前输入列表) {
-      输入.disabled = 值
+      输入.disabled = 值 || 输入.dataset['optionDisabled'] === 'true'
       if (输入.parentElement instanceof HTMLDivElement) {
-        输入.parentElement.style.cursor = 值 ? 'not-allowed' : 'pointer'
-        输入.parentElement.setAttribute('aria-disabled', 值 ? 'true' : 'false')
+        输入.parentElement.style.cursor = 输入.disabled ? 'not-allowed' : 'pointer'
+        输入.parentElement.setAttribute('aria-disabled', 输入.disabled ? 'true' : 'false')
       }
     }
     if (值 === true) this.安全执行(async (): Promise<void> => await this.关闭面板())

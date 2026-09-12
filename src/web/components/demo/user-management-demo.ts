@@ -9,7 +9,7 @@ import { 表单 } from '../general/form/form'
 import { 复选框 } from '../general/form/form-checkbox'
 import { 密码输入框, 普通输入框 } from '../general/form/form-input'
 import { 表格组件 } from '../general/table/table'
-import { 数据表加载数据参数 } from '../general/table/types'
+import { 数据表加载数据参数, 数据表操作结果 } from '../general/table/types'
 
 type 发出事件类型 = {}
 type 监听事件类型 = {}
@@ -43,7 +43,7 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
       操作列表: [
         {
           名称: '编辑',
-          回调: async (数据项: 数据项): Promise<void> => {
+          回调: async (数据项: 数据项): Promise<数据表操作结果 | void> => {
             let name = await 显示输入对话框('请输入新名称:', 数据项.name)
             if (name === null) return
             if (name === '') {
@@ -51,14 +51,16 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
               return
             }
             await API管理器.请求postJson并处理错误('/api/demo/crud/user/update', { newName: name, userId: 数据项.id })
+            return { 需要刷新: true }
           },
         },
         {
           名称: '删除',
-          回调: async (数据项: 数据项): Promise<void> => {
+          回调: async (数据项: 数据项): Promise<数据表操作结果 | void> => {
             let 确认结果 = await 显示确认对话框('你确定要删除这条数据吗？')
             if (确认结果 === false) return
             await API管理器.请求postJson并处理错误('/api/demo/crud/user/delete', { id: 数据项.id })
+            return { 需要刷新: true }
           },
         },
         {

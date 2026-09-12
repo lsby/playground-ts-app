@@ -1,3 +1,5 @@
+import { 创建元素 } from '../tools/create-element'
+
 type 外部关闭策略 = '不关闭' | '仅遮罩' | '任意外部'
 type 浮层挂载方式 = 'body' | '原位弹出层'
 
@@ -31,6 +33,7 @@ class 浮层管理器类 {
   private 全局监听器 = new AbortController()
   private 原页面滚动状态: 页面滚动状态 | null = null
   private 原惰性状态 = new Map<HTMLElement, boolean>()
+  private 门户根: HTMLDivElement | null = null
 
   public constructor() {
     this.绑定全局事件()
@@ -45,7 +48,7 @@ class 浮层管理器类 {
       if (记录.根元素.isConnected === false) throw new Error('原位弹出层必须先连接至文档')
       记录.根元素.setAttribute('popover', 'manual')
       记录.根元素.showPopover()
-    } else document.body.appendChild(记录.根元素)
+    } else this.获得门户根().appendChild(记录.根元素)
     this.栈.push(记录)
     this.同步页面滚动()
     this.同步背景可交互性()
@@ -85,6 +88,15 @@ class 浮层管理器类 {
 
   public 是否有浮层(): boolean {
     return this.栈.length > 0
+  }
+
+  public 获得门户根(): HTMLDivElement {
+    if (this.门户根 === null) {
+      this.门户根 = 创建元素('div')
+      this.门户根.dataset['overlayPortal'] = 'true'
+    }
+    if (this.门户根.isConnected === false) document.body.append(this.门户根)
+    return this.门户根
   }
 
   private 绑定全局事件(): void {

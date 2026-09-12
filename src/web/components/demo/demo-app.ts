@@ -3,6 +3,7 @@ import { 右键菜单管理器 } from '../../global/manager/context-menu-manager
 import { 显示对话框 } from '../../global/manager/dialog-manager'
 import { 显示模态框 } from '../../global/manager/modal-manager'
 import { 成功提示, 显示吐司 } from '../../global/manager/toast-manager'
+import { 等待可取消任务 } from '../../global/tools/abort'
 import { 创建元素 } from '../../global/tools/create-element'
 import { 主要按钮, 危险按钮, 普通按钮 } from '../general/base/base-button'
 import { 卡片组件 } from '../general/base/card'
@@ -120,13 +121,13 @@ export class 演示应用组件 extends 组件基类<发出事件类型, 监听�
   }
 
   private 创建表单区(): HTMLElement {
-    let 多选下拉 = new 多选下拉框({ 占位符: '请选择标签' })
-    多选下拉.监听发出事件('打开', (): void => {
-      多选下拉.刷新列表([
-        { 文字: '前端', value: 'frontend' },
-        { 文字: '后端', value: 'backend' },
-        { 文字: '测试', value: 'testing' },
-      ])
+    let 多选下拉 = new 多选下拉框({
+      占位符: '请选择标签',
+      选项列表: [
+        { 文本: '前端', 值: 'frontend' },
+        { 文本: '后端', 值: 'backend' },
+        { 文本: '测试', 值: 'testing' },
+      ],
     })
     let 表单实例 = new 表单<资料数据>({
       项列表: [
@@ -135,11 +136,15 @@ export class 演示应用组件 extends 组件基类<发出事件类型, 监听�
           标签: '普通文本演示',
           组件: new 普通输入框(),
           必填: true,
+          校验防抖毫秒: 200,
           校验器们: [
-            async (): Promise<string | null> => {
-              await new Promise<void>((完成): void => {
-                setTimeout(完成, 100)
-              })
+            async (_值, _数据, { 信号 }): Promise<string | null> => {
+              await 等待可取消任务(
+                new Promise<void>((完成): void => {
+                  setTimeout(完成, 100)
+                }),
+                信号,
+              )
               return null
             },
           ],

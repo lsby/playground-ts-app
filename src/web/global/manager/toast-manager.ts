@@ -1,5 +1,6 @@
 import { 创建图标, type 图标名称 } from '../../components/general/base/icon'
 import { 创建元素 } from '../tools/create-element'
+import { 浮层管理器 } from './overlay-manager'
 
 export type 吐司类型 = 'success' | 'error' | 'warning' | 'info'
 export type 吐司位置 = 'top' | 'bottom' | 'center'
@@ -112,7 +113,7 @@ class 吐司管理器类 {
       容器.style.bottom = 'var(--间距-5)'
       容器.style.flexDirection = 'column-reverse'
     } else 容器.style.top = '50%'
-    document.body.append(容器)
+    浮层管理器.获得门户根().append(容器)
     this.容器映射.set(位置, 容器)
     return 容器
   }
