@@ -120,15 +120,13 @@ export class 演示应用组件 extends 组件基类<发出事件类型, 监听�
   }
 
   private 创建表单区(): HTMLElement {
-    let 多选下拉 = new 多选下拉框({
-      占位符: '请选择标签',
-      打开处理函数: (): void => {
-        多选下拉.刷新列表([
-          { 文字: '前端', value: 'frontend' },
-          { 文字: '后端', value: 'backend' },
-          { 文字: '测试', value: 'testing' },
-        ])
-      },
+    let 多选下拉 = new 多选下拉框({ 占位符: '请选择标签' })
+    多选下拉.监听发出事件('打开', (): void => {
+      多选下拉.刷新列表([
+        { 文字: '前端', value: 'frontend' },
+        { 文字: '后端', value: 'backend' },
+        { 文字: '测试', value: 'testing' },
+      ])
     })
     let 表单实例 = new 表单<资料数据>({
       项列表: [

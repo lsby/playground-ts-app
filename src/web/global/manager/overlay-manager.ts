@@ -1,4 +1,5 @@
 type 外部关闭策略 = '不关闭' | '仅遮罩' | '任意外部'
+type 浮层挂载方式 = 'body' | '原位弹出层'
 
 export type 浮层选项 = {
   根元素: HTMLElement
@@ -8,11 +9,19 @@ export type 浮层选项 = {
   外部关闭?: 外部关闭策略
   初始焦点?: HTMLElement
   请求关闭?: () => void | Promise<void>
+  挂载方式?: 浮层挂载方式
+  附加内部元素?: readonly HTMLElement[]
+  位置更新?: () => void
 }
 
 export type 浮层句柄 = { id: number; 关闭: () => Promise<void> }
 
-type 浮层记录 = 浮层选项 & { id: number; 原焦点: HTMLElement | null; 正在关闭: boolean }
+type 浮层记录 = 浮层选项 & {
+  id: number
+  原焦点: HTMLElement | null
+  正在关闭: boolean
+  位置监听器: AbortController | null
+}
 
 type 页面滚动状态 = { overflow: string; paddingRight: string }
 
@@ -29,13 +38,18 @@ class 浮层管理器类 {
 
   public 打开(选项: 浮层选项): 浮层句柄 {
     this.序号 += 1
-    let 记录: 浮层记录 = { ...选项, id: this.序号, 原焦点: this.获得当前焦点(), 正在关闭: false }
+    let 记录: 浮层记录 = { ...选项, id: this.序号, 原焦点: this.获得当前焦点(), 正在关闭: false, 位置监听器: null }
     记录.根元素.style.zIndex = `calc(var(--浮层起始层级) + ${String(this.栈.length * 2)})`
     记录.根元素.dataset['overlayId'] = String(记录.id)
+    if (记录.挂载方式 === '原位弹出层') {
+      if (记录.根元素.isConnected === false) throw new Error('原位弹出层必须先连接至文档')
+      记录.根元素.setAttribute('popover', 'manual')
+      记录.根元素.showPopover()
+    } else document.body.appendChild(记录.根元素)
     this.栈.push(记录)
-    document.body.appendChild(记录.根元素)
     this.同步页面滚动()
     this.同步背景可交互性()
+    this.绑定位置更新(记录)
     this.安排初始聚焦(记录)
 
     return { id: 记录.id, 关闭: async (): Promise<void> => await this.关闭(记录.id) }
@@ -48,7 +62,10 @@ class 浮层管理器类 {
     记录.正在关闭 = true
     let 索引 = this.栈.findIndex((项) => 项.id === 记录.id)
     if (索引 >= 0) this.栈.splice(索引, 1)
-    记录.根元素.remove()
+    记录.位置监听器?.abort()
+    if (记录.挂载方式 === '原位弹出层') {
+      if (记录.根元素.matches(':popover-open') === true) 记录.根元素.hidePopover()
+    } else 记录.根元素.remove()
     this.同步页面滚动()
     this.同步背景可交互性()
     if (是顶层 === true && 记录.原焦点?.isConnected === true) 记录.原焦点.focus()
@@ -89,16 +106,33 @@ class 浮层管理器类 {
       'pointerdown',
       (event: PointerEvent): void => {
         let 顶层 = this.获得顶层()
-        if (顶层 === undefined || event.target instanceof Node === false) return
+        let 目标 = event.target
+        if (顶层 === undefined || 目标 instanceof Node === false) return
         let 策略 = 顶层.外部关闭 ?? '不关闭'
-        let 是内部 = 顶层.内容元素.contains(event.target)
-        let 是遮罩 = event.target === 顶层.根元素
+        let 事件路径 = event.composedPath()
+        let 是内部 =
+          事件路径.includes(顶层.内容元素) ||
+          顶层.内容元素.contains(目标) ||
+          顶层.附加内部元素?.some((元素): boolean => 事件路径.includes(元素) || 元素.contains(目标)) === true
+        let 是遮罩 = 目标 === 顶层.根元素
         if ((策略 === '任意外部' && 是内部 === false) || (策略 === '仅遮罩' && 是遮罩 === true)) {
           void this.请求关闭(顶层.id).catch((错误: unknown): void => console.error('关闭浮层失败:', 错误))
         }
       },
       { capture: true, signal: this.全局监听器.signal },
     )
+  }
+
+  private 绑定位置更新(记录: 浮层记录): void {
+    if (记录.位置更新 === undefined) return
+    let 监听器 = new AbortController()
+    记录.位置监听器 = 监听器
+    let 更新 = (): void => {
+      if (记录.正在关闭 === false && this.栈.some((项): boolean => 项.id === 记录.id)) 记录.位置更新?.()
+    }
+    window.addEventListener('resize', 更新, { signal: 监听器.signal })
+    window.addEventListener('scroll', 更新, { capture: true, signal: 监听器.signal })
+    更新()
   }
 
   private 安排初始聚焦(记录: 浮层记录, 尝试次数 = 0): void {

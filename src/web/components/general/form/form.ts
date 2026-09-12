@@ -14,19 +14,48 @@ export type 表单元素<值类型 extends 基础值结构 = 基础值结构> = 
   获得禁用?(): boolean
   聚焦?(): void
   设置可访问名称?(名称: string): void
-  设置校验状态?(错误: string | null, 描述元素标识列表: string[]): void
+  设置校验状态?(错误: string | null, 描述文本列表: string[]): void
 }
+
+let 表单控件描述序号 = 0
+let 表单控件描述元素映射 = new WeakMap<Node, HTMLSpanElement>()
 
 export function 同步表单控件校验状态(
   元素列表: Iterable<HTMLElement>,
   错误: string | null,
-  描述元素标识列表: string[],
+  描述文本列表: string[],
 ): void {
-  let 描述 = 描述元素标识列表.join(' ')
-  for (let 元素 of 元素列表) {
+  let 控件列表 = [...元素列表]
+  let 首个控件 = 控件列表[0]
+  if (首个控件 === undefined) return
+  let 根节点 = 首个控件.getRootNode()
+  let 描述元素 = 表单控件描述元素映射.get(根节点)
+  if (描述元素 === undefined) {
+    表单控件描述序号 += 1
+    描述元素 = 创建元素('span', {
+      id: `lsby-form-control-description-${表单控件描述序号}`,
+      style: {
+        position: 'absolute',
+        width: '1px',
+        height: '1px',
+        padding: '0',
+        margin: '-1px',
+        overflow: 'hidden',
+        clipPath: 'inset(50%)',
+        whiteSpace: 'nowrap',
+        border: '0',
+      },
+    })
+    表单控件描述元素映射.set(根节点, 描述元素)
+  }
+  let 完整描述列表 = [...描述文本列表, ...(错误 === null ? [] : [错误])].filter((文本): boolean => 文本 !== '')
+  描述元素.textContent = 完整描述列表.join('；')
+  if (完整描述列表.length > 0 && 描述元素.parentNode !== 根节点) 根节点.appendChild(描述元素)
+  if (完整描述列表.length === 0) 描述元素.remove()
+  for (let 元素 of 控件列表) {
     元素.setAttribute('aria-invalid', 错误 === null ? 'false' : 'true')
-    if (描述 === '') 元素.removeAttribute('aria-describedby')
-    else 元素.setAttribute('aria-describedby', 描述)
+    if (完整描述列表.length === 0) 元素.removeAttribute('aria-describedby')
+    else 元素.setAttribute('aria-describedby', 描述元素.id)
   }
 }
 
@@ -76,6 +105,7 @@ type 运行项 = {
   错误元素: HTMLDivElement | null
   当前错误: string | null
   描述元素标识列表: string[]
+  描述文本列表: string[]
   已触碰: boolean
   已修改: boolean
   校验代次: number
@@ -150,6 +180,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
       let 运行项 = this.运行项映射.get(项配置.键)
       if (运行项 === undefined) continue
       运行项.描述元素标识列表 = []
+      运行项.描述文本列表 = []
       运行项.错误元素 = null
       let 项包装器 = 创建元素('div', {
         className:
@@ -180,6 +211,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
           }),
         )
         运行项.描述元素标识列表.push(帮助标识)
+        运行项.描述文本列表.push(项配置.帮助文本)
       }
       let 错误标识 = `${this.表单标识前缀}-error-${项索引}`
       let 错误元素 = 创建元素('div', {
@@ -319,6 +351,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
       错误元素: null,
       当前错误: null,
       描述元素标识列表: [],
+      描述文本列表: [],
       已触碰: false,
       已修改: false,
       校验代次: 0,
@@ -388,7 +421,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
     运行项.组件.setAttribute('aria-invalid', 错误 === null ? 'false' : 'true')
     运行项.组件.setAttribute('aria-describedby', 运行项.描述元素标识列表.join(' '))
     let 设置校验状态 = '设置校验状态' in 运行项.组件 ? 运行项.组件['设置校验状态'] : undefined
-    if (typeof 设置校验状态 === 'function') 设置校验状态.call(运行项.组件, 错误, 运行项.描述元素标识列表)
+    if (typeof 设置校验状态 === 'function') 设置校验状态.call(运行项.组件, 错误, 运行项.描述文本列表)
   }
 
   private 是空值(值: 基础值结构): boolean {

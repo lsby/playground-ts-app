@@ -12,7 +12,6 @@ export type 复选框组配置 = {
   禁用?: boolean
   额外提示?: string
   可访问名称?: string
-  变化处理函数?: (选中值列表: string[]) => void | Promise<void>
   宿主样式?: 增强样式类型
   元素样式?: 增强样式类型
 }
@@ -60,7 +59,6 @@ export class 复选框组 extends 表单组件基类<复选框组事件, 监听�
         复选框.onchange = (): void => {
           let 选中值列表 = this.获得选中值列表()
           this.配置.选中值列表 = 选中值列表
-          this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(选中值列表))
           this.派发事件('变化', 选中值列表)
         }
         选项容器.appendChild(复选框)
@@ -137,8 +135,8 @@ export class 复选框组 extends 表单组件基类<复选框组事件, 监听�
     this.配置.可访问名称 = 名称
     this.容器元素?.setAttribute('aria-label', 名称)
   }
-  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
-    同步表单控件校验状态(this.复选框元素们, 错误, 描述元素标识列表)
+  public 设置校验状态(错误: string | null, 描述文本列表: string[]): void {
+    同步表单控件校验状态(this.复选框元素们, 错误, 描述文本列表)
   }
 }
 

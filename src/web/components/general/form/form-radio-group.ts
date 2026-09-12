@@ -13,7 +13,6 @@ export type 单选框组配置<值类型 extends string> = {
   禁用?: boolean
   额外提示?: string
   可访问名称?: string
-  变化处理函数?: (值: 值类型) => void | Promise<void>
   宿主样式?: 增强样式类型
   元素样式?: 增强样式类型
   方向?: '横' | '竖'
@@ -93,7 +92,6 @@ export class 单选框组<值类型 extends string = string> extends 表单组�
         单选框.onchange = (): void => {
           let 值 = 单选框.value as 值类型
           this.配置.值 = 值
-          this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(值))
           this.派发事件('变化', 值)
         }
         选项容器.appendChild(单选框)
@@ -147,8 +145,8 @@ export class 单选框组<值类型 extends string = string> extends 表单组�
     this.配置.可访问名称 = 名称
     this.容器元素?.setAttribute('aria-label', 名称)
   }
-  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
-    同步表单控件校验状态(this.单选框元素们, 错误, 描述元素标识列表)
+  public 设置校验状态(错误: string | null, 描述文本列表: string[]): void {
+    同步表单控件校验状态(this.单选框元素们, 错误, 描述文本列表)
   }
 }
 

@@ -3,14 +3,7 @@ import { 增强样式类型 } from '../../../global/types/style'
 import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
 type 开关事件 = { 变化: boolean; 失焦: void }
-export type 开关配置 = {
-  标签?: string
-  值?: boolean
-  禁用?: boolean
-  可访问名称?: string
-  变化处理函数?: (值: boolean) => void | Promise<void>
-  宿主样式?: 增强样式类型
-}
+export type 开关配置 = { 标签?: string; 值?: boolean; 禁用?: boolean; 可访问名称?: string; 宿主样式?: 增强样式类型 }
 
 export class 开关组件 extends 表单组件基类<开关事件, {}, boolean> {
   static {
@@ -81,7 +74,6 @@ export class 开关组件 extends 表单组件基类<开关事件, {}, boolean> 
     输入.onchange = (): void => {
       this.配置.值 = 输入.checked
       this.同步视觉状态()
-      this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(输入.checked))
       this.派发事件('变化', 输入.checked)
     }
     输入.onblur = (): void => {
@@ -124,8 +116,8 @@ export class 开关组件 extends 表单组件基类<开关事件, {}, boolean> 
     this.配置.可访问名称 = 名称
     this.输入元素?.setAttribute('aria-label', 名称)
   }
-  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
-    if (this.输入元素 !== undefined) 同步表单控件校验状态([this.输入元素], 错误, 描述元素标识列表)
+  public 设置校验状态(错误: string | null, 描述文本列表: string[]): void {
+    if (this.输入元素 !== undefined) 同步表单控件校验状态([this.输入元素], 错误, 描述文本列表)
   }
   private 同步视觉状态(): void {
     let 已选中 = this.输入元素?.checked ?? this.配置.值 ?? false

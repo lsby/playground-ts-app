@@ -1,20 +1,19 @@
 import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 组件基类 } from '../../../base/base'
+import { 浮层管理器, type 浮层句柄 } from '../../../global/manager/overlay-manager'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
 import { 创建图标 } from '../base/icon'
 import { 同步表单控件校验状态, type 表单元素 } from './form'
 
 export type 多选下拉框选项 = { 文字: string; value: string }
 
-type 多选下拉框事件 = { 变化: string[]; 失焦: void }
+type 多选下拉框事件 = { 打开: void; 变化: string[]; 失焦: void }
 type 监听多选下拉框事件 = {}
 
 let 多选下拉框序号 = 0
 
 export type 多选下拉框配置 = {
   占位符?: string
-  打开处理函数?: () => void | Promise<void>
-  变化处理函数?: (选中值列表: string[]) => void | Promise<void>
   宿主样式?: 增强样式类型
   值?: string[]
   禁用?: boolean
@@ -31,6 +30,7 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
   private 箭头?: SVGSVGElement
   private 浮动面板?: HTMLDivElement
   private 触发按钮?: HTMLButtonElement
+  private 浮层句柄: 浮层句柄 | null = null
   private 选项列表: 多选下拉框选项[] = []
   private 面板id: string
 
@@ -85,12 +85,9 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
       id: this.面板id,
       role: 'listbox',
       style: {
-        display: 'none',
-        position: 'absolute',
-        top: '100%',
-        left: '0',
-        right: '0',
-        zIndex: '9999',
+        position: 'fixed',
+        inset: 'unset',
+        margin: '0',
         border: '1px solid var(--边框颜色)',
         borderRadius: '4px',
         backgroundColor: 'var(--背景颜色)',
@@ -98,6 +95,7 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
         padding: '6px 0',
         maxHeight: '200px',
         overflowY: 'auto',
+        boxSizing: 'border-box',
       },
     })
     this.浮动面板.setAttribute('aria-multiselectable', 'true')
@@ -110,18 +108,20 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
 
     触发框.onclick = (): void => {
       if (this.配置.禁用 === true) return
-      if (this.展开状态 === true) this.关闭面板()
-      else this.打开面板(false)
+      this.安全执行(async (): Promise<void> => {
+        if (this.展开状态 === true) await this.关闭面板()
+        else this.打开面板(false)
+      })
     }
     触发框.onkeydown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape' && this.展开状态 === true) {
         event.preventDefault()
-        this.关闭面板()
+        this.安全执行(async (): Promise<void> => await this.关闭面板())
         return
       }
       if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown') {
         event.preventDefault()
-        if (this.展开状态 === false) this.打开面板(true)
+        if (this.展开状态 === false) this.安全执行((): void => this.打开面板(true))
         else this.聚焦选项(0)
       }
     }
@@ -136,7 +136,7 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
         失焦计时器 = null
         let 当前焦点 = this.shadow.activeElement
         if (当前焦点 instanceof Node && 容器.contains(当前焦点) === true) return
-        this.关闭面板()
+        this.安全执行(async (): Promise<void> => await this.关闭面板())
         this.派发事件('失焦', undefined)
       })
     }
@@ -145,30 +145,65 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
       容器.removeEventListener('focusout', 失去焦点)
       if (失焦计时器 !== null) window.clearTimeout(失焦计时器)
     })
+    this.注册清理(async (): Promise<void> => await this.关闭面板())
 
     this.shadow.appendChild(容器)
     this.渲染选项列表()
   }
 
   private 打开面板(聚焦首项: boolean): void {
-    this.展开状态 = true
-    if (this.浮动面板 !== undefined) this.浮动面板.style.display = 'block'
-    if (this.箭头 !== undefined) this.箭头.style.transform = 'rotate(180deg)'
-    this.触发按钮?.setAttribute('aria-expanded', 'true')
-    this.安全执行(async (): Promise<void> => {
-      await this.配置.打开处理函数?.()
-      if (聚焦首项 === true && this.展开状态 === true) {
-        let 选中索引 = this.当前输入列表.findIndex((输入): boolean => 输入.checked)
-        this.聚焦选项(选中索引 >= 0 ? 选中索引 : 0)
-      }
+    if (this.浮动面板 === undefined || this.触发按钮 === undefined || this.浮层句柄 !== null) return
+    this.浮层句柄 = 浮层管理器.打开({
+      根元素: this.浮动面板,
+      内容元素: this.浮动面板,
+      挂载方式: '原位弹出层',
+      附加内部元素: [this.触发按钮],
+      外部关闭: '任意外部',
+      允许Escape关闭: true,
+      位置更新: (): void => this.更新面板位置(),
+      请求关闭: async (): Promise<void> => await this.关闭面板(),
     })
+    this.展开状态 = true
+    if (this.箭头 !== undefined) this.箭头.style.transform = 'rotate(180deg)'
+    this.触发按钮.setAttribute('aria-expanded', 'true')
+    this.派发事件('打开', undefined)
+    this.更新面板位置()
+    if (聚焦首项 === true && this.仍在展开状态() === true) {
+      let 选中索引 = this.当前输入列表.findIndex((输入): boolean => 输入.checked)
+      this.聚焦选项(选中索引 >= 0 ? 选中索引 : 0)
+    }
   }
 
-  private 关闭面板(): void {
+  private 仍在展开状态(): boolean {
+    return this.展开状态
+  }
+
+  private async 关闭面板(): Promise<void> {
     this.展开状态 = false
-    if (this.浮动面板 !== undefined) this.浮动面板.style.display = 'none'
     if (this.箭头 !== undefined) this.箭头.style.transform = 'rotate(0deg)'
     this.触发按钮?.setAttribute('aria-expanded', 'false')
+    let 句柄 = this.浮层句柄
+    this.浮层句柄 = null
+    await 句柄?.关闭()
+  }
+
+  private 更新面板位置(): void {
+    if (this.浮动面板 === undefined || this.触发按钮 === undefined) return
+    let 边距 = 8
+    let 间隔 = 4
+    let 触发框矩形 = this.触发按钮.getBoundingClientRect()
+    let 面板宽度 = Math.min(触发框矩形.width, window.innerWidth - 边距 * 2)
+    this.浮动面板.style.width = `${Math.max(0, 面板宽度)}px`
+    let 下方空间 = window.innerHeight - 触发框矩形.bottom - 间隔 - 边距
+    let 上方空间 = 触发框矩形.top - 间隔 - 边距
+    let 放在上方 = 下方空间 < Math.min(200, this.浮动面板.scrollHeight) && 上方空间 > 下方空间
+    let 可用高度 = Math.max(80, Math.min(200, 放在上方 ? 上方空间 : 下方空间))
+    this.浮动面板.style.maxHeight = `${可用高度}px`
+    let 面板高度 = Math.min(this.浮动面板.scrollHeight, 可用高度)
+    let 左 = Math.max(边距, Math.min(触发框矩形.left, window.innerWidth - 面板宽度 - 边距))
+    let 上 = 放在上方 ? 触发框矩形.top - 面板高度 - 间隔 : 触发框矩形.bottom + 间隔
+    this.浮动面板.style.left = `${左}px`
+    this.浮动面板.style.top = `${Math.max(边距, 上)}px`
   }
 
   private 更新显示文本(): void {
@@ -183,6 +218,7 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
     this.配置.值 = this.获得值()
     this.选项列表 = [...选项列表]
     this.渲染选项列表()
+    if (this.展开状态 === true) this.更新面板位置()
   }
 
   private 渲染选项列表(): void {
@@ -263,7 +299,7 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
         输入.parentElement.setAttribute('aria-disabled', 值 ? 'true' : 'false')
       }
     }
-    if (值 === true) this.关闭面板()
+    if (值 === true) this.安全执行(async (): Promise<void> => await this.关闭面板())
   }
   public 获得禁用(): boolean {
     return this.配置.禁用 ?? false
@@ -276,9 +312,9 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
     this.触发按钮?.setAttribute('aria-label', 名称)
     this.浮动面板?.setAttribute('aria-label', `${名称}选项`)
   }
-  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
-    if (this.触发按钮 !== undefined) 同步表单控件校验状态([this.触发按钮], 错误, 描述元素标识列表)
-    同步表单控件校验状态(this.当前选项元素列表, 错误, 描述元素标识列表)
+  public 设置校验状态(错误: string | null, 描述文本列表: string[]): void {
+    if (this.触发按钮 !== undefined) 同步表单控件校验状态([this.触发按钮], 错误, 描述文本列表)
+    同步表单控件校验状态(this.当前选项元素列表, 错误, 描述文本列表)
   }
 
   private 切换选项(输入: HTMLInputElement, 选项元素: HTMLDivElement, 选中标记: SVGSVGElement): void {
@@ -287,14 +323,13 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
     this.更新显示文本()
     let 选中值 = this.获得值()
     this.配置.值 = 选中值
-    this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(选中值))
     this.派发事件('变化', 选中值)
   }
 
   private 处理选项键盘(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       event.preventDefault()
-      this.关闭面板()
+      this.安全执行(async (): Promise<void> => await this.关闭面板())
       this.触发按钮?.focus()
       return
     }

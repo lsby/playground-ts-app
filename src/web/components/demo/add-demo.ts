@@ -16,25 +16,21 @@ export class 演示加法组件 extends 组件基类<发出事件类型, 监听�
   private 值a: string = '0'
   private 值b: string = '0'
   private 结果 = 创建元素('p')
-  private 输入框1 = new 数字输入框({
-    占位符: '输入第一个数字',
-    输入处理函数: async (值: string): Promise<void> => {
-      this.值a = 值
-      await this.计算结果()
-    },
-  })
-  private 输入框2 = new 数字输入框({
-    占位符: '输入第二个数字',
-    输入处理函数: async (值: string): Promise<void> => {
-      this.值b = 值
-      await this.计算结果()
-    },
-  })
+  private 输入框1 = new 数字输入框({ 占位符: '输入第一个数字' })
+  private 输入框2 = new 数字输入框({ 占位符: '输入第二个数字' })
 
   public constructor(配置: 加法配置 = {}) {
     super()
     this.值a = 配置.a ?? '0'
     this.值b = 配置.b ?? '0'
+    this.输入框1.监听发出事件('输入', async (事件): Promise<void> => {
+      this.值a = 事件.detail
+      await this.计算结果()
+    })
+    this.输入框2.监听发出事件('输入', async (事件): Promise<void> => {
+      this.值b = 事件.detail
+      await this.计算结果()
+    })
   }
 
   protected override async 当加载时(): Promise<void> {

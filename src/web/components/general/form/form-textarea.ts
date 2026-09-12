@@ -14,8 +14,6 @@ export type 自动伸缩文本框配置 = {
   回车提交?: boolean
   自动伸缩?: boolean
   额外提示?: string
-  变化处理函数?: (值: string) => void | Promise<void>
-  提交处理函数?: (值: string) => void | Promise<void>
   宿主样式?: 增强样式类型
   可访问名称?: string
 }
@@ -71,7 +69,6 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
       onchange: (): void => {
         let 值 = this.获得值()
         this.配置.值 = 值
-        this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(值))
         this.派发事件('变化', 值)
       },
       onkeydown: (e: KeyboardEvent): void => {
@@ -79,7 +76,6 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
           e.preventDefault()
           let 值 = this.获得值()
           if (值.trim() !== '') {
-            this.安全执行(async (): Promise<void> => await this.配置.提交处理函数?.(值))
             this.派发事件('提交', 值)
           }
         }
@@ -215,8 +211,8 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
     this.文本框元素?.setAttribute('aria-label', 名称)
   }
 
-  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
-    if (this.文本框元素 !== undefined) 同步表单控件校验状态([this.文本框元素], 错误, 描述元素标识列表)
+  public 设置校验状态(错误: string | null, 描述文本列表: string[]): void {
+    if (this.文本框元素 !== undefined) 同步表单控件校验状态([this.文本框元素], 错误, 描述文本列表)
   }
 
   public 聚焦(): void {

@@ -2,7 +2,7 @@ import { 创建元素, 应用宿主样式, 应用样式 } from '../../../global/
 import { 增强样式类型 } from '../../../global/types/style'
 import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
-type 输入框事件 = { 输入: string; 变化: string; 焦点: void; 失焦: void; 回车: string }
+type 输入框事件 = { 输入: string; 变化: string; 焦点: void; 失焦: string; 回车: string }
 type 监听输入框事件 = {}
 
 export type 输入框配置 = {
@@ -14,11 +14,6 @@ export type 输入框配置 = {
   额外提示?: string
   可访问名称?: string
   自动完成?: string
-  输入处理函数?: (值: string) => void | Promise<void>
-  变化处理函数?: (值: string) => void | Promise<void>
-  焦点处理函数?: () => void | Promise<void>
-  失焦处理函数?: (值: string) => void | Promise<void>
-  回车处理函数?: (值: string) => void | Promise<void>
   宿主样式?: 增强样式类型
   元素样式?: 增强样式类型
   最小值?: string
@@ -55,26 +50,21 @@ abstract class 输入框基类 extends 表单组件基类<输入框事件, 监�
     if (this.配置.可访问名称 !== undefined) 输入框.setAttribute('aria-label', this.配置.可访问名称)
     输入框.oninput = (): void => {
       this.配置.值 = 输入框.value
-      this.安全执行(async (): Promise<void> => await this.配置.输入处理函数?.(输入框.value))
       this.派发事件('输入', 输入框.value)
     }
     输入框.onchange = (): void => {
       this.配置.值 = 输入框.value
-      this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(输入框.value))
       this.派发事件('变化', 输入框.value)
     }
     输入框.onfocus = (): void => {
-      this.安全执行(async (): Promise<void> => await this.配置.焦点处理函数?.())
       this.派发事件('焦点', undefined)
     }
     输入框.onblur = (): void => {
       this.配置.值 = 输入框.value
-      this.安全执行(async (): Promise<void> => await this.配置.失焦处理函数?.(输入框.value))
-      this.派发事件('失焦', undefined)
+      this.派发事件('失焦', 输入框.value)
     }
     输入框.onkeydown = (event: KeyboardEvent): void => {
       if (event.key !== 'Enter' || event.isComposing === true) return
-      this.安全执行(async (): Promise<void> => await this.配置.回车处理函数?.(输入框.value))
       this.派发事件('回车', 输入框.value)
     }
     容器.append(输入框)
@@ -146,8 +136,8 @@ abstract class 输入框基类 extends 表单组件基类<输入框事件, 监�
     this.输入框元素?.setAttribute('aria-label', 名称)
   }
 
-  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
-    if (this.输入框元素 !== undefined) 同步表单控件校验状态([this.输入框元素], 错误, 描述元素标识列表)
+  public 设置校验状态(错误: string | null, 描述文本列表: string[]): void {
+    if (this.输入框元素 !== undefined) 同步表单控件校验状态([this.输入框元素], 错误, 描述文本列表)
   }
 }
 

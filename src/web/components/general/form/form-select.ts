@@ -2,7 +2,7 @@ import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 创建元素, 应用宿主样式, 应用样式 } from '../../../global/tools/create-element'
 import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
-type 下拉框事件 = { 变化: string; 焦点: void; 失焦: void }
+type 下拉框事件 = { 变化: string; 焦点: void; 失焦: string }
 
 type 监听下拉框事件 = {}
 
@@ -15,9 +15,6 @@ export type 下拉框配置 = {
   占位符?: string
   额外提示?: string
   可访问名称?: string
-  变化处理函数?: (值: string) => void | Promise<void>
-  焦点处理函数?: () => void | Promise<void>
-  失焦处理函数?: (值: string) => void | Promise<void>
   宿主样式?: 增强样式类型
   元素样式?: 增强样式类型
 }
@@ -69,17 +66,13 @@ abstract class 下拉框基类 extends 表单组件基类<下拉框事件, 监�
     下拉框元素.onchange = (e: Event): void => {
       let 值 = (e.target as HTMLSelectElement).value
       this.配置.值 = 值
-      this.安全执行(async (): Promise<void> => await this.配置.变化处理函数?.(值))
       this.派发事件('变化', 值)
     }
     下拉框元素.onfocus = (): void => {
-      this.安全执行(async (): Promise<void> => await this.配置.焦点处理函数?.())
       this.派发事件('焦点', undefined)
     }
     下拉框元素.onblur = (): void => {
-      let 值 = 下拉框元素.value
-      this.安全执行(async (): Promise<void> => await this.配置.失焦处理函数?.(值))
-      this.派发事件('失焦', undefined)
+      this.派发事件('失焦', 下拉框元素.value)
     }
 
     容器.appendChild(下拉框元素)
@@ -128,8 +121,8 @@ abstract class 下拉框基类 extends 表单组件基类<下拉框事件, 监�
     this.下拉框元素?.setAttribute('aria-label', 名称)
   }
 
-  public 设置校验状态(错误: string | null, 描述元素标识列表: string[]): void {
-    if (this.下拉框元素 !== undefined) 同步表单控件校验状态([this.下拉框元素], 错误, 描述元素标识列表)
+  public 设置校验状态(错误: string | null, 描述文本列表: string[]): void {
+    if (this.下拉框元素 !== undefined) 同步表单控件校验状态([this.下拉框元素], 错误, 描述文本列表)
   }
 
   public 设置选项列表(选项列表: 选项类型[]): void {

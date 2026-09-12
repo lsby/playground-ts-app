@@ -22,9 +22,6 @@ export class 演示todo组件 extends 组件基类<发出事件类型, 监听事
   private 输入框 = new 普通输入框({
     占位符: '请输入任务内容',
     元素样式: { padding: '0.5em', fontSize: '1em', borderColor: 'var(--边框颜色)' },
-    回车处理函数: (): void => {
-      this.添加任务()
-    },
   })
   private 添加按钮 = new 主要按钮({
     文本: '添加任务',
@@ -34,6 +31,11 @@ export class 演示todo组件 extends 组件基类<发出事件类型, 监听事
   })
   private 列表容器 = 创建元素('ul')
   private todo列表: string[] = []
+
+  public constructor() {
+    super()
+    this.输入框.监听发出事件('回车', (): void => this.添加任务())
+  }
 
   private 刷新列表(): void {
     this.列表容器.innerHTML = ''

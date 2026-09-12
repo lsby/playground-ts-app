@@ -15,9 +15,11 @@ export type 按钮配置 = {
   自动加载?: boolean
   尺寸?: 按钮尺寸
   图标?: Node
+  /** 按钮会等待此命令并管理自动加载态；仅观察点击时应监听“点击”事件。 */
   点击处理函数?: (e: MouseEvent) => void | Promise<void>
   宿主样式?: 增强样式类型
   元素样式?: 增强样式类型
+  /** 构造期引用钩子，用于内联创建按钮时取得实例。 */
   ref?: (el: 按钮基类) => void
 }
 
@@ -43,7 +45,7 @@ export abstract class 按钮基类 extends 组件基类<按钮事件, 监听按�
       type: 'button',
       style: 按钮样式,
       title: this.配置.标题 ?? '',
-      disabled: this.配置.禁用 === true,
+      disabled: this.获得实际禁用(),
     })
     按钮元素.setAttribute('aria-busy', this.配置.加载中 === true ? 'true' : 'false')
     按钮元素.setAttribute('aria-disabled', this.获得实际禁用() === true ? 'true' : 'false')
@@ -156,7 +158,7 @@ export abstract class 按钮基类 extends 组件基类<按钮事件, 监听按�
 
   private 同步状态(): void {
     if (this.按钮元素 === undefined) return
-    this.按钮元素.disabled = this.配置.禁用 === true
+    this.按钮元素.disabled = this.获得实际禁用()
     this.按钮元素.setAttribute('aria-busy', this.配置.加载中 === true ? 'true' : 'false')
     this.按钮元素.setAttribute('aria-disabled', this.获得实际禁用() === true ? 'true' : 'false')
     应用样式(this.按钮元素, this.获得按钮样式对象())

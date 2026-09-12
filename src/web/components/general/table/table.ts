@@ -47,7 +47,35 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
   private 表格单元格元素映射 = new Map<string, HTMLTableCellElement>()
   private 表头元素映射 = new Map<number, HTMLElement>()
   private 列单元格映射 = new Map<number, HTMLElement[]>()
+  private 列宽映射 = new Map<number, number>()
   private 选择管理器: 表格选择管理器<数据项>
+  private 根容器 = 创建元素('div', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--间距-3)' } })
+  private 加载状态元素 = 创建元素('div', {
+    role: 'status',
+    textContent: '正在加载…',
+    hidden: true,
+    style: { color: 'var(--次要文字颜色)' },
+  })
+  private 错误状态元素 = 创建元素('div', {
+    role: 'alert',
+    hidden: true,
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 'var(--间距-3)',
+      padding: 'var(--间距-3)',
+      color: 'var(--错误颜色)',
+      backgroundColor: 'color-mix(in srgb, var(--错误颜色) 10%, transparent)',
+      borderRadius: 'var(--圆角-中)',
+    },
+  })
+  private 错误文本元素 = 创建元素('span')
+  private 表格包装 = 创建元素('div', {
+    style: { width: '100%', overflowX: 'auto', border: '1px solid var(--边框颜色)', borderRadius: 'var(--圆角-中)' },
+  })
+  private 表格元素 = 创建元素('table', { style: { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' } })
+  private 分页: 分页组件
 
   public constructor(选项: 数据表格选项<数据项>) {
     super()
@@ -69,6 +97,21 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
       表格行元素映射: this.表格行元素映射,
       表格单元格元素映射: this.表格单元格元素映射,
     })
+    this.分页 = new 分页组件(this.分页配置, false)
+    this.分页.监听发出事件('页码变化', async (事件): Promise<void> => {
+      this.分页配置.当前页码 = 事件.detail.页码
+      this.派发事件('页码变化', 事件.detail)
+      await this.加载数据()
+    })
+    let 顶部 = 渲染顶部操作区(this.创建渲染上下文())
+    if (顶部 !== null) this.根容器.append(顶部)
+    this.错误状态元素.append(
+      this.错误文本元素,
+      new 普通按钮({ 文本: '重试', 尺寸: '紧凑', 点击处理函数: async (): Promise<void> => await this.加载数据() }),
+    )
+    this.表格元素.setAttribute('aria-label', this.可访问名称)
+    this.表格包装.append(this.表格元素)
+    this.根容器.append(this.加载状态元素, this.错误状态元素, this.表格包装, this.分页)
   }
 
   public 获得当前页码(): number {
@@ -83,6 +126,9 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
 
   protected override async 当加载时(): Promise<void> {
     应用宿主样式(this.获得宿主样式(), this.宿主样式)
+    this.shadow.append(this.根容器)
+    this.渲染数据视图()
+    this.同步状态视图()
     await this.加载数据()
   }
 
@@ -95,20 +141,21 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
     this.请求代次 += 1
     let 本次代次 = this.请求代次
     this.请求控制器.abort()
-    this.请求控制器 = new AbortController()
+    let 本次请求控制器 = new AbortController()
+    this.请求控制器 = 本次请求控制器
     this.加载中 = true
     this.加载错误 = null
     void 右键菜单管理器.获得实例().隐藏菜单()
     this.派发事件('加载状态变化', { 加载中: true, 错误: null })
-    this.渲染()
+    this.同步状态视图()
     try {
-      let 结果 = await this.请求当前页(this.请求控制器.signal)
-      if (本次代次 !== this.请求代次 || this.请求控制器.signal.aborted === true) return
+      let 结果 = await this.请求当前页(本次请求控制器.signal)
+      if (本次代次 !== this.请求代次 || 本次请求控制器.signal.aborted === true) return
       this.分页配置.总数量 = 结果.总数
       let 总页数 = Math.max(1, Math.ceil(结果.总数 / this.分页配置.每页数量))
       if (this.分页配置.当前页码 > 总页数) {
         this.分页配置.当前页码 = 总页数
-        结果 = await this.请求当前页(this.请求控制器.signal)
+        结果 = await this.请求当前页(本次请求控制器.signal)
         if (本次代次 !== this.请求代次) return
         this.分页配置.总数量 = 结果.总数
       }
@@ -116,12 +163,13 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
       this.数据列表.splice(0, this.数据列表.length, ...结果.数据)
       this.选择管理器.移除已不存在的选择()
     } catch (错误) {
-      if (this.请求控制器.signal.aborted === false && 本次代次 === this.请求代次)
+      if (本次请求控制器.signal.aborted === false && 本次代次 === this.请求代次)
         this.加载错误 = 错误 instanceof Error ? 错误.message : String(错误)
     } finally {
-      if (本次代次 === this.请求代次 && this.请求控制器.signal.aborted === false && this.isConnected === true) {
+      if (本次代次 === this.请求代次 && 本次请求控制器.signal.aborted === false && this.isConnected === true) {
         this.加载中 = false
-        this.渲染()
+        this.渲染数据视图()
+        this.同步状态视图()
         this.派发事件('加载状态变化', { 加载中: false, 错误: this.加载错误 })
       }
     }
@@ -137,58 +185,23 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
     })
   }
 
-  private 渲染(): void {
+  private 渲染数据视图(): void {
     this.表格行元素映射.clear()
     this.表格单元格元素映射.clear()
     this.表头元素映射.clear()
     this.列单元格映射.clear()
-    let 容器 = 创建元素('div', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--间距-3)' } })
     let 操作列宽度 = this.操作列表.map((操作) => Math.max(88, 操作.名称.length * 16 + 40))
     let 上下文 = this.创建渲染上下文()
-    let 顶部 = 渲染顶部操作区(上下文)
-    if (顶部 !== null) 容器.append(顶部)
-    if (this.加载中 === true)
-      容器.append(
-        创建元素('div', { role: 'status', textContent: '正在加载…', style: { color: 'var(--次要文字颜色)' } }),
-      )
-    if (this.加载错误 !== null) {
-      let 错误区 = 创建元素('div', {
-        role: 'alert',
-        style: {
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 'var(--间距-3)',
-          padding: 'var(--间距-3)',
-          color: 'var(--错误颜色)',
-          backgroundColor: 'color-mix(in srgb, var(--错误颜色) 10%, transparent)',
-          borderRadius: 'var(--圆角-中)',
-        },
-      })
-      错误区.append(
-        创建元素('span', { textContent: `加载失败：${this.加载错误}` }),
-        new 普通按钮({ 文本: '重试', 尺寸: '紧凑', 点击处理函数: async (): Promise<void> => await this.加载数据() }),
-      )
-      容器.append(错误区)
-    }
-    let 表格包装 = 创建元素('div', {
-      style: { width: '100%', overflowX: 'auto', border: '1px solid var(--边框颜色)', borderRadius: 'var(--圆角-中)' },
-    })
-    let 表格 = 创建元素('table', { style: { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' } })
-    表格.setAttribute('aria-label', this.可访问名称)
-    表格.setAttribute('aria-busy', this.加载中 ? 'true' : 'false')
-    表格.append(渲染表头(上下文, 操作列宽度), 渲染表体(上下文, 操作列宽度))
-    表格包装.append(表格)
-    容器.append(表格包装)
-    let 分页 = new 分页组件(this.分页配置, this.加载中)
-    分页.on页码变化 = async (数据): Promise<void> => {
-      this.分页配置.当前页码 = 数据.页码
-      this.派发事件('页码变化', 数据)
-      await this.加载数据()
-    }
-    容器.append(分页)
-    this.清空影子dom()
-    this.shadow.append(容器)
+    this.表格元素.replaceChildren(渲染表头(上下文, 操作列宽度), 渲染表体(上下文, 操作列宽度))
+    for (let [列索引, 宽度] of this.列宽映射) this.应用列宽到当前元素(列索引, 宽度)
+  }
+
+  private 同步状态视图(): void {
+    this.加载状态元素.hidden = this.加载中 === false
+    this.错误状态元素.hidden = this.加载错误 === null
+    this.错误文本元素.textContent = this.加载错误 === null ? '' : `加载失败：${this.加载错误}`
+    this.表格元素.setAttribute('aria-busy', this.加载中 ? 'true' : 'false')
+    this.分页.更新配置(this.分页配置, this.加载中)
   }
 
   private 创建渲染上下文(): 表格渲染上下文<数据项> {
@@ -275,12 +288,16 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
   }
   private 应用列宽(列索引: number, 宽度: number): void {
     let 新宽度 = Math.max(50, 宽度)
+    this.列宽映射.set(列索引, 新宽度)
+    this.应用列宽到当前元素(列索引, 新宽度)
+  }
+  private 应用列宽到当前元素(列索引: number, 宽度: number): void {
     let 元素们 = [this.表头元素映射.get(列索引), ...(this.列单元格映射.get(列索引) ?? [])]
     for (let 元素 of 元素们) {
       if (元素 === undefined) continue
-      元素.style.width = `${新宽度}px`
-      元素.style.minWidth = `${新宽度}px`
-      元素.style.maxWidth = `${新宽度}px`
+      元素.style.width = `${宽度}px`
+      元素.style.minWidth = `${宽度}px`
+      元素.style.maxWidth = `${宽度}px`
     }
   }
 }
