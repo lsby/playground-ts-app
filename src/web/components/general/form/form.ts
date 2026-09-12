@@ -113,12 +113,36 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
 
   protected override async 当加载时(): Promise<void> {
     应用宿主样式(this.获得宿主样式(), this.配置.宿主样式)
-    let 容器样式: 增强样式类型 = {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-      gap: 'var(--间距-4)',
-    }
-    let 容器 = 创建元素('div', { style: { ...容器样式, ...this.配置.元素样式 } })
+    this.获得宿主样式().containerType = 'inline-size'
+    this.shadow.append(
+      创建元素('style', {
+        textContent: `
+.lsby-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.lsby-form-item-full {
+  grid-column: 1 / -1;
+}
+@container (max-width: 560px) {
+  .lsby-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lsby-form-item {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 640px) {
+  .lsby-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lsby-form-item {
+    grid-column: 1 / -1;
+  }
+}`,
+      }),
+    )
+    let 容器样式: 增强样式类型 = { display: 'grid', gap: 'var(--间距-4)' }
+    let 容器 = 创建元素('div', { className: 'lsby-form-grid', style: { ...容器样式, ...this.配置.元素样式 } })
     容器.setAttribute('role', 'group')
     for (let 项索引 = 0; 项索引 < this.配置.项列表.length; 项索引 += 1) {
       let 项配置 = this.配置.项列表[项索引]
@@ -128,13 +152,9 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
       运行项.描述元素标识列表 = []
       运行项.错误元素 = null
       let 项包装器 = 创建元素('div', {
-        style: {
-          gridColumn: `span ${项配置.宽度 ?? 1}`,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--间距-1)',
-          minWidth: '0',
-        },
+        className:
+          项配置.宽度 !== undefined && 项配置.宽度 > 1 ? 'lsby-form-item lsby-form-item-full' : 'lsby-form-item',
+        style: { display: 'flex', flexDirection: 'column', gap: 'var(--间距-1)', minWidth: '0' },
       })
       let 标签文本 = 项配置.标签
       if (标签文本 !== undefined) {

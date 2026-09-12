@@ -24,7 +24,8 @@ export type 按钮配置 = {
 export abstract class 按钮基类 extends 组件基类<按钮事件, 监听按钮事件> {
   protected 配置: 按钮配置
   private 按钮元素?: HTMLButtonElement
-  private 文本元素?: HTMLSpanElement
+  private 前缀元素?: HTMLSpanElement
+  private 文本元素: HTMLSpanElement | undefined
   private 正在执行 = false
 
   public constructor(配置: 按钮配置 = {}) {
@@ -42,24 +43,23 @@ export abstract class 按钮基类 extends 组件基类<按钮事件, 监听按�
       type: 'button',
       style: 按钮样式,
       title: this.配置.标题 ?? '',
-      disabled: this.获得实际禁用(),
+      disabled: this.配置.禁用 === true,
     })
     按钮元素.setAttribute('aria-busy', this.配置.加载中 === true ? 'true' : 'false')
+    按钮元素.setAttribute('aria-disabled', this.获得实际禁用() === true ? 'true' : 'false')
     按钮元素.onclick = (event: MouseEvent): void => {
       event.preventDefault()
       this.安全执行(async (): Promise<void> => await this.执行点击(event))
     }
-
-    if (this.配置.加载中 === true) 按钮元素.append(this.创建加载指示器())
-    else if (this.配置.图标 !== undefined) 按钮元素.append(this.配置.图标)
-
-    if (this.配置.文本 !== undefined) {
-      let 文本元素 = 创建元素('span', { textContent: this.配置.文本 })
-      按钮元素.append(文本元素)
-      this.文本元素 = 文本元素
-    }
+    let 前缀元素 = 创建元素('span', {
+      style: { display: 'none', alignItems: 'center', justifyContent: 'center', flexShrink: '0' },
+    })
+    按钮元素.append(前缀元素)
     this.shadow.append(按钮元素)
     this.按钮元素 = 按钮元素
+    this.前缀元素 = 前缀元素
+    this.文本元素 = undefined
+    this.同步内容()
   }
 
   protected abstract 获得颜色(): { 背景: string; 文字: string; 边框: string }
@@ -104,7 +104,8 @@ export abstract class 按钮基类 extends 组件基类<按钮事件, 监听按�
   public 设置加载中(值: boolean): void {
     if (this.配置.加载中 === 值) return
     this.配置.加载中 = 值
-    this.安全执行(async (): Promise<void> => await this.刷新())
+    this.同步状态()
+    this.同步内容()
   }
 
   public 获得加载中(): boolean {
@@ -121,8 +122,7 @@ export abstract class 按钮基类 extends 组件基类<按钮事件, 监听按�
 
   public 设置文本(文本: string): void {
     this.配置.文本 = 文本
-    if (this.文本元素 !== undefined) this.文本元素.textContent = 文本
-    else this.安全执行(async (): Promise<void> => await this.刷新())
+    this.同步内容()
   }
 
   public 设置标题(标题: string): void {
@@ -133,7 +133,7 @@ export abstract class 按钮基类 extends 组件基类<按钮事件, 监听按�
   public 设置图标(图标: Node | undefined): void {
     if (图标 === undefined) delete this.配置.图标
     else this.配置.图标 = 图标
-    this.安全执行(async (): Promise<void> => await this.刷新())
+    this.同步内容()
   }
 
   private async 执行点击(event: MouseEvent): Promise<void> {
@@ -156,9 +156,26 @@ export abstract class 按钮基类 extends 组件基类<按钮事件, 监听按�
 
   private 同步状态(): void {
     if (this.按钮元素 === undefined) return
-    this.按钮元素.disabled = this.获得实际禁用()
+    this.按钮元素.disabled = this.配置.禁用 === true
     this.按钮元素.setAttribute('aria-busy', this.配置.加载中 === true ? 'true' : 'false')
+    this.按钮元素.setAttribute('aria-disabled', this.获得实际禁用() === true ? 'true' : 'false')
     应用样式(this.按钮元素, this.获得按钮样式对象())
+  }
+
+  private 同步内容(): void {
+    if (this.按钮元素 === undefined || this.前缀元素 === undefined) return
+    this.前缀元素.replaceChildren()
+    let 前缀: Node | undefined = this.配置.加载中 === true ? this.创建加载指示器() : this.配置.图标
+    if (前缀 !== undefined) this.前缀元素.append(前缀)
+    this.前缀元素.style.display = 前缀 === undefined ? 'none' : 'inline-flex'
+
+    if (this.配置.文本 !== undefined) {
+      if (this.文本元素 === undefined) {
+        this.文本元素 = 创建元素('span')
+        this.按钮元素.append(this.文本元素)
+      }
+      this.文本元素.textContent = this.配置.文本
+    }
   }
 
   private 创建加载指示器(): HTMLSpanElement {

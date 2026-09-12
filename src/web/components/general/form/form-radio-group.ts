@@ -22,7 +22,7 @@ export type 单选框组配置<值类型 extends string> = {
 
 let 单选框组序号 = 0
 
-class 单选框组<值类型 extends string = string> extends 表单组件基类<单选框组事件, 监听单选框组事件, 值类型> {
+export class 单选框组<值类型 extends string = string> extends 表单组件基类<单选框组事件, 监听单选框组事件, 值类型> {
   protected 配置: 单选框组配置<值类型>
   private 单选框元素们: HTMLInputElement[] = []
   private 组名: string
@@ -152,7 +152,4 @@ class 单选框组<值类型 extends string = string> extends 表单组件基类
   }
 }
 
-// 注册组件
 单选框组.注册组件('lsby-form-radio-group', 单选框组)
-
-export { 单选框组 }

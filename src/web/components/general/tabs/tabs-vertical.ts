@@ -145,6 +145,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
         transition: 'opacity 0.3s ease',
       },
     })
+    遮罩层.setAttribute('aria-hidden', 'true')
 
     // 移动端悬浮菜单按钮
     let 移动端菜单按钮 = 创建元素('button', {
@@ -176,17 +177,72 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
 
     移动端菜单按钮.appendChild(new 图标组件('menu', 24))
 
+    let 打开前焦点: HTMLElement | null = null
     let 打开移动端菜单 = (): void => {
+      let 当前焦点 = this.shadow.activeElement
+      打开前焦点 = 当前焦点 instanceof HTMLElement ? 当前焦点 : 移动端菜单按钮
       this.标签头容器.classList.add('open')
       遮罩层.classList.add('open')
       移动端菜单按钮.setAttribute('aria-expanded', 'true')
+      移动端菜单按钮.setAttribute('aria-label', '关闭标签页菜单')
+      移动端菜单按钮.title = '关闭标签页菜单'
+      requestAnimationFrame((): void => {
+        if (this.标签头容器.classList.contains('open') === false) return
+        let 初始焦点 = this.标签按钮列表[this.当前索引] ?? this.标签按钮列表[0] ?? 移动端菜单按钮
+        初始焦点.focus()
+      })
     }
 
     this.关闭移动端菜单 = (): void => {
+      let 恢复焦点 = 打开前焦点
+      打开前焦点 = null
       this.标签头容器.classList.remove('open')
       遮罩层.classList.remove('open')
       移动端菜单按钮.setAttribute('aria-expanded', 'false')
+      移动端菜单按钮.setAttribute('aria-label', '打开标签页菜单')
+      移动端菜单按钮.title = '打开标签页菜单'
+      if (恢复焦点?.isConnected === true) requestAnimationFrame((): void => 恢复焦点.focus())
     }
+
+    let 处理抽屉键盘 = (事件: Event): void => {
+      if (事件 instanceof KeyboardEvent === false) return
+      if (this.标签头容器.classList.contains('open') === false) return
+      if (事件.key === 'Escape') {
+        事件.preventDefault()
+        事件.stopPropagation()
+        this.关闭移动端菜单()
+        return
+      }
+      if (事件.key !== 'Tab') return
+      let 可聚焦按钮 = this.标签按钮列表.filter((按钮): boolean => 按钮.disabled === false && 按钮.tabIndex >= 0)
+      let 首个按钮 = 可聚焦按钮[0]
+      let 最后按钮 = 可聚焦按钮[可聚焦按钮.length - 1]
+      if (首个按钮 === undefined || 最后按钮 === undefined) {
+        事件.preventDefault()
+        移动端菜单按钮.focus()
+        return
+      }
+      let 当前焦点 = this.shadow.activeElement
+      let 焦点在抽屉内 = 当前焦点 instanceof HTMLButtonElement && 可聚焦按钮.includes(当前焦点)
+      if (事件.shiftKey === true && (当前焦点 === 首个按钮 || 焦点在抽屉内 === false)) {
+        事件.preventDefault()
+        最后按钮.focus()
+      } else if (事件.shiftKey === false && (当前焦点 === 最后按钮 || 焦点在抽屉内 === false)) {
+        事件.preventDefault()
+        首个按钮.focus()
+      }
+    }
+    this.shadow.addEventListener('keydown', 处理抽屉键盘)
+    this.注册清理((): void => this.shadow.removeEventListener('keydown', 处理抽屉键盘))
+
+    let 移动端查询 = window.matchMedia('(max-width: 768px)')
+    let 处理视口变化 = (): void => {
+      if (移动端查询.matches === true || this.标签头容器.classList.contains('open') === false) return
+      打开前焦点 = null
+      this.关闭移动端菜单()
+    }
+    移动端查询.addEventListener('change', 处理视口变化)
+    this.注册清理((): void => 移动端查询.removeEventListener('change', 处理视口变化))
 
     移动端菜单按钮.onclick = (事件: MouseEvent): void => {
       事件.stopPropagation()

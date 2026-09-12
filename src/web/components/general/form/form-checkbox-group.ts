@@ -17,7 +17,7 @@ export type 复选框组配置 = {
   元素样式?: 增强样式类型
 }
 
-class 复选框组 extends 表单组件基类<复选框组事件, 监听复选框组事件, string[]> {
+export class 复选框组 extends 表单组件基类<复选框组事件, 监听复选框组事件, string[]> {
   protected 配置: 复选框组配置
   private 复选框元素们: HTMLInputElement[] = []
   private 容器元素?: HTMLDivElement
@@ -142,7 +142,4 @@ class 复选框组 extends 表单组件基类<复选框组事件, 监听复选�
   }
 }
 
-// 注册组件
 复选框组.注册组件('lsby-form-checkbox-group', 复选框组)
-
-export { 复选框组 }
