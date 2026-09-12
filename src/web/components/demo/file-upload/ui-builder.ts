@@ -1,8 +1,8 @@
 import { 创建元素, 应用样式 } from '../../../global/tools/create-element'
+import { 格式化文件大小 } from '../../../global/tools/format-file-size'
 import { 主要按钮, 文本按钮 } from '../../general/base/base-button'
 import { 创建图标 } from '../../general/base/icon'
 import { 普通输入框 } from '../../general/form/form-input'
-import { 格式化文件大小 } from './utils'
 
 export type 上传成功结果 = { message: string; files: { name: string; size: number }[] }
 

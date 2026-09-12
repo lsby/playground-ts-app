@@ -107,6 +107,7 @@
 - 场景示例:
   - 核心功能示例包括 `src/web/components/demo/add-demo.ts`, 以及展示元素引用与状态管理的 `src/web/components/demo/todo-list-demo.ts`
   - 业务功能示例涵盖 `src/web/components/demo/user-management-demo.ts`, 以及处理文件上传的 `src/web/components/demo/file-upload/`
+  - 通用扩展组件示例位于 `src/web/components/demo/general-components-demo.ts`, 覆盖反馈与空状态, 日期时间, 异步组合框, 文件选择上传, 抽屉和折叠面板
   - 进阶场景包括 `src/web/components/demo/ws-demo.ts`, `src/web/components/demo/dialog-demo.ts` 和 `src/web/components/demo/toast-demo.ts`
   - 跨端适配示例包括 `src/web/components/demo/electron-demo.ts` 和 `src/web/components/demo/capacitor-demo.ts`
 - 组件与 DOM:

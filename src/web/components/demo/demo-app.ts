@@ -20,6 +20,7 @@ import { 自动伸缩文本框 } from '../general/form/form-textarea'
 import { 横向tab组件 } from '../general/tabs/tabs-horizontal'
 import { 演示能力组件 } from './capability-demo'
 import { 演示对话框组件 } from './dialog-demo'
+import { 通用组件演示 } from './general-components-demo'
 import { 演示用户管理组件 } from './user-management-demo'
 
 type 发出事件类型 = {}
@@ -60,6 +61,7 @@ export class 演示应用组件 extends 组件基类<发出事件类型, 监听�
     let 标签页 = new 横向tab组件({ 路由键: 'tab' })
     标签页.添加标签页({ 标签: '基础组件', 标识: 'base' }, this.创建标签内容(this.创建按钮区(), this.创建状态区()))
     标签页.添加标签页({ 标签: '表单组件', 标识: 'form' }, this.创建标签内容(this.创建表单区()))
+    标签页.添加标签页({ 标签: '扩展组件', 标识: 'extended' }, this.创建标签内容(new 通用组件演示()))
     标签页.添加标签页({ 标签: '数据与通信', 标识: 'data' }, this.创建标签内容(new 演示能力组件({ 分组: '数据与通信' })))
     标签页.添加标签页(
       { 标签: '浮层反馈', 标识: 'overlay' },
