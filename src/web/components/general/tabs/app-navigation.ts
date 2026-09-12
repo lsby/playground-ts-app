@@ -1,6 +1,7 @@
 import { 组件基类 } from '../../../base/base'
 import { 创建元素 } from '../../../global/tools/create-element'
-import { 创建标签页标识前缀, 同步标签页路由, type 标签方向, 计算键盘目标索引, 读取标签页索引 } from './tabs-common'
+import { 创建图标, type 图标名称 } from '../base/icon'
+import { 创建标签页标识前缀, 刷新标签页内容, type 标签方向, 标签页状态管理器 } from './tabs-common'
 
 export type App导航配置 = { 路由键?: string | undefined }
 export type appNavigation发出事件类型 = { 切换: { 当前索引: number } }
@@ -8,7 +9,7 @@ type 监听事件类型 = {}
 
 type 标签页项 = {
   标签: string
-  图标?: string | undefined
+  图标?: 图标名称 | undefined
   标识?: string | undefined
   内容: HTMLElement
   内容面板: HTMLDivElement
@@ -30,21 +31,22 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
   }
 
   private 配置: App导航配置
-  private 当前索引: number = 0
   private 导航栏容器: HTMLDivElement = 创建元素('div')
   private 内容容器: HTMLDivElement = 创建元素('div')
   private 是移动端: boolean = false
   private 标签页列表: 标签页项[] = []
   private 标签按钮列表: HTMLButtonElement[] = []
   private readonly 标签页标识前缀 = 创建标签页标识前缀()
+  private readonly 状态管理器: 标签页状态管理器<标签页项>
 
   public constructor(配置: App导航配置 = {}) {
     super()
     this.配置 = 配置
+    this.状态管理器 = new 标签页状态管理器(this.配置.路由键, (): readonly 标签页项[] => this.标签页列表)
   }
 
   public 添加标签页(
-    配置: { 标签: string; 图标?: string | undefined; 标识?: string | undefined },
+    配置: { 标签: string; 图标?: 图标名称 | undefined; 标识?: string | undefined },
     内容: HTMLElement,
   ): void {
     let 内容面板 = 创建元素('div', {
@@ -54,8 +56,14 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
     this.标签页列表.push({ 标签: 配置.标签, 图标: 配置.图标, 标识: 配置.标识, 内容, 内容面板, 已挂载: false })
   }
 
+  public override async 刷新(): Promise<void> {
+    this.更新布局()
+    let 目标项 = this.标签页列表[this.状态管理器.获得当前索引()]
+    if (目标项 !== undefined) await 刷新标签页内容(目标项.内容)
+  }
+
   protected override async 当加载时(): Promise<void> {
-    this.当前索引 = 读取标签页索引(this.配置.路由键, this.标签页列表, this.当前索引)
+    this.状态管理器.从路由同步()
 
     let 移动端查询 = window.matchMedia('(max-width: 768px)')
     this.是移动端 = 移动端查询.matches
@@ -67,7 +75,7 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
     this.注册清理((): void => 移动端查询.removeEventListener('change', 处理布局变化))
 
     this.初始化结构()
-    this.确保标签页已挂载(this.当前索引)
+    this.确保标签页已挂载(this.状态管理器.获得当前索引())
     this.更新布局()
     this.更新UI()
   }
@@ -127,7 +135,7 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
     this.标签按钮列表 = []
 
     this.标签页列表.forEach((项, idx) => {
-      let 选中 = idx === this.当前索引
+      let 选中 = idx === this.状态管理器.获得当前索引()
 
       let 按钮 = 创建元素('button', {
         type: 'button',
@@ -163,11 +171,8 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
       项.内容面板.setAttribute('aria-labelledby', 标签标识)
       项.内容面板.hidden = 选中 === false
 
-      if (项.图标 !== undefined && 项.图标 !== '') {
-        let 图标元素 = 创建元素('span', {
-          textContent: 项.图标,
-          style: { fontSize: this.是移动端 ? '20px' : '18px', lineHeight: '1' },
-        })
+      if (项.图标 !== undefined) {
+        let 图标元素 = 创建图标(项.图标, this.是移动端 ? 20 : 18)
         按钮.appendChild(图标元素)
       }
 
@@ -187,7 +192,7 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
     })
 
     this.标签页列表.forEach((项, idx) => {
-      if (idx === this.当前索引) {
+      if (idx === this.状态管理器.获得当前索引()) {
         项.内容面板.style.display = 'grid'
       } else {
         项.内容面板.style.display = 'none'
@@ -196,16 +201,10 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
   }
 
   private async 切换标签(index: number): Promise<void> {
-    let 目标项 = this.标签页列表[index]
-    if (目标项 === undefined) return
-
-    if (this.当前索引 !== index) {
-      this.当前索引 = index
-      this.确保标签页已挂载(index)
-      this.更新UI()
-      同步标签页路由(this.配置.路由键, 目标项, index)
-      this.派发事件('切换', { 当前索引: index })
-    }
+    if (this.状态管理器.切换(index) === null) return
+    this.确保标签页已挂载(index)
+    this.更新UI()
+    this.派发事件('切换', { 当前索引: index })
   }
 
   private 确保标签页已挂载(index: number): void {
@@ -217,7 +216,7 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
 
   private 处理标签键盘(事件: KeyboardEvent, 当前索引: number): void {
     let 方向: 标签方向 = this.是移动端 ? 'horizontal' : 'vertical'
-    let 目标索引 = 计算键盘目标索引(事件, 当前索引, this.标签页列表.length, 方向)
+    let 目标索引 = this.状态管理器.计算键盘目标(事件, 当前索引, 方向)
     if (目标索引 === null) return
     事件.preventDefault()
     this.安全执行(async (): Promise<void> => {

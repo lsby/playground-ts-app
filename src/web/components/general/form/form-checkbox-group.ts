@@ -32,7 +32,7 @@ export class 复选框组 extends 表单组件基类<复选框组事件, 监听�
 
     let 容器 = 创建元素('div', {
       role: 'group',
-      style: { display: 'flex', flexDirection: 'column', gap: '8px', ...this.配置.元素样式 },
+      style: { display: 'flex', flexDirection: 'column', gap: 'var(--间距-2)', ...this.配置.元素样式 },
     })
     if (this.配置.可访问名称 !== undefined) 容器.setAttribute('aria-label', this.配置.可访问名称)
 
@@ -51,7 +51,7 @@ export class 复选框组 extends 表单组件基类<复选框组事件, 监听�
           value: 选项,
           checked: this.配置.选中值列表?.includes(选项) ?? false,
           disabled: this.配置.禁用 ?? false,
-          style: { marginRight: '8px' },
+          style: { marginRight: 'var(--间距-2)' },
         })
 
         let 文本 = 创建元素('span', { textContent: 选项 })
@@ -69,7 +69,7 @@ export class 复选框组 extends 表单组件基类<复选框组事件, 监听�
     }
 
     if (this.配置.额外提示 !== undefined) {
-      let 提示容器 = 创建元素('div', { style: { display: 'flex', alignItems: 'center', marginTop: '4px' } })
+      let 提示容器 = 创建元素('div', { style: { display: 'flex', alignItems: 'center', marginTop: 'var(--间距-1)' } })
       let 提示图标 = this.创建提示图标(this.配置.额外提示)
       提示容器.appendChild(提示图标)
       容器.appendChild(提示容器)

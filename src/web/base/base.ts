@@ -82,7 +82,15 @@ export abstract class 组件基类<
     if (this.基础样式元素.parentNode !== this._shadow) this._shadow.prepend(this.基础样式元素)
   }
 
+  /**
+   * 刷新组件当前视图。默认会完整重建；持有子组件状态的组合组件应覆盖此方法做局部更新。
+   */
   public 刷新(): Promise<void> {
+    return this.重建()
+  }
+
+  /** 显式执行完整生命周期重建，包含清理、清空 Shadow DOM 和重新加载。 */
+  public 重建(): Promise<void> {
     return this.请求渲染()
   }
 
@@ -115,7 +123,7 @@ export abstract class 组件基类<
     f: (e: CustomEvent<监听事件类型[K]>) => void | Promise<void>,
     o?: AddEventListenerOptions,
   ): void {
-    this.注册事件监听(k.toString(), f, o)
+    this.注册事件监听(k.toString(), f, '后代', o)
   }
 
   public 监听发出事件<K extends keyof 发出事件类型>(
@@ -123,7 +131,7 @@ export abstract class 组件基类<
     f: (e: CustomEvent<发出事件类型[K]>) => void | Promise<void>,
     o?: AddEventListenerOptions,
   ): void {
-    this.注册事件监听(k.toString(), f, o)
+    this.注册事件监听(k.toString(), f, '自身', o)
   }
 
   protected 注册清理(函数: 清理函数): void {
@@ -219,10 +227,13 @@ export abstract class 组件基类<
   private 注册事件监听<详情>(
     类型: string,
     函数: (e: CustomEvent<详情>) => void | Promise<void>,
+    来源: '自身' | '后代',
     选项?: AddEventListenerOptions,
   ): void {
     let 处理器 = (event: Event): void => {
       if (event instanceof CustomEvent === false) return
+      let 原始来源 = event.composedPath()[0]
+      if ((来源 === '自身' && 原始来源 !== this) || (来源 === '后代' && 原始来源 === this)) return
       let 类型化事件 = event as CustomEvent<详情>
       this.安全执行(async (): Promise<void> => await 函数(类型化事件))
     }

@@ -2,7 +2,7 @@ import { 组件基类 } from '../../../base/base'
 import { 浮层管理器, type 浮层句柄 } from '../../../global/manager/overlay-manager'
 import { 创建元素 } from '../../../global/tools/create-element'
 import { 图标组件 } from '../base/icon'
-import { 创建标签页标识前缀, 刷新标签页内容, 同步标签页路由, 计算键盘目标索引, 读取标签页索引 } from './tabs-common'
+import { 创建标签页标识前缀, 刷新标签页内容, 标签页状态管理器 } from './tabs-common'
 
 export type 纵向tab配置 = { 路由键?: string | undefined }
 export type tabVertical发出事件类型 = { 切换: { 当前索引: number } }
@@ -32,18 +32,19 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
   }
 
   private 配置: 纵向tab配置
-  private 当前索引: number = 0
   private 标签头容器: HTMLDivElement = 创建元素('div', { className: 'tabs-sidebar' })
   private 插槽容器: HTMLDivElement = 创建元素('div')
   private 标签页列表: 标签页项[] = []
   private 标签按钮列表: HTMLButtonElement[] = []
   private readonly 标签页标识前缀 = 创建标签页标识前缀()
+  private readonly 状态管理器: 标签页状态管理器<标签页项>
   private 关闭移动端菜单: () => void = (): void => {}
   private 移动端浮层句柄: 浮层句柄 | null = null
 
   public constructor(配置: 纵向tab配置 = {}) {
     super()
     this.配置 = 配置
+    this.状态管理器 = new 标签页状态管理器(this.配置.路由键, (): readonly 标签页项[] => this.标签页列表)
   }
 
   public 添加标签页(
@@ -58,13 +59,13 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
   }
 
   public override async 刷新(): Promise<void> {
-    await super.刷新()
-    let 目标项 = this.标签页列表[this.当前索引]
+    this.更新UI()
+    let 目标项 = this.标签页列表[this.状态管理器.获得当前索引()]
     if (目标项 !== undefined) await 刷新标签页内容(目标项.内容)
   }
 
   protected override async 当加载时(): Promise<void> {
-    this.当前索引 = 读取标签页索引(this.配置.路由键, this.标签页列表, this.当前索引)
+    this.状态管理器.从路由同步()
 
     let style = this.获得宿主样式()
     style.display = 'flex'
@@ -244,7 +245,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
     this.shadow.appendChild(移动端菜单按钮)
     this.注册清理((): void => this.关闭移动端菜单())
 
-    this.确保标签页已挂载(this.当前索引)
+    this.确保标签页已挂载(this.状态管理器.获得当前索引())
     this.更新UI()
   }
 
@@ -255,7 +256,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
     let 上一个分组: string | undefined = undefined
 
     this.标签页列表.forEach((项, idx) => {
-      let 选中 = idx === this.当前索引
+      let 选中 = idx === this.状态管理器.获得当前索引()
 
       // 如果有分组，且与上一个分组不同，则渲染分组标题
       if (项.分组 !== undefined && 项.分组 !== 上一个分组) {
@@ -354,7 +355,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
     })
 
     this.标签页列表.forEach((项, idx) => {
-      if (idx === this.当前索引) {
+      if (idx === this.状态管理器.获得当前索引()) {
         项.内容面板.style.display = 'grid'
       } else {
         项.内容面板.style.display = 'none'
@@ -363,16 +364,10 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
   }
 
   private async 切换标签(index: number): Promise<void> {
-    let 目标项 = this.标签页列表[index]
-    if (目标项 === undefined) return
-
-    if (this.当前索引 !== index) {
-      this.当前索引 = index
-      this.确保标签页已挂载(index)
-      this.更新UI()
-      同步标签页路由(this.配置.路由键, 目标项, index)
-      this.派发事件('切换', { 当前索引: index })
-    }
+    if (this.状态管理器.切换(index) === null) return
+    this.确保标签页已挂载(index)
+    this.更新UI()
+    this.派发事件('切换', { 当前索引: index })
   }
 
   private 确保标签页已挂载(index: number): void {
@@ -383,7 +378,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
   }
 
   private 处理标签键盘(事件: KeyboardEvent, 当前索引: number): void {
-    let 目标索引 = 计算键盘目标索引(事件, 当前索引, this.标签页列表.length, 'vertical')
+    let 目标索引 = this.状态管理器.计算键盘目标(事件, 当前索引, 'vertical')
     if (目标索引 === null) return
     事件.preventDefault()
     this.安全执行(async (): Promise<void> => {

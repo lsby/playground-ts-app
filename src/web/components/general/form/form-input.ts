@@ -1,5 +1,6 @@
 import { 创建元素, 应用宿主样式, 应用样式 } from '../../../global/tools/create-element'
 import { 增强样式类型 } from '../../../global/types/style'
+import { 获得表单控件基础样式 } from './control-style'
 import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
 type 输入框事件<值类型> = { 输入: 值类型; 变化: 值类型; 焦点: void; 失焦: 值类型; 回车: 值类型 }
@@ -85,19 +86,7 @@ abstract class 输入框基类<值类型 extends string | number | null> extends
 
   protected 获得输入框样式对象(): 增强样式类型 {
     let 禁用 = this.配置.禁用 ?? false
-    return {
-      width: '100%',
-      height: 'var(--控件高度)',
-      padding: '0 var(--间距-3)',
-      boxSizing: 'border-box',
-      border: '1px solid var(--边框颜色)',
-      borderRadius: 'var(--圆角-中)',
-      backgroundColor: 禁用 ? 'var(--禁用背景)' : 'var(--输入框背景)',
-      color: 'var(--文字颜色)',
-      cursor: 禁用 ? 'not-allowed' : 'text',
-      opacity: 禁用 ? '0.6' : '1',
-      transition: 'border-color var(--动画-快), box-shadow var(--动画-快)',
-    }
+    return 获得表单控件基础样式({ 禁用, 光标: 'text' })
   }
 
   public 设置值(值: 值类型): void {

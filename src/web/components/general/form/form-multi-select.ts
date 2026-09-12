@@ -3,6 +3,7 @@ import { 组件基类 } from '../../../base/base'
 import { 浮层管理器, type 浮层句柄 } from '../../../global/manager/overlay-manager'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
 import { 创建图标 } from '../base/icon'
+import { 获得表单控件基础样式 } from './control-style'
 import { 同步表单控件校验状态, type 表单元素 } from './form'
 
 export type 多选下拉框选项 = { 文字: string; value: string }
@@ -53,19 +54,11 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
       type: 'button',
       disabled: this.配置.禁用 ?? false,
       style: {
-        width: '100%',
-        padding: '6px 10px',
-        fontSize: '14px',
-        border: '1px solid var(--边框颜色)',
-        borderRadius: 'var(--圆角-小)',
-        backgroundColor: 'var(--输入框背景)',
-        color: 'var(--文字颜色)',
-        cursor: this.配置.禁用 === true ? 'not-allowed' : 'pointer',
+        ...获得表单控件基础样式({ 禁用: this.配置.禁用 ?? false, 光标: 'pointer' }),
         userSelect: 'none',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        boxSizing: 'border-box',
         textAlign: 'left',
       },
     })
@@ -89,7 +82,7 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
         inset: 'unset',
         margin: '0',
         border: '1px solid var(--边框颜色)',
-        borderRadius: '4px',
+        borderRadius: 'var(--圆角-小)',
         backgroundColor: 'var(--背景颜色)',
         boxShadow: 'var(--浅阴影)',
         padding: '6px 0',
@@ -236,7 +229,13 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
       let 行 = 创建元素('div', {
         role: 'option',
         tabIndex: -1,
-        style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 10px', cursor: 'pointer' },
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--间距-2)',
+          padding: 'var(--间距-1) var(--间距-3)',
+          cursor: 'pointer',
+        },
       })
       let input = 创建元素('input', {
         type: 'checkbox',
@@ -251,7 +250,10 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
       行.onpointerdown = (): void => 行.focus()
       let 选中标记 = 创建图标('check', 16)
       选中标记.style.flexShrink = '0'
-      let text = 创建元素('span', { textContent: 选项.文字, style: { fontSize: '13px', color: 'var(--文字颜色)' } })
+      let text = 创建元素('span', {
+        textContent: 选项.文字,
+        style: { fontSize: 'var(--字号-正文)', color: 'var(--文字颜色)' },
+      })
       行.appendChild(input)
       行.appendChild(选中标记)
       行.appendChild(text)

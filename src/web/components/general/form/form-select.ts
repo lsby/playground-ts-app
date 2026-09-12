@@ -1,5 +1,6 @@
 import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 创建元素, 应用宿主样式, 应用样式 } from '../../../global/tools/create-element'
+import { 获得表单控件基础样式 } from './control-style'
 import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
 type 下拉框事件 = { 变化: string; 焦点: void; 失焦: string }
@@ -154,18 +155,7 @@ abstract class 下拉框基类 extends 表单组件基类<下拉框事件, 监�
 export class 普通下拉框 extends 下拉框基类 {
   protected 获得下拉框样式对象(): 增强样式类型 {
     let 禁用 = this.配置.禁用 ?? false
-    return {
-      width: '100%',
-      padding: '8px 12px',
-      fontSize: '14px',
-      border: '1px solid var(--边框颜色)',
-      borderRadius: '4px',
-      backgroundColor: 禁用 ? 'var(--禁用背景)' : 'var(--输入框背景)',
-      color: 'var(--文字颜色)',
-      cursor: 禁用 ? 'not-allowed' : 'pointer',
-      opacity: 禁用 ? '0.6' : '1',
-      boxSizing: 'border-box',
-    }
+    return 获得表单控件基础样式({ 禁用, 光标: 'pointer' })
   }
 }
 

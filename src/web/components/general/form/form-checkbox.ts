@@ -33,7 +33,7 @@ export class 复选框 extends 表单组件基类<复选框事件, 监听复选�
       style: {
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
+        gap: 'var(--间距-2)',
         cursor: (this.配置.禁用 ?? false) ? 'not-allowed' : 'pointer',
         ...this.配置.元素样式,
       },
@@ -59,12 +59,12 @@ export class 复选框 extends 表单组件基类<复选框事件, 监听复选�
     容器.appendChild(复选框元素)
 
     if (this.配置.标签 !== undefined) {
-      let 标签元素 = 创建元素('span', { textContent: this.配置.标签, style: { fontSize: '14px' } })
+      let 标签元素 = 创建元素('span', { textContent: this.配置.标签, style: { fontSize: 'var(--字号-正文)' } })
       容器.appendChild(标签元素)
 
       if (this.配置.额外提示 !== undefined) {
         let 提示图标 = this.创建提示图标(this.配置.额外提示)
-        提示图标.style.marginLeft = '4px'
+        提示图标.style.marginLeft = 'var(--间距-1)'
         容器.appendChild(提示图标)
       }
     }

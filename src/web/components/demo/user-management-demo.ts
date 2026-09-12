@@ -69,12 +69,16 @@ export class 演示用户管理组件 extends 组件基类<发出事件类型, �
         },
       ],
       加载数据: async (参数: 数据表加载数据参数<数据项>): Promise<{ 数据: 数据项[]; 总数: number }> => {
-        let { data, total } = await API管理器.请求postJson并处理错误('/api/demo/crud/user/read', {
-          page: 参数.页码,
-          size: 参数.每页数量,
-          ...(参数.排序列表.length > 0 ? { orderBy: 参数.排序列表 } : {}),
-          ...(Object.keys(参数.筛选条件).length > 0 ? { filter: 参数.筛选条件 } : {}),
-        })
+        let { data, total } = await API管理器.请求postJson并处理错误(
+          '/api/demo/crud/user/read',
+          {
+            page: 参数.页码,
+            size: 参数.每页数量,
+            ...(参数.排序列表.length > 0 ? { orderBy: 参数.排序列表 } : {}),
+            ...(Object.keys(参数.筛选条件).length > 0 ? { filter: 参数.筛选条件 } : {}),
+          },
+          { 信号: 参数.信号 },
+        )
         return { 数据: data, 总数: total }
       },
     })

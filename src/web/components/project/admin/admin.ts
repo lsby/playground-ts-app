@@ -33,10 +33,15 @@ export class 管理中心页面组件 extends 组件基类<发出事件类型, �
     ]
 
     for (let 项 of 菜单项) {
-      let a = 创建元素('a', { href: 项.链接, target: '_blank', style: { textDecoration: 'none' } })
-      let 按钮 = 创建元素('button', {
+      let 链接 = 创建元素('a', {
+        href: 项.链接,
+        target: '_blank',
+        rel: 'noopener noreferrer',
         textContent: 项.文本,
         style: {
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           padding: '20px 40px',
           fontSize: '18px',
           backgroundColor: 'var(--主色调)',
@@ -45,10 +50,10 @@ export class 管理中心页面组件 extends 组件基类<发出事件类型, �
           borderRadius: '8px',
           cursor: 'pointer',
           boxShadow: '0 4px 12px var(--深阴影颜色)',
+          textDecoration: 'none',
         },
       })
-      a.append(按钮)
-      按钮容器.append(a)
+      按钮容器.append(链接)
     }
 
     容器.append(按钮容器)

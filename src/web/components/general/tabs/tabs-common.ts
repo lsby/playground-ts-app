@@ -47,6 +47,38 @@ export function 计算键盘目标索引(
   return null
 }
 
+export class 标签页状态管理器<项类型 extends 标签页路由项> {
+  private readonly 路由键: string | undefined
+  private readonly 获得标签页列表: () => readonly 项类型[]
+  private 当前索引 = 0
+
+  public constructor(路由键: string | undefined, 获得标签页列表: () => readonly 项类型[]) {
+    this.路由键 = 路由键
+    this.获得标签页列表 = 获得标签页列表
+  }
+
+  public 从路由同步(): void {
+    this.当前索引 = 读取标签页索引(this.路由键, [...this.获得标签页列表()], this.当前索引)
+  }
+
+  public 获得当前索引(): number {
+    return this.当前索引
+  }
+
+  public 切换(索引: number): 项类型 | null {
+    let 标签页列表 = this.获得标签页列表()
+    let 目标项 = 标签页列表[索引]
+    if (目标项 === undefined || this.当前索引 === 索引) return null
+    this.当前索引 = 索引
+    同步标签页路由(this.路由键, 目标项, 索引)
+    return 目标项
+  }
+
+  public 计算键盘目标(事件: KeyboardEvent, 当前索引: number, 方向: 标签方向): number | null {
+    return 计算键盘目标索引(事件, 当前索引, this.获得标签页列表().length, 方向)
+  }
+}
+
 export async function 刷新标签页内容(内容: HTMLElement): Promise<void> {
   if (内容 instanceof 组件基类) {
     await 内容.刷新()

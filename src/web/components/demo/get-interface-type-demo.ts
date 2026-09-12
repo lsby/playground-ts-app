@@ -92,11 +92,11 @@ export class 演示接口类型组件 extends 组件基类<发出事件类型, �
 
     this.shadow.appendChild(容器)
     this.内容容器.textContent = '暂无数据，请点击按钮获取。'
-    await this.同步功能状态()
+    await this.同步功能状态(this.渲染信号)
   }
 
-  private async 同步功能状态(): Promise<void> {
-    let 系统配置 = await API管理器.请求postJson并处理错误('/api/system/get-system-config', {})
+  private async 同步功能状态(信号: AbortSignal): Promise<void> {
+    let 系统配置 = await API管理器.请求postJson并处理错误('/api/system/get-system-config', {}, { 信号 })
     this.设置功能状态(系统配置.enable_get_interface_type)
   }
 

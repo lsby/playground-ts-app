@@ -39,12 +39,14 @@ export class 单选框组<值类型 extends string = string> extends 表单组�
     应用宿主样式(this.获得宿主样式(), this.配置.宿主样式)
 
     if (this.配置.标签 !== undefined || this.配置.额外提示 !== undefined) {
-      let 头部 = 创建元素('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' } })
+      let 头部 = 创建元素('div', {
+        style: { display: 'flex', alignItems: 'center', gap: 'var(--间距-1)', marginBottom: 'var(--间距-2)' },
+      })
 
       if (this.配置.标签 !== undefined) {
         let 标签元素 = 创建元素('span', {
           textContent: this.配置.标签,
-          style: { fontSize: '14px', color: 'var(--文字颜色)' },
+          style: { fontSize: 'var(--字号-正文)', color: 'var(--文字颜色)' },
         })
         头部.appendChild(标签元素)
       }
@@ -62,7 +64,7 @@ export class 单选框组<值类型 extends string = string> extends 表单组�
       style: {
         display: 'flex',
         flexDirection: this.配置.方向 === '横' ? 'row' : 'column',
-        gap: '8px',
+        gap: 'var(--间距-2)',
         ...this.配置.元素样式,
       },
     })
@@ -84,7 +86,7 @@ export class 单选框组<值类型 extends string = string> extends 表单组�
           value: 选项,
           checked: this.配置.值 === 选项,
           disabled: this.配置.禁用 ?? false,
-          style: { marginRight: '8px' },
+          style: { marginRight: 'var(--间距-2)' },
         })
 
         let 文本 = 创建元素('span', { textContent: this.配置.选项翻译?.[选项] ?? 选项 })

@@ -1,5 +1,6 @@
 import { 增强样式类型 } from '../../../../web/global/types/style'
 import { 创建元素, 应用宿主样式 } from '../../../global/tools/create-element'
+import { 获得表单控件基础样式 } from './control-style'
 import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
 type 事件类型 = { 输入: string; 变化: string; 焦点: void; 失焦: void; 提交: string }
@@ -39,25 +40,18 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
       placeholder: this.配置.占位符 ?? '',
       rows: 1,
       style: {
-        width: '100%',
-        padding: '10px 14px',
-        fontSize: '14px',
-        border: '1px solid var(--边框颜色)',
-        borderRadius: '8px',
-        backgroundColor: this.配置.禁用 === true ? 'var(--禁用背景)' : 'var(--输入框背景)',
-        color: 'var(--文字颜色)',
-        cursor: this.配置.禁用 === true ? 'not-allowed' : 'text',
-        opacity: this.配置.禁用 === true ? '0.6' : '1',
-        boxSizing: 'border-box',
+        ...获得表单控件基础样式({
+          禁用: this.配置.禁用 ?? false,
+          光标: 'text',
+          高度: this.配置.自动伸缩 === true ? 'auto' : '100%',
+        }),
+        padding: 'var(--间距-2) var(--间距-3)',
         resize: this.配置.自动伸缩 === true ? 'none' : 'vertical',
         minHeight: this.配置.最小高度,
         maxHeight: this.配置.自动伸缩 === true ? (this.配置.最大高度 ?? '200px') : (this.配置.最大高度 ?? 'none'),
         overflowY: this.配置.自动伸缩 === true ? 'hidden' : 'auto',
         lineHeight: '1.5',
-        fontFamily: 'inherit',
-        transition: 'border-color 0.2s, box-shadow 0.2s',
         display: 'block',
-        height: this.配置.自动伸缩 === true ? 'auto' : '100%',
       },
       oninput: (): void => {
         if (this.文本框元素 !== undefined) this.配置.值 = this.文本框元素.value
@@ -102,12 +96,14 @@ export class 自动伸缩文本框 extends 表单组件基类<事件类型, 监�
       this.文本框元素.value = this.配置.值
     }
 
-    let 包装容器 = 创建元素('div', { style: { display: 'flex', alignItems: 'flex-start', width: '100%', gap: '4px' } })
+    let 包装容器 = 创建元素('div', {
+      style: { display: 'flex', alignItems: 'flex-start', width: '100%', gap: 'var(--间距-1)' },
+    })
     包装容器.appendChild(this.文本框元素)
 
     if (this.配置.额外提示 !== undefined) {
       let 提示图标 = this.创建提示图标(this.配置.额外提示)
-      提示图标.style.marginTop = '8px' // 调整到第一行文字附近
+      提示图标.style.marginTop = 'var(--间距-2)'
       包装容器.appendChild(提示图标)
     }
 
