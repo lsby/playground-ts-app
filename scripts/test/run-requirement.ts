@@ -1,4 +1,4 @@
-import { spawn } from 'child_process'
+import crossSpawn from 'cross-spawn'
 import inquirer from 'inquirer'
 import * as fsSync from 'node:fs'
 import * as fs from 'node:fs/promises'
@@ -189,6 +189,7 @@ async function 主函数(): Promise<void> {
   let 指定流程名称: string | undefined
   let 指定需求名称: string | undefined
   let 指定模式: 'auto' | 'demo' | undefined
+  let 指定跳过人工验收: boolean | undefined
   let 传递给执行器的参数: string[] = []
 
   for (let 索引 = 0; 索引 < 命令行参数.length; 索引 += 1) {
@@ -204,6 +205,14 @@ async function 主函数(): Promise<void> {
     }
     if (参数 === '--auto') {
       指定模式 = 'auto'
+      continue
+    }
+    if (参数 === '--skip-manual') {
+      指定跳过人工验收 = true
+      continue
+    }
+    if (参数 === '--no-skip-manual') {
+      指定跳过人工验收 = false
       continue
     }
     if (参数 === '--mode') {
@@ -261,10 +270,42 @@ async function 主函数(): Promise<void> {
     演示模式 = false
   }
 
+  let 人工流程名称列表: string[]
+  switch (目标.类型) {
+    case '单流程':
+      人工流程名称列表 = 目标.流程.覆盖验收点们.some((验收点) => 验收点.验收手段 === '人工') ? [目标.流程.名称] : []
+      break
+    case '全部':
+      人工流程名称列表 = 目标.流程列表.filter((流程项) => 流程项.包含人工验收).map((流程项) => 流程项.流程名称)
+      break
+  }
+  let 跳过人工验收: boolean
+  if (指定跳过人工验收 !== undefined) {
+    跳过人工验收 = 指定跳过人工验收
+  } else if (人工流程名称列表.length > 0 && process.stdin.isTTY === true && process.stdout.isTTY === true) {
+    let 回答 = await inquirer.prompt<{ 跳过人工验收: boolean }>([
+      { type: 'confirm', name: '跳过人工验收', message: '是否跳过需要人工验收的测试？', default: 演示模式 === false },
+    ])
+    跳过人工验收 = 回答.跳过人工验收
+  } else {
+    跳过人工验收 = 演示模式 === false
+  }
+  if (跳过人工验收 === true && 人工流程名称列表.length > 0) {
+    console.log(`\n已跳过 ${String(人工流程名称列表.length)} 个需人工验收的流程：${人工流程名称列表.join('、')}`)
+    switch (目标.类型) {
+      case '单流程':
+        console.log('没有剩余的自动验收流程可执行。')
+        return
+      case '全部':
+        目标 = { 类型: '全部', 流程列表: 目标.流程列表.filter((流程项) => 流程项.包含人工验收 === false) }
+        break
+    }
+  }
+
   let grep参数: string[] = []
   if (目标.类型 === '单流程') {
     console.log(`\n🎯 选中执行单一流程: ${目标.流程.名称}`)
-    grep参数 = ['--grep', `^${转义正则(目标.流程.名称)}$`]
+    grep参数 = ['--grep', 转义正则(目标.流程.名称)]
   } else {
     if (目标.流程列表.length === 0) {
       console.log('\n⚠️ 当前筛选条件下没有任何流程可执行')
@@ -273,10 +314,10 @@ async function 主函数(): Promise<void> {
     if (目标.流程列表.length === 流程列表.length) {
       console.log(`\n🚀 全量执行所有测试流程 (${目标.流程列表.length} 个流程)`)
     } else {
-      let 流程名正则 = 目标.流程列表.map((项) => `^${转义正则(项.流程名称)}$`).join('|')
+      let 流程名正则 = 目标.流程列表.map((项) => 转义正则(项.流程名称)).join('|')
       console.log(`\n🚀 执行筛选后的 ${目标.流程列表.length} 个测试流程:`)
       for (let 项 of 目标.流程列表) console.log(`   - ${项.流程名称}`)
-      grep参数 = ['--grep', `(${流程名正则})`]
+      grep参数 = ['--grep', 流程名正则]
     }
   }
 
@@ -299,7 +340,7 @@ async function 主函数(): Promise<void> {
   let 环境变量 = { ...process.env }
   环境变量['DEMO_MODE'] = 演示模式 === true ? 'true' : 'false'
 
-  let 子进程 = spawn('playwright', 完整参数, { cwd: 根目录, stdio: 'inherit', shell: true, env: 环境变量 })
+  let 子进程 = crossSpawn('playwright', 完整参数, { cwd: 根目录, stdio: 'inherit', env: 环境变量 })
 
   await new Promise<void>((完成, 失败) => {
     子进程.on('error', 失败)

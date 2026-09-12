@@ -123,7 +123,6 @@ test.describe('演示用户管理业务需求', (): void => {
   })
 
   test(管理员交互式人工核验用户管理界面流程.名称, async ({ page }, testInfo): Promise<void> => {
-    test.skip(process.env['DEMO_MODE'] !== 'true', '人工核验流程需要在 --demo 模式下由审核员确认')
     await 运行需求演示流程({
       page,
       流程: 管理员交互式人工核验用户管理界面流程,

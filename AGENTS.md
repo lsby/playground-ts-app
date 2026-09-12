@@ -230,7 +230,7 @@
   - 相关目录, 文件, 任务和配置统一使用 `requirement` 命名, 不建立平行测试体系
   - 初始化可以直接准备数据, 业务行为和观察必须通过真实业务入口完成, 并返回符合项目证据策略的证据
   - 演示模式只控制展示和速度, 不得改变流程, 断言, 证据或测试数据
-  - 修改需求模型后运行 `npm run task -- test:requirement:coverage`, 执行测试使用 `npm run test:requirement` (支持交互选择流程, 或通过 `--all` 全量执行, `--scenario=<流程名>`, `--requirement=<需求名>` 及 `--auto` / `--demo` 参数指定). 各测试在非 TTY 环境下均会自动静默全量运行
+  - 修改需求模型后运行 `npm run task -- test:requirement:coverage`, 执行测试使用 `npm run test:requirement` (支持交互选择流程, 或通过 `--all` 全量执行, `--scenario=<流程名>`, `--requirement=<需求名>` 及 `--auto` / `--demo` 参数指定). 选中人工验收流程时会询问是否跳过, 也可用 `--skip-manual` / `--no-skip-manual` 指定; 非 TTY 环境默认跳过人工验收流程, 自动流程仍正常运行. 不跳过时, 非演示模式的人工确认会以“需人工验收”明确失败
   - 需求测试快照由快照模块自动只保留最近 10 个, 需要显式清空时运行 `npm run task -- clean:requirement-snapshots`
   - 默认无需额外参数即自动生成 Playwright HTML 测试报告与业务需求证据附件至 `test-outputs/requirement-report/index.html`
 

@@ -301,7 +301,7 @@ export async function 演示_完成(page: Page, message: string): Promise<void> 
 export async function 演示_确认(page: Page, message: string): Promise<boolean> {
   if (演示模式 === false) {
     throw new Error(
-      `当前步骤属于人工介入核验，只能在演示 (Demo) 模式下运行；非演示模式直接判定失败。\n提示内容: ${message}`,
+      `需人工验收：当前步骤只能在演示 (Demo) 模式下由审核员确认；非演示模式直接判定失败。\n提示内容: ${message}`,
     )
   }
   test.setTimeout(0)
