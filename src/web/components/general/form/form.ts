@@ -59,6 +59,20 @@ export function 同步表单控件校验状态(
   }
 }
 
+function 创建表单帮助按钮(提示内容: string): HTMLButtonElement {
+  let 图标 = 创建元素('button', {
+    type: 'button',
+    textContent: '?',
+    title: '查看帮助',
+    style: { width: '18px', height: '18px', padding: '0', borderRadius: '50%', fontSize: '11px', cursor: 'help' },
+  })
+  图标.onmouseenter = (): void => 提示管理器.显示({ 文本: 提示内容 }, 图标)
+  图标.onmouseleave = (): void => 提示管理器.隐藏()
+  图标.onfocus = (): void => 提示管理器.显示({ 文本: 提示内容 }, 图标)
+  图标.onblur = (): void => 提示管理器.隐藏()
+  return 图标
+}
+
 export type 表单校验器<值类型 extends 基础值结构, 数据类型 extends 表单数据> = (
   值: 值类型,
   数据: Readonly<数据类型>,
@@ -99,7 +113,7 @@ type 运行项 = {
   设置禁用?: (value: boolean) => void
   获得禁用?: () => boolean
   聚焦?: () => void
-  校验: () => Promise<string | null>
+  校验: (数据: Readonly<表单数据>) => Promise<string | null>
   依赖字段: ReadonlySet<string>
   变化时校验: boolean
   错误元素: HTMLDivElement | null
@@ -112,6 +126,7 @@ type 运行项 = {
 }
 
 type 项校验结果 = { 已过期: boolean; 错误: string | null }
+type 表单校验结果<数据类型 extends 表单数据> = { 通过: boolean; 数据: 数据类型 }
 
 type 表单事件<数据类型 extends 表单数据> = {
   变化: 数据类型
@@ -119,7 +134,7 @@ type 表单事件<数据类型 extends 表单数据> = {
   提交开始: 数据类型
   提交结束: { 成功: boolean }
 }
-type 监听表单事件 = { 变化: 基础值结构; 失焦: void }
+type 监听表单事件 = { 输入: 基础值结构; 变化: 基础值结构; 失焦: void }
 
 let 表单序号 = 0
 
@@ -138,7 +153,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
     this.表单标识前缀 = `lsby-form-${表单序号}`
     for (let 项 of this.配置.项列表) this.注册项(项)
     if (this.配置.初始数据 !== undefined) this.设置数据(this.配置.初始数据)
-    for (let [键, 运行项] of this.运行项映射) this.默认值映射.set(键, 运行项.获得值())
+    for (let [键, 运行项] of this.运行项映射) this.默认值映射.set(键, this.复制值(运行项.获得值()))
   }
 
   protected override async 当加载时(): Promise<void> {
@@ -193,7 +208,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
         let 标签 = 创建元素('span', { textContent: 标签文本, style: { fontWeight: '500' } })
         标签行.append(标签)
         if (项配置.必填 === true)
-          标签行.append(创建元素('span', { textContent: '*', style: { color: 'var(--错误颜色)' } }))
+          标签行.append(创建元素('span', { textContent: '*', style: { color: 'var(--错误前景)' } }))
         let 提示 = 项配置.帮助文本 ?? 项配置.额外提示
         if (提示 !== undefined) 标签行.append(this.创建提示图标(提示))
         项包装器.append(标签行)
@@ -217,7 +232,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
       let 错误元素 = 创建元素('div', {
         id: 错误标识,
         role: 'alert',
-        style: { minHeight: '18px', color: 'var(--错误颜色)', fontSize: 'var(--字号-小)' },
+        style: { minHeight: '18px', color: 'var(--错误前景)', fontSize: 'var(--字号-小)' },
       })
       项包装器.append(错误元素)
       运行项.错误元素 = 错误元素
@@ -231,6 +246,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
       this.显示项错误(运行项, 运行项.当前错误)
     }
     this.监听冒泡事件('变化', async (event): Promise<void> => await this.处理子项变化(event))
+    this.监听冒泡事件('输入', async (event): Promise<void> => await this.处理子项变化(event))
     this.监听冒泡事件('失焦', async (event): Promise<void> => await this.处理子项失焦(event))
   }
 
@@ -241,12 +257,26 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
   }
 
   public 设置数据(数据: Partial<数据类型>): void {
+    this.应用数据(数据, false)
+  }
+
+  public 设置初始数据(数据: Partial<数据类型>): void {
+    this.应用数据(数据, true)
+  }
+
+  private 应用数据(数据: Partial<数据类型>, 更新重置基准: boolean): void {
     for (let 键 of Object.keys(数据)) {
       let 值 = 数据[键]
       let 运行项 = this.运行项映射.get(键)
       if (值 !== undefined && 运行项 !== undefined) {
         this.使校验过期(运行项)
         运行项.设置值(值)
+        if (更新重置基准 === true) {
+          this.默认值映射.set(键, this.复制值(运行项.获得值()))
+          运行项.已触碰 = false
+          运行项.已修改 = false
+          this.显示项错误(运行项, null)
+        }
       }
     }
   }
@@ -271,42 +301,61 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
   }
 
   public async 校验(): Promise<boolean> {
-    let 错误们: Partial<Record<keyof 数据类型, string>> = {}
-    let 第一个错误: 运行项 | null = null
-    for (let 运行项 of this.运行项映射.values()) {
-      let 错误 = await this.校验最新值(运行项)
-      if (错误 !== null) {
-        错误们[运行项.键 as keyof 数据类型] = 错误
-        第一个错误 ??= 运行项
+    return (await this.校验并获得数据()).通过
+  }
+
+  private async 校验并获得数据(通过时?: () => void): Promise<表单校验结果<数据类型>> {
+    while (true) {
+      let 本次数据代次 = this.数据代次
+      let 数据快照 = this.获得数据()
+      let 运行项们 = [...this.运行项映射.values()]
+      let 结果们 = await Promise.all(运行项们.map(async (运行项) => await this.校验项(运行项, 数据快照, 本次数据代次)))
+      if (本次数据代次 !== this.数据代次 || 结果们.some((结果): boolean => 结果.已过期 === true)) continue
+
+      let 错误们: Partial<Record<keyof 数据类型, string>> = {}
+      let 第一个错误: 运行项 | null = null
+      for (let 索引 = 0; 索引 < 运行项们.length; 索引 += 1) {
+        let 运行项 = 运行项们[索引]
+        let 错误 = 结果们[索引]?.错误 ?? null
+        if (运行项 !== undefined && 错误 !== null) {
+          错误们[运行项.键 as keyof 数据类型] = 错误
+          第一个错误 ??= 运行项
+        }
       }
+      let 通过 = 第一个错误 === null
+      this.派发事件('校验', { 通过, 错误们 })
+      if (本次数据代次 !== this.数据代次) continue
+      if (第一个错误 !== null) 第一个错误.聚焦?.()
+      else 通过时?.()
+      return { 通过, 数据: 数据快照 }
     }
-    let 通过 = 第一个错误 === null
-    this.派发事件('校验', { 通过, 错误们 })
-    if (第一个错误 !== null) 第一个错误.聚焦?.()
-    return 通过
   }
 
   public async 提交(处理函数: (数据: 数据类型) => void | Promise<void>): Promise<boolean> {
-    if (this.正在提交 === true || (await this.校验()) === false) return false
+    if (this.正在提交 === true) return false
     this.正在提交 = true
     let 原禁用映射 = new Map<运行项, boolean>()
-    let 数据 = this.获得数据()
-    this.setAttribute('aria-busy', 'true')
-    for (let 项 of this.运行项映射.values()) {
-      原禁用映射.set(项, 项.获得禁用?.() ?? false)
-      项.设置禁用?.(true)
-    }
-    this.派发事件('提交开始', 数据)
+    let 已开始提交 = false
     let 成功 = false
     try {
-      await 处理函数(数据)
+      let 校验结果 = await this.校验并获得数据((): void => {
+        this.setAttribute('aria-busy', 'true')
+        for (let 项 of this.运行项映射.values()) {
+          原禁用映射.set(项, 项.获得禁用?.() ?? false)
+          项.设置禁用?.(true)
+        }
+      })
+      if (校验结果.通过 === false) return false
+      已开始提交 = true
+      this.派发事件('提交开始', 校验结果.数据)
+      await 处理函数(校验结果.数据)
       成功 = true
       return true
     } finally {
       this.正在提交 = false
       this.removeAttribute('aria-busy')
       for (let [项, 原禁用] of 原禁用映射) 项.设置禁用?.(原禁用)
-      this.派发事件('提交结束', { 成功 })
+      if (已开始提交 === true) this.派发事件('提交结束', { 成功 })
     }
   }
 
@@ -337,11 +386,12 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
       组件: 项.组件,
       获得值: (): 基础值结构 => 项.组件.获得值(),
       设置值: (值: 基础值结构): void => 项.组件.设置值(值 as 数据类型[键]),
-      校验: async (): Promise<string | null> => {
-        let 值 = 项.组件.获得值()
+      校验: async (数据: Readonly<表单数据>): Promise<string | null> => {
+        let 值 = 数据[项.键]
+        if (值 === undefined) throw new Error(`表单数据缺少字段: ${项.键}`)
         if (项.必填 === true && this.是空值(值) === true) return `${项.标签 ?? 项.键}为必填项`
         for (let 校验器 of 项.校验器们 ?? []) {
-          let 错误 = await 校验器(值, this.获得数据())
+          let 错误 = await 校验器(值 as 数据类型[键], 数据 as Readonly<数据类型>)
           if (错误 !== null) return 错误
         }
         return null
@@ -363,8 +413,9 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
   }
 
   private async 处理子项变化(event: CustomEvent<基础值结构>): Promise<void> {
-    if (event.target === this || event.target instanceof HTMLElement === false) return
-    let 运行项 = [...this.运行项映射.values()].find((项) => 项.组件 === event.target)
+    let 事件来源 = event.composedPath()[0]
+    if (事件来源 === this || 事件来源 instanceof HTMLElement === false) return
+    let 运行项 = [...this.运行项映射.values()].find((项) => 项.组件 === 事件来源)
     if (运行项 === undefined) return
     let 受影响项 = [
       运行项,
@@ -374,28 +425,31 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
     ]
     for (let 项 of 受影响项) this.使校验过期(项)
     运行项.已修改 = true
-    for (let 项 of 受影响项) {
-      if (项.变化时校验 === true || 项.已触碰 === true) await this.校验项(项)
-    }
+    await Promise.all(
+      受影响项
+        .filter((项): boolean => 项.变化时校验 === true || 项.已触碰 === true)
+        .map(async (项): Promise<void> => {
+          await this.校验最新值(项)
+        }),
+    )
     this.派发事件('变化', this.获得数据())
   }
 
   private async 处理子项失焦(event: CustomEvent<void>): Promise<void> {
-    if (event.target instanceof HTMLElement === false) return
-    let 运行项 = [...this.运行项映射.values()].find((项) => 项.组件 === event.target)
+    let 事件来源 = event.composedPath()[0]
+    if (事件来源 instanceof HTMLElement === false) return
+    let 运行项 = [...this.运行项映射.values()].find((项) => 项.组件 === 事件来源)
     if (运行项 === undefined) return
     运行项.已触碰 = true
-    await this.校验项(运行项)
+    await this.校验最新值(运行项)
   }
 
-  private async 校验项(运行项: 运行项): Promise<项校验结果> {
-    运行项.校验代次 += 1
+  private async 校验项(运行项: 运行项, 数据快照: Readonly<数据类型>, 数据代次: number): Promise<项校验结果> {
     let 本次代次 = 运行项.校验代次
-    let 本次数据代次 = this.数据代次
     运行项.组件.setAttribute('aria-busy', 'true')
     try {
-      let 错误 = await 运行项.校验()
-      let 已过期 = 本次代次 !== 运行项.校验代次 || 本次数据代次 !== this.数据代次
+      let 错误 = await 运行项.校验(数据快照)
+      let 已过期 = 本次代次 !== 运行项.校验代次 || 数据代次 !== this.数据代次
       if (已过期 === false) this.显示项错误(运行项, 错误)
       return { 已过期, 错误 }
     } finally {
@@ -404,9 +458,11 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
   }
 
   private async 校验最新值(运行项: 运行项): Promise<string | null> {
-    let 结果 = await this.校验项(运行项)
-    while (结果.已过期 === true) 结果 = await this.校验项(运行项)
-    return 结果.错误
+    while (true) {
+      let 数据代次 = this.数据代次
+      let 结果 = await this.校验项(运行项, this.获得数据(), 数据代次)
+      if (结果.已过期 === false) return 结果.错误
+    }
   }
 
   private 使校验过期(运行项: 运行项): void {
@@ -431,18 +487,18 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
     return false
   }
 
+  private 复制值(值: 基础值结构): 基础值结构 {
+    if (Array.isArray(值)) return 值.map((项): 基础值结构 => this.复制值(项))
+    if (typeof 值 === 'object' && 值 !== null) {
+      let 结果: Record<string, 基础值结构> = {}
+      for (let [键, 子值] of Object.entries(值)) 结果[键] = this.复制值(子值)
+      return 结果
+    }
+    return 值
+  }
+
   private 创建提示图标(提示: string): HTMLElement {
-    let 图标 = 创建元素('button', {
-      type: 'button',
-      textContent: '?',
-      title: '查看帮助',
-      style: { width: '18px', height: '18px', padding: '0', borderRadius: '50%', fontSize: '11px', cursor: 'help' },
-    })
-    图标.onmouseenter = (): void => 提示管理器.显示({ 文本: 提示 }, 图标)
-    图标.onmouseleave = (): void => 提示管理器.隐藏()
-    图标.onfocus = (): void => 提示管理器.显示({ 文本: 提示 }, 图标)
-    图标.onblur = (): void => 提示管理器.隐藏()
-    return 图标
+    return 创建表单帮助按钮(提示)
   }
 }
 
@@ -472,19 +528,14 @@ export abstract class 表单组件基类<
 {
   public abstract 获得值(): 值类型
   public abstract 设置值(值: 值类型): void
+  public abstract 设置禁用(值: boolean): void
+  public abstract 获得禁用(): boolean
+  public abstract 聚焦(): void
+  public abstract 设置可访问名称(名称: string): void
+  public abstract 设置校验状态(错误: string | null, 描述文本列表: string[]): void
 
   protected 创建提示图标(提示内容: string): HTMLElement {
-    let 图标 = 创建元素('button', {
-      type: 'button',
-      textContent: '?',
-      title: '查看帮助',
-      style: { width: '18px', height: '18px', padding: '0', borderRadius: '50%', cursor: 'help' },
-    })
-    图标.onmouseenter = (): void => 提示管理器.显示({ 文本: 提示内容 }, 图标)
-    图标.onmouseleave = (): void => 提示管理器.隐藏()
-    图标.onfocus = (): void => 提示管理器.显示({ 文本: 提示内容 }, 图标)
-    图标.onblur = (): void => 提示管理器.隐藏()
-    return 图标
+    return 创建表单帮助按钮(提示内容)
   }
 }
 

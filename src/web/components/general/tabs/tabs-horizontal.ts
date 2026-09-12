@@ -160,10 +160,6 @@ export class 横向tab组件 extends 组件基类<tabHorizontal发出事件类�
     this.标签页列表.forEach((项, idx) => {
       if (idx === this.当前索引) {
         项.内容滚动容器.style.display = 'block'
-        项.内容.style.display = 'flex'
-        项.内容.style.flexDirection = 'column'
-        项.内容.style.minHeight = '0'
-        项.内容.style.minWidth = '0'
       } else {
         项.内容滚动容器.style.display = 'none'
       }

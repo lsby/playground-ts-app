@@ -49,7 +49,7 @@ export class 卡片组件 extends 组件基类<{}, {}> {
             style: {
               margin: '0',
               fontSize: 'var(--字号-标题)',
-              color: 危险强调 ? 'var(--错误颜色)' : 'var(--文字颜色)',
+              color: 危险强调 ? 'var(--错误前景)' : 'var(--文字颜色)',
             },
           }),
         )

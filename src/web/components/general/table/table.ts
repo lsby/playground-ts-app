@@ -65,7 +65,7 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
       justifyContent: 'space-between',
       gap: 'var(--间距-3)',
       padding: 'var(--间距-3)',
-      color: 'var(--错误颜色)',
+      color: 'var(--错误前景)',
       backgroundColor: 'color-mix(in srgb, var(--错误颜色) 10%, transparent)',
       borderRadius: 'var(--圆角-中)',
     },
@@ -120,6 +120,9 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
   public 获得每页数量(): number {
     return this.分页配置.每页数量
   }
+  public 获得选中行键(): 数据表行键[] {
+    return [...this.选择管理器.获得选中行键()]
+  }
   public async 刷新数据(): Promise<void> {
     await this.加载数据()
   }
@@ -162,6 +165,7 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
       this.验证行键(结果.数据)
       this.数据列表.splice(0, this.数据列表.length, ...结果.数据)
       this.选择管理器.移除已不存在的选择()
+      this.派发事件('选择变化', { 行键列表: this.获得选中行键() })
     } catch (错误) {
       if (本次请求控制器.signal.aborted === false && 本次代次 === this.请求代次)
         this.加载错误 = 错误 instanceof Error ? 错误.message : String(错误)
@@ -225,7 +229,10 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
       刷新数据: async () => await this.刷新数据(),
       处理行点击: (行, ctrl, shift) => this.选择管理器.处理行点击(行, ctrl, shift),
       处理单元格点击: (行, 列, ctrl, shift) => this.选择管理器.处理单元格点击(行, 列, ctrl, shift),
-      更新选中状态: () => this.选择管理器.更新选中状态(),
+      更新选中状态: (): void => {
+        this.选择管理器.更新选中状态()
+        this.派发事件('选择变化', { 行键列表: this.获得选中行键() })
+      },
       派发操作点击: (操作名, 数据项): void => {
         this.派发事件('操作点击', { 操作名, 数据项 })
       },

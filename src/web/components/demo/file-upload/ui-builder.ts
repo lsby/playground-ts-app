@@ -164,7 +164,7 @@ export function 渲染上传成功结果(容器: HTMLDivElement, 结果: 上传�
   })
 
   let 成功头部 = 创建元素('div', {
-    style: { display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: 'var(--成功颜色)' },
+    style: { display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: 'var(--成功前景)' },
   })
   成功头部.appendChild(创建图标('check', 20))
   成功头部.appendChild(创建元素('span', { textContent: `上传成功: ${结果.message}` }))
@@ -199,7 +199,7 @@ export function 渲染上传失败结果(容器: HTMLDivElement, 错误: unknown
   })
 
   let 失败头部 = 创建元素('div', {
-    style: { display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: 'var(--错误颜色)' },
+    style: { display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: 'var(--错误前景)' },
   })
   失败头部.appendChild(创建图标('error', 20))
   失败头部.appendChild(创建元素('span', { textContent: `上传失败` }))

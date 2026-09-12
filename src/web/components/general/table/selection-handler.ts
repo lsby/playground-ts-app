@@ -12,7 +12,7 @@ export type 选择处理器上下文<数据项> = {
 export class 表格选择管理器<数据项> {
   private 选中行键 = new Set<数据表行键>()
   private 最后点击的单元格: { 行键: 数据表行键; 列: number } | null = null
-  private shift选择起点 = -1
+  private shift选择起点: 数据表行键 | null = null
 
   public constructor(private 上下文: 选择处理器上下文<数据项>) {}
 
@@ -35,20 +35,22 @@ export class 表格选择管理器<数据项> {
     for (let 行键 of this.选中行键) if (存在行键.has(行键) === false) this.选中行键.delete(行键)
     if (this.最后点击的单元格 !== null && 存在行键.has(this.最后点击的单元格.行键) === false)
       this.最后点击的单元格 = null
+    if (this.shift选择起点 !== null && 存在行键.has(this.shift选择起点) === false) this.shift选择起点 = null
   }
 
   public 清除选择(): void {
     this.选中行键.clear()
     this.最后点击的单元格 = null
-    this.shift选择起点 = -1
+    this.shift选择起点 = null
   }
 
   public 处理行点击(行索引: number, ctrl键: boolean, shift键: boolean): void {
     let 行键 = this.上下文.获得行键(行索引)
     if (行键 === undefined) return
-    if (shift键 === true && this.shift选择起点 >= 0) {
-      let 开始 = Math.min(this.shift选择起点, 行索引)
-      let 结束 = Math.max(this.shift选择起点, 行索引)
+    let 起点索引 = this.shift选择起点 === null ? -1 : this.获得行索引(this.shift选择起点)
+    if (shift键 === true && 起点索引 >= 0) {
+      let 开始 = Math.min(起点索引, 行索引)
+      let 结束 = Math.max(起点索引, 行索引)
       this.选中行键.clear()
       for (let 索引 = 开始; 索引 <= 结束; 索引 += 1) {
         let 范围行键 = this.上下文.获得行键(索引)
@@ -57,11 +59,11 @@ export class 表格选择管理器<数据项> {
     } else if (ctrl键 === true) {
       if (this.选中行键.has(行键) === true) this.选中行键.delete(行键)
       else this.选中行键.add(行键)
-      this.shift选择起点 = 行索引
+      this.shift选择起点 = 行键
     } else {
       this.选中行键.clear()
       this.选中行键.add(行键)
-      this.shift选择起点 = 行索引
+      this.shift选择起点 = 行键
     }
   }
 

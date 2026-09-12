@@ -51,12 +51,12 @@ export class 登录组件 extends 组件基类<发出事件类型, 监听事件�
     let 注册表单容器 = 创建元素('div')
     登录表单容器.append(登录表单)
     注册表单容器.append(注册表单)
-    let 结果 = 创建元素('div', { role: 'alert', style: { minHeight: '22px', color: 'var(--错误颜色)' } })
+    let 结果 = 创建元素('div', { role: 'alert', style: { minHeight: '22px', color: 'var(--错误前景)' } })
     let 标题 = 创建元素('h1', { style: { margin: '0' } })
 
     let 执行登录 = async (): Promise<void> => {
       结果.textContent = ''
-      结果.style.color = 'var(--错误颜色)'
+      结果.style.color = 'var(--错误前景)'
       try {
         await 登录表单.提交(async (数据): Promise<void> => {
           let 响应 = await API管理器.请求postJson并处理错误('/api/project/login', {
@@ -81,7 +81,7 @@ export class 登录组件 extends 组件基类<发出事件类型, 监听事件�
           })
         })
         if (成功 === false) return
-        结果.style.color = 'var(--成功颜色)'
+        结果.style.color = 'var(--成功前景)'
         结果.textContent = '注册成功，请登录'
         登录用户名.设置值(注册用户名.获得值())
         模式 = 'login'
@@ -183,10 +183,10 @@ export class 登录组件 extends 组件基类<发出事件类型, 监听事件�
     }
     try {
       await API管理器.重置纯前端管理员密码(密码)
-      结果.style.color = 'var(--成功颜色)'
+      结果.style.color = 'var(--成功前景)'
       结果.textContent = '密码已重设'
     } catch (错误) {
-      结果.style.color = 'var(--错误颜色)'
+      结果.style.color = 'var(--错误前景)'
       结果.textContent = 错误 instanceof Error ? 错误.message : '重设失败'
     }
   }

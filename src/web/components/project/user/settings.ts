@@ -130,12 +130,12 @@ export class 用户设置组件 extends 组件基类<设置事件, 监听设置�
   private async 加载数据(信号: AbortSignal): Promise<void> {
     if (this.用户信息 !== undefined && this.用户信息.is_admin && this.系统配置表单 !== undefined) {
       let 系统配置 = await API管理器.请求postJson并处理错误('/api/system/get-system-config', {}, { 信号 })
-      this.系统配置表单.设置数据(系统配置)
+      this.系统配置表单.设置初始数据(系统配置)
     }
 
     if (this.用户配置表单 !== undefined) {
       let 用户配置 = await API管理器.请求postJson并处理错误('/api/user/get-user-config', {}, { 信号 })
-      this.用户配置表单.设置数据(用户配置)
+      this.用户配置表单.设置初始数据(用户配置)
     }
   }
 

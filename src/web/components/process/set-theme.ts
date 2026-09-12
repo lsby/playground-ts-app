@@ -6,7 +6,7 @@ type 监听事件类型 = {}
 
 export class 设置主题组件 extends 组件基类<发出事件类型, 监听事件类型> {
   static {
-    this.注册组件('set-theme', this)
+    this.注册组件('lsby-set-theme', this)
   }
 
   public constructor(配置?: { 从数据库加载?: boolean }) {

@@ -2,12 +2,12 @@ import { 创建元素, 应用宿主样式, 应用样式 } from '../../../global/
 import { 增强样式类型 } from '../../../global/types/style'
 import { 同步表单控件校验状态, 表单组件基类 } from './form'
 
-type 输入框事件 = { 输入: string; 变化: string; 焦点: void; 失焦: string; 回车: string }
+type 输入框事件<值类型> = { 输入: 值类型; 变化: 值类型; 焦点: void; 失焦: 值类型; 回车: 值类型 }
 type 监听输入框事件 = {}
 
-export type 输入框配置 = {
+type 基础输入框配置<值类型> = {
   占位符?: string
-  值?: string
+  值?: 值类型
   禁用?: boolean
   只读?: boolean
   类型?: string
@@ -16,16 +16,23 @@ export type 输入框配置 = {
   自动完成?: string
   宿主样式?: 增强样式类型
   元素样式?: 增强样式类型
-  最小值?: string
-  最大值?: string
-  步长?: string
+  最小值?: string | number
+  最大值?: string | number
+  步长?: string | number
 }
 
-abstract class 输入框基类 extends 表单组件基类<输入框事件, 监听输入框事件, string> {
-  protected 配置: 输入框配置
+export type 输入框配置 = 基础输入框配置<string>
+export type 数字输入框配置 = Omit<基础输入框配置<number | null>, '类型'>
+
+abstract class 输入框基类<值类型 extends string | number | null> extends 表单组件基类<
+  输入框事件<值类型>,
+  监听输入框事件,
+  值类型
+> {
+  protected 配置: 基础输入框配置<值类型>
   private 输入框元素?: HTMLInputElement
 
-  public constructor(配置: 输入框配置 = {}) {
+  public constructor(配置: 基础输入框配置<值类型>) {
     super()
     this.配置 = 配置
   }
@@ -38,40 +45,43 @@ abstract class 输入框基类 extends 表单组件基类<输入框事件, 监�
     let 输入框 = 创建元素('input', {
       type: this.配置.类型 ?? 'text',
       placeholder: this.配置.占位符 ?? '',
-      value: this.配置.值 ?? '',
+      value: this.配置.值 === null || this.配置.值 === undefined ? '' : String(this.配置.值),
       disabled: this.配置.禁用 ?? false,
       readOnly: this.配置.只读 ?? false,
       style: { ...this.获得输入框样式对象(), ...this.配置.元素样式 },
     })
-    if (this.配置.最小值 !== undefined) 输入框.min = this.配置.最小值
-    if (this.配置.最大值 !== undefined) 输入框.max = this.配置.最大值
-    if (this.配置.步长 !== undefined) 输入框.step = this.配置.步长
+    if (this.配置.最小值 !== undefined) 输入框.min = String(this.配置.最小值)
+    if (this.配置.最大值 !== undefined) 输入框.max = String(this.配置.最大值)
+    if (this.配置.步长 !== undefined) 输入框.step = String(this.配置.步长)
     if (this.配置.自动完成 !== undefined) 输入框.setAttribute('autocomplete', this.配置.自动完成)
     if (this.配置.可访问名称 !== undefined) 输入框.setAttribute('aria-label', this.配置.可访问名称)
     输入框.oninput = (): void => {
-      this.配置.值 = 输入框.value
-      this.派发事件('输入', 输入框.value)
+      let 值 = this.读取并保存值(输入框)
+      this.派发事件('输入', 值)
     }
     输入框.onchange = (): void => {
-      this.配置.值 = 输入框.value
-      this.派发事件('变化', 输入框.value)
+      let 值 = this.读取并保存值(输入框)
+      this.派发事件('变化', 值)
     }
     输入框.onfocus = (): void => {
       this.派发事件('焦点', undefined)
     }
     输入框.onblur = (): void => {
-      this.配置.值 = 输入框.value
-      this.派发事件('失焦', 输入框.value)
+      let 值 = this.读取并保存值(输入框)
+      this.派发事件('失焦', 值)
     }
     输入框.onkeydown = (event: KeyboardEvent): void => {
       if (event.key !== 'Enter' || event.isComposing === true) return
-      this.派发事件('回车', 输入框.value)
+      this.派发事件('回车', this.读取并保存值(输入框))
     }
     容器.append(输入框)
     if (this.配置.额外提示 !== undefined) 容器.append(this.创建提示图标(this.配置.额外提示))
     this.shadow.append(容器)
     this.输入框元素 = 输入框
   }
+
+  protected abstract 从输入元素读取值(元素: HTMLInputElement): 值类型
+  protected abstract 获得空值时配置值(): 值类型
 
   protected 获得输入框样式对象(): 增强样式类型 {
     let 禁用 = this.配置.禁用 ?? false
@@ -90,13 +100,14 @@ abstract class 输入框基类 extends 表单组件基类<输入框事件, 监�
     }
   }
 
-  public 设置值(值: string): void {
+  public 设置值(值: 值类型): void {
     this.配置.值 = 值
-    if (this.输入框元素 !== undefined) this.输入框元素.value = 值
+    if (this.输入框元素 !== undefined) this.输入框元素.value = 值 === null ? '' : String(值)
   }
 
-  public 获得值(): string {
-    return this.输入框元素?.value ?? this.配置.值 ?? ''
+  public 获得值(): 值类型 {
+    if (this.输入框元素 !== undefined) return this.从输入元素读取值(this.输入框元素)
+    return this.获得空值时配置值()
   }
 
   public 设置禁用(值: boolean): void {
@@ -119,9 +130,11 @@ abstract class 输入框基类 extends 表单组件基类<输入框事件, 监�
   public 获得只读(): boolean {
     return this.配置.只读 ?? false
   }
+
   public 聚焦(): void {
     this.输入框元素?.focus()
   }
+
   public 失焦(): void {
     this.输入框元素?.blur()
   }
@@ -139,19 +152,46 @@ abstract class 输入框基类 extends 表单组件基类<输入框事件, 监�
   public 设置校验状态(错误: string | null, 描述文本列表: string[]): void {
     if (this.输入框元素 !== undefined) 同步表单控件校验状态([this.输入框元素], 错误, 描述文本列表)
   }
+
+  private 读取并保存值(元素: HTMLInputElement): 值类型 {
+    let 值 = this.从输入元素读取值(元素)
+    this.配置.值 = 值
+    return 值
+  }
 }
 
-export class 普通输入框 extends 输入框基类 {}
+export class 普通输入框 extends 输入框基类<string> {
+  public constructor(配置: 输入框配置 = {}) {
+    super(配置)
+  }
 
-export class 密码输入框 extends 输入框基类 {
+  protected 从输入元素读取值(元素: HTMLInputElement): string {
+    return 元素.value
+  }
+
+  protected 获得空值时配置值(): string {
+    return this.配置.值 ?? ''
+  }
+}
+
+export class 密码输入框 extends 普通输入框 {
   public constructor(配置: 输入框配置 = {}) {
     super({ ...配置, 类型: 'password' })
   }
 }
 
-export class 数字输入框 extends 输入框基类 {
-  public constructor(配置: 输入框配置 = {}) {
+export class 数字输入框 extends 输入框基类<number | null> {
+  public constructor(配置: 数字输入框配置 = {}) {
     super({ ...配置, 类型: 'number' })
+  }
+
+  protected 从输入元素读取值(元素: HTMLInputElement): number | null {
+    if (元素.value === '' || Number.isNaN(元素.valueAsNumber) === true) return null
+    return 元素.valueAsNumber
+  }
+
+  protected 获得空值时配置值(): number | null {
+    return this.配置.值 ?? null
   }
 }
 

@@ -44,6 +44,7 @@ export type 数据表格选项<数据项> = {
 
 export type 发出事件类型<数据项> = {
   操作点击: { 操作名: string; 数据项: 数据项 }
+  选择变化: { 行键列表: 数据表行键[] }
   页码变化: { 页码: number }
   加载状态变化: { 加载中: boolean; 错误: string | null }
 }

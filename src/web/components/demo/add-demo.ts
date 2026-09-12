@@ -6,23 +6,23 @@ import { 数字输入框 } from '../general/form/form-input'
 type 发出事件类型 = {}
 type 监听事件类型 = {}
 
-type 加法配置 = { a?: string | undefined; b?: string | undefined }
+type 加法配置 = { a?: number | undefined; b?: number | undefined }
 
 export class 演示加法组件 extends 组件基类<发出事件类型, 监听事件类型> {
   static {
     this.注册组件('lsby-add-demo', this)
   }
 
-  private 值a: string = '0'
-  private 值b: string = '0'
+  private 值a: number | null = 0
+  private 值b: number | null = 0
   private 结果 = 创建元素('p')
   private 输入框1 = new 数字输入框({ 占位符: '输入第一个数字' })
   private 输入框2 = new 数字输入框({ 占位符: '输入第二个数字' })
 
   public constructor(配置: 加法配置 = {}) {
     super()
-    this.值a = 配置.a ?? '0'
-    this.值b = 配置.b ?? '0'
+    this.值a = 配置.a ?? 0
+    this.值b = 配置.b ?? 0
     this.输入框1.监听发出事件('输入', async (事件): Promise<void> => {
       this.值a = 事件.detail
       await this.计算结果()
@@ -81,10 +81,11 @@ export class 演示加法组件 extends 组件基类<发出事件类型, 监听�
   }
 
   private async 计算结果(): Promise<void> {
-    let 调用结果 = await API管理器.请求postJson并处理错误('/api/demo/base/add', {
-      a: parseInt(this.值a),
-      b: parseInt(this.值b),
-    })
+    if (this.值a === null || this.值b === null) {
+      this.结果.textContent = '请输入两个数字'
+      return
+    }
+    let 调用结果 = await API管理器.请求postJson并处理错误('/api/demo/base/add', { a: this.值a, b: this.值b })
     this.结果.textContent = 调用结果.res.toString()
   }
 }

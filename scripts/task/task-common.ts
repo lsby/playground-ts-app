@@ -28,6 +28,6 @@ export let 生成API类型命令 = 命令(
   './src/interface',
   './src/types/interface-type.ts',
 )
-export let 生成Web索引命令 = 命令('tsx', 'scripts/gen/gen-web-index.ts')
+export let 生成Web页面入口命令 = 命令('tsx', 'scripts/gen/gen-web-page-entry.ts')
 export let 生成本地API列表命令 = 命令('tsx', 'scripts/gen/gen-local-api-list.ts')
 export let 生成本地Schema命令 = 命令('tsx', 'scripts/gen/gen-local-schema.ts')

@@ -6,7 +6,7 @@ import { 警告提示 } from '../../global/manager/toast-manager'
 import { 创建元素 } from '../../global/tools/create-element'
 import { 主要按钮, 普通按钮 } from '../general/base/base-button'
 import { 动态表单, 动态表单项配置 } from '../general/form/form'
-import { 数字输入框, 普通输入框 } from '../general/form/form-input'
+import { 普通输入框 } from '../general/form/form-input'
 import { 表格组件 } from '../general/table/table'
 import { 数据表加载数据参数 } from '../general/table/types'
 
@@ -234,7 +234,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
       let 列类型 = 列.type
       let 输入框 =
         this.获得输入框类型(列类型) === 'number'
-          ? new 数字输入框({ 占位符: `请输入 ${列名}` })
+          ? new 普通输入框({ 占位符: `请输入 ${列名}`, 类型: 'number' })
           : new 普通输入框({ 占位符: `请输入 ${列名}` })
 
       表单项列表.push({ 键: 列名, 组件: 输入框, 标签: 列名 })
@@ -293,7 +293,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
 
       let 输入框 =
         this.获得输入框类型(列类型) === 'number'
-          ? new 数字输入框({ 值: String(当前值 ?? '') })
+          ? new 普通输入框({ 值: String(当前值 ?? ''), 类型: 'number' })
           : new 普通输入框({ 值: String(当前值 ?? '') })
 
       表单项列表.push({ 键: 列名, 组件: 输入框, 标签: 列名 })

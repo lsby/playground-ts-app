@@ -148,16 +148,47 @@ test.describe('演示组件 E2E', (): void => {
     await 演示_点击(page.getByRole('button', { name: '验证并提交' }))
     await expect(page.getByRole('alert').filter({ hasText: '普通文本演示为必填项' })).toBeVisible()
 
+    let 表单 = page.locator('lsby-form')
+    let 名称输入框 = page.getByRole('textbox', { name: '普通文本演示' })
+    await 表单.evaluate((元素): void => {
+      if ('设置初始数据' in 元素 === false || typeof 元素.设置初始数据 !== 'function')
+        throw new Error('表单未提供设置初始数据方法')
+      元素.设置初始数据({ name: '服务端初始值' })
+    })
+    await expect(名称输入框).toHaveValue('服务端初始值')
+    await 名称输入框.fill('临时修改值')
+    await 表单.evaluate((元素): void => {
+      if ('重置' in 元素 === false || typeof 元素.重置 !== 'function') throw new Error('表单未提供重置方法')
+      元素.重置()
+    })
+    await expect(名称输入框).toHaveValue('服务端初始值')
+
+    await 名称输入框.fill('校验中的旧值')
+    let 提交按钮 = page.getByRole('button', { name: '验证并提交' })
+    let 提交操作 = 提交按钮.click()
+    await expect(page.locator('lsby-form-input-default').first()).toHaveAttribute('aria-busy', 'true')
+    await 名称输入框.fill('')
+    await 提交操作
+    await expect(page.getByRole('alert').filter({ hasText: '普通文本演示为必填项' })).toBeVisible()
+    await expect(提交按钮).toBeEnabled()
+    await expect(page.getByRole('dialog', { name: '表单提交数据' })).toHaveCount(0)
+
     // 2. 依次填入各项控件数据
     await 演示_说明_右下角(page, '依次录入普通文本、数字、下拉选择、单选、复选、多选下拉与开关等控件')
-    await 演示_输入(page.getByRole('textbox', { name: '普通文本演示' }), '示例资料')
+    await 演示_输入(名称输入框, '示例资料')
     await 演示_输入(page.getByRole('spinbutton', { name: '数字输入演示' }), '3')
     await 演示_选择(page.getByRole('combobox', { name: '下拉选择演示' }), 'business')
     await 演示_勾选(page.getByRole('radio', { name: '紧凑' }))
     await 演示_勾选(page.getByRole('checkbox', { name: '复选框演示' }))
     await 演示_勾选(page.getByRole('checkbox', { name: '表格' }))
 
+    await 表单.evaluate((元素): void => {
+      元素.addEventListener('变化', (事件): void => {
+        if (事件.target === 元素) 元素.setAttribute('data-observed-change', 'true')
+      })
+    })
     let 多选下拉 = page.getByRole('combobox', { name: '多选下拉演示' })
+    let 多选下拉组件 = page.locator('lsby-form-multi-select')
     await 演示_点击(多选下拉)
     await 演示_点击(page.getByText('前端', { exact: true }))
     await expect(多选下拉).toContainText('已选 1 项')
@@ -167,13 +198,34 @@ test.describe('演示组件 E2E', (): void => {
     await expect(page.getByRole('option', { name: '后端', exact: true })).toHaveAttribute('aria-selected', 'true')
     await expect(多选下拉).toContainText('已选 2 项')
 
-    await 演示_勾选(page.getByRole('switch', { name: '布尔开关演示' }))
-    let 表单 = page.locator('lsby-form')
-    await 表单.evaluate((元素): void => {
-      元素.addEventListener('变化', (事件): void => {
-        if (事件.target === 元素) 元素.setAttribute('data-observed-change', 'true')
-      })
+    await 多选下拉组件.evaluate((元素): void => {
+      if ('刷新列表' in 元素 === false || typeof 元素.刷新列表 !== 'function')
+        throw new Error('多选下拉未提供刷新列表方法')
+      元素.刷新列表([{ 文字: '后端', value: 'backend' }])
     })
+    await expect(多选下拉).toContainText('已选 1 项')
+    await expect(表单).toHaveAttribute('data-observed-change', 'true')
+    await 多选下拉组件.evaluate((元素): void => {
+      if ('刷新列表' in 元素 === false || typeof 元素.刷新列表 !== 'function')
+        throw new Error('多选下拉未提供刷新列表方法')
+      元素.刷新列表([
+        { 文字: '前端', value: 'frontend' },
+        { 文字: '后端', value: 'backend' },
+        { 文字: '测试', value: 'testing' },
+      ])
+    })
+    await 演示_点击(page.getByText('前端', { exact: true }))
+    await expect(多选下拉).toContainText('已选 2 项')
+    await page.mouse.click(1, 1)
+    await expect(多选下拉).toHaveAttribute('aria-expanded', 'false')
+    let 打开浮层列表 = await page
+      .locator(':popover-open')
+      .evaluateAll((元素列表) =>
+        元素列表.map((元素) => ({ 标签: 元素.tagName, 角色: 元素.getAttribute('role'), 文本: 元素.textContent })),
+      )
+    expect(打开浮层列表).toEqual([])
+
+    await 演示_勾选(page.getByRole('switch', { name: '布尔开关演示' }))
     let 自动伸缩文本框 = page.getByRole('textbox', { name: '自动伸缩文本框演示' })
     await 演示_输入(自动伸缩文本框, '多行文本示例')
     await 自动伸缩文本框.blur()
@@ -181,12 +233,12 @@ test.describe('演示组件 E2E', (): void => {
 
     // 3. 提交并展示数据模态框
     await 演示_说明_右下角(page, '表单填写完毕，点击“验证并提交”查看解析后的强类型结构化数据')
-    await 演示_点击(page.getByRole('button', { name: '验证并提交' }))
+    await 演示_点击(提交按钮)
 
     let 数据模态框 = page.getByRole('dialog', { name: '表单提交数据' })
     await expect(数据模态框).toBeVisible()
     await expect(数据模态框).toContainText('"name": "示例资料"')
-    await expect(数据模态框).toContainText('"quantity": "3"')
+    await expect(数据模态框).toContainText('"quantity": 3')
     await expect(数据模态框).toContainText('"category": "business"')
     await expect(数据模态框).toContainText('"mode": "紧凑"')
     await expect(数据模态框).toContainText('"confirmed": true')
@@ -336,6 +388,24 @@ test.describe('演示组件 E2E', (): void => {
     await expect(page.getByRole('button', { name: 'ID ▼1', exact: true })).toBeVisible()
     let ID降序行 = await 读取用户表格行(page)
     expect(ID降序行.map((行) => 行.id)).toEqual([...ID降序行.map((行) => 行.id)].sort(比较文本).reverse())
+
+    await 演示_说明_右下角(page, '切换排序后进行 Shift 范围选择，验证锚点跟随稳定行键而不是旧行号')
+    await 演示_点击(page.getByRole('button', { name: 'ID ▼1', exact: true }))
+    await 演示_点击(page.getByRole('button', { name: '名称', exact: true }))
+    let 用户B行 = page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'sort-user-b', exact: true }) })
+    await 用户B行.click()
+    await 演示_点击(page.getByRole('button', { name: '名称 ▲1', exact: true }))
+    let 管理员行 = page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'admin', exact: true }) })
+    await 管理员行.click({ modifiers: ['Shift'] })
+    await expect(page.locator('lsby-table tbody tr[aria-selected="true"]')).toHaveCount(3)
+    let 选中数量 = await 用户表格.evaluate((元素): number => {
+      if ('获得选中行键' in 元素 === false || typeof 元素.获得选中行键 !== 'function')
+        throw new Error('表格未提供获得选中行键方法')
+      let 行键列表: unknown = 元素.获得选中行键()
+      if (Array.isArray(行键列表) === false) throw new Error('表格选中行键返回值无效')
+      return 行键列表.length
+    })
+    expect(选中数量).toBe(3)
 
     // 4. 定格在当前最终排好序的业务表格界面上，展示最终成果
     await 演示_完成(

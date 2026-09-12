@@ -65,6 +65,7 @@ class 浮层管理器类 {
     记录.位置监听器?.abort()
     if (记录.挂载方式 === '原位弹出层') {
       if (记录.根元素.matches(':popover-open') === true) 记录.根元素.hidePopover()
+      记录.根元素.removeAttribute('popover')
     } else 记录.根元素.remove()
     this.同步页面滚动()
     this.同步背景可交互性()
@@ -246,12 +247,34 @@ class 浮层管理器类 {
       this.原惰性状态.clear()
       return
     }
-    let 可交互根元素 = new Set(this.栈.slice(顶层模态索引).map((项) => 项.根元素))
+    let 可交互根元素 = new Set(
+      this.栈
+        .slice(顶层模态索引)
+        .map((项) => this.获得Body直属元素(项.根元素))
+        .filter((元素): 元素 is HTMLElement => 元素 !== null),
+    )
     for (let 子元素 of document.body.children) {
       if (子元素 instanceof HTMLElement === false) continue
       if (this.原惰性状态.has(子元素) === false) this.原惰性状态.set(子元素, 子元素.inert)
       子元素.inert = 可交互根元素.has(子元素) === false
     }
+  }
+
+  private 获得Body直属元素(元素: HTMLElement): HTMLElement | null {
+    let 当前: Node = 元素
+    while (当前.parentNode !== document.body) {
+      if (当前.parentNode !== null) {
+        当前 = 当前.parentNode
+        continue
+      }
+      let 根 = 当前.getRootNode()
+      if (根 instanceof ShadowRoot) {
+        当前 = 根.host
+        continue
+      }
+      return null
+    }
+    return 当前 instanceof HTMLElement ? 当前 : null
   }
 }
 

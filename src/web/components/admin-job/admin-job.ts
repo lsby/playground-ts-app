@@ -26,7 +26,7 @@ export class 任务管理页面组件 extends 组件基类<发出事件类型, �
     this.获得宿主样式().height = '100%'
 
     this.监听冒泡事件('切换', async (e: CustomEvent<{ 当前索引: number }>) => {
-      if (e.target !== this.tabs) return
+      if (e.composedPath()[0] !== this.tabs) return
       let type = e.detail.当前索引 === 0 ? 'instant' : 'scheduled'
       let url = new URL(window.location.href)
       url.searchParams.set('type', type)

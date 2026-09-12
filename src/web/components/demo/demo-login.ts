@@ -23,7 +23,7 @@ export class 演示登录组件 extends 组件基类<发出事件类型, 监听�
         { 键: 'password', 标签: '密码', 组件: 密码, 宽度: 2, 必填: true },
       ],
     })
-    let 结果 = 创建元素('div', { role: 'alert', style: { minHeight: '22px', color: 'var(--错误颜色)' } })
+    let 结果 = 创建元素('div', { role: 'alert', style: { minHeight: '22px', color: 'var(--错误前景)' } })
     let 登录 = async (): Promise<void> => {
       结果.textContent = ''
       await 表单实例.提交(async (数据): Promise<void> => {

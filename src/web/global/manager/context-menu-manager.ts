@@ -62,7 +62,7 @@ export class 右键菜单管理器 {
           border: '0',
           borderRadius: 'var(--圆角-小)',
           backgroundColor: 'transparent',
-          color: 菜单项.危险 === true ? 'var(--错误颜色)' : 'var(--文字颜色)',
+          color: 菜单项.危险 === true ? 'var(--错误前景)' : 'var(--文字颜色)',
           textAlign: 'left',
           cursor: 菜单项.禁用 === true ? 'not-allowed' : 'pointer',
         },

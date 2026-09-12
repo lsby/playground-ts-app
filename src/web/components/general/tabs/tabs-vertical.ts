@@ -1,4 +1,5 @@
 import { 组件基类 } from '../../../base/base'
+import { 浮层管理器, type 浮层句柄 } from '../../../global/manager/overlay-manager'
 import { 创建元素 } from '../../../global/tools/create-element'
 import { 图标组件 } from '../base/icon'
 import { 创建标签页标识前缀, 刷新标签页内容, 同步标签页路由, 计算键盘目标索引, 读取标签页索引 } from './tabs-common'
@@ -10,6 +11,7 @@ type 监听事件类型 = {}
 type 标签页项 = {
   标签: string
   内容: HTMLElement
+  内容面板: HTMLDivElement
   分组?: string | undefined
   标识?: string | undefined
   已挂载: boolean
@@ -37,6 +39,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
   private 标签按钮列表: HTMLButtonElement[] = []
   private readonly 标签页标识前缀 = 创建标签页标识前缀()
   private 关闭移动端菜单: () => void = (): void => {}
+  private 移动端浮层句柄: 浮层句柄 | null = null
 
   public constructor(配置: 纵向tab配置 = {}) {
     super()
@@ -47,7 +50,11 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
     配置: { 标签: string; 分组?: string | undefined; 标识?: string | undefined },
     内容: HTMLElement,
   ): void {
-    this.标签页列表.push({ 标签: 配置.标签, 分组: 配置.分组, 标识: 配置.标识, 内容, 已挂载: false })
+    let 内容面板 = 创建元素('div', {
+      style: { display: 'grid', gridTemplateRows: 'minmax(0, 1fr)', minWidth: '0', minHeight: '0', overflow: 'auto' },
+    })
+    内容面板.append(内容)
+    this.标签页列表.push({ 标签: 配置.标签, 分组: 配置.分组, 标识: 配置.标识, 内容, 内容面板, 已挂载: false })
   }
 
   public override async 刷新(): Promise<void> {
@@ -85,6 +92,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
           padding: 30px 20px !important;
           box-sizing: border-box !important;
           overflow-y: auto !important;
+          margin: 0 !important;
         }
         .tabs-sidebar.open {
           left: 0 !important;
@@ -177,68 +185,41 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
 
     移动端菜单按钮.appendChild(new 图标组件('menu', 24))
 
-    let 打开前焦点: HTMLElement | null = null
     let 打开移动端菜单 = (): void => {
-      let 当前焦点 = this.shadow.activeElement
-      打开前焦点 = 当前焦点 instanceof HTMLElement ? 当前焦点 : 移动端菜单按钮
+      if (this.移动端浮层句柄 !== null) return
       this.标签头容器.classList.add('open')
       遮罩层.classList.add('open')
+      this.插槽容器.inert = true
       移动端菜单按钮.setAttribute('aria-expanded', 'true')
       移动端菜单按钮.setAttribute('aria-label', '关闭标签页菜单')
       移动端菜单按钮.title = '关闭标签页菜单'
-      requestAnimationFrame((): void => {
-        if (this.标签头容器.classList.contains('open') === false) return
-        let 初始焦点 = this.标签按钮列表[this.当前索引] ?? this.标签按钮列表[0] ?? 移动端菜单按钮
-        初始焦点.focus()
+      this.移动端浮层句柄 = 浮层管理器.打开({
+        根元素: this.标签头容器,
+        内容元素: this.标签头容器,
+        挂载方式: '原位弹出层',
+        模态: true,
+        允许Escape关闭: true,
+        外部关闭: '不关闭',
+        初始焦点: this.标签头容器,
+        请求关闭: (): void => this.关闭移动端菜单(),
       })
     }
 
     this.关闭移动端菜单 = (): void => {
-      let 恢复焦点 = 打开前焦点
-      打开前焦点 = null
+      let 句柄 = this.移动端浮层句柄
+      this.移动端浮层句柄 = null
       this.标签头容器.classList.remove('open')
       遮罩层.classList.remove('open')
+      this.插槽容器.inert = false
       移动端菜单按钮.setAttribute('aria-expanded', 'false')
       移动端菜单按钮.setAttribute('aria-label', '打开标签页菜单')
       移动端菜单按钮.title = '打开标签页菜单'
-      if (恢复焦点?.isConnected === true) requestAnimationFrame((): void => 恢复焦点.focus())
+      if (句柄 !== null) void 句柄.关闭().catch((错误: unknown): void => console.error('关闭移动端标签菜单失败:', 错误))
     }
-
-    let 处理抽屉键盘 = (事件: Event): void => {
-      if (事件 instanceof KeyboardEvent === false) return
-      if (this.标签头容器.classList.contains('open') === false) return
-      if (事件.key === 'Escape') {
-        事件.preventDefault()
-        事件.stopPropagation()
-        this.关闭移动端菜单()
-        return
-      }
-      if (事件.key !== 'Tab') return
-      let 可聚焦按钮 = this.标签按钮列表.filter((按钮): boolean => 按钮.disabled === false && 按钮.tabIndex >= 0)
-      let 首个按钮 = 可聚焦按钮[0]
-      let 最后按钮 = 可聚焦按钮[可聚焦按钮.length - 1]
-      if (首个按钮 === undefined || 最后按钮 === undefined) {
-        事件.preventDefault()
-        移动端菜单按钮.focus()
-        return
-      }
-      let 当前焦点 = this.shadow.activeElement
-      let 焦点在抽屉内 = 当前焦点 instanceof HTMLButtonElement && 可聚焦按钮.includes(当前焦点)
-      if (事件.shiftKey === true && (当前焦点 === 首个按钮 || 焦点在抽屉内 === false)) {
-        事件.preventDefault()
-        最后按钮.focus()
-      } else if (事件.shiftKey === false && (当前焦点 === 最后按钮 || 焦点在抽屉内 === false)) {
-        事件.preventDefault()
-        首个按钮.focus()
-      }
-    }
-    this.shadow.addEventListener('keydown', 处理抽屉键盘)
-    this.注册清理((): void => this.shadow.removeEventListener('keydown', 处理抽屉键盘))
 
     let 移动端查询 = window.matchMedia('(max-width: 768px)')
     let 处理视口变化 = (): void => {
       if (移动端查询.matches === true || this.标签头容器.classList.contains('open') === false) return
-      打开前焦点 = null
       this.关闭移动端菜单()
     }
     移动端查询.addEventListener('change', 处理视口变化)
@@ -261,6 +242,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
     this.shadow.appendChild(this.插槽容器)
     this.shadow.appendChild(遮罩层)
     this.shadow.appendChild(移动端菜单按钮)
+    this.注册清理((): void => this.关闭移动端菜单())
 
     this.确保标签页已挂载(this.当前索引)
     this.更新UI()
@@ -328,10 +310,10 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
       按钮.setAttribute('aria-controls', 面板标识)
       按钮.setAttribute('aria-selected', 选中 ? 'true' : 'false')
       按钮.tabIndex = 选中 ? 0 : -1
-      项.内容.id = 面板标识
-      项.内容.setAttribute('role', 'tabpanel')
-      项.内容.setAttribute('aria-labelledby', 标签标识)
-      项.内容.hidden = 选中 === false
+      项.内容面板.id = 面板标识
+      项.内容面板.setAttribute('role', 'tabpanel')
+      项.内容面板.setAttribute('aria-labelledby', 标签标识)
+      项.内容面板.hidden = 选中 === false
 
       if (选中 === false) {
         按钮.onmouseenter = (): void => {
@@ -373,18 +355,9 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
 
     this.标签页列表.forEach((项, idx) => {
       if (idx === this.当前索引) {
-        项.内容.style.display = 'flex'
-        项.内容.style.flex = '1'
-        项.内容.style.flexDirection = 'column'
-        项.内容.style.minHeight = '0'
-        项.内容.style.minWidth = '0'
-        let 已经有overflow样式: boolean =
-          项.内容.style.overflow !== '' || 项.内容.style.overflowY !== '' || 项.内容.style.overflowX !== ''
-        if (已经有overflow样式 === false) {
-          项.内容.style.overflow = 'auto'
-        }
+        项.内容面板.style.display = 'grid'
       } else {
-        项.内容.style.display = 'none'
+        项.内容面板.style.display = 'none'
       }
     })
   }
@@ -405,7 +378,7 @@ export class 纵向tab组件 extends 组件基类<tabVertical发出事件类型,
   private 确保标签页已挂载(index: number): void {
     let 目标项 = this.标签页列表[index]
     if (this.isConnected === false || 目标项 === undefined || 目标项.已挂载 === true) return
-    this.appendChild(目标项.内容)
+    this.appendChild(目标项.内容面板)
     目标项.已挂载 = true
   }
 

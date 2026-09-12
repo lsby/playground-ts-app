@@ -38,9 +38,9 @@
       "group": { "kind": "build", "isDefault": true }
     },
     {
-      "label": "_持续生成web组件索引",
+      "label": "_持续生成web页面入口",
       "type": "shell",
-      "command": "npm run task -- watch:web-index",
+      "command": "npm run task -- watch:web-page-entry",
       "problemMatcher": [
         {
           "pattern": { "kind": "file", "regexp": "(错误: .*)", "file": 1, "message": 1 },
@@ -124,7 +124,7 @@
         "_持续ESLint检查",
         "_持续生成API接口列表",
         "_持续生成API接口类型",
-        "_持续生成web组件索引",
+        "_持续生成web页面入口",
         "_运行web后端",
         "_运行前端"
       ],
@@ -138,7 +138,7 @@
         "_持续ESLint检查",
         "_持续生成API接口列表",
         "_持续生成API接口类型",
-        "_持续生成web组件索引",
+        "_持续生成web页面入口",
         "_运行electron后端",
         "_运行前端"
       ],
@@ -196,7 +196,7 @@
         "_持续ESLint检查",
         "_持续生成API接口列表",
         "_持续生成API接口类型",
-        "_持续生成web组件索引",
+        "_持续生成web页面入口",
         "_持续生成纯前端本地API列表",
         "_持续生成纯前端本地数据库Schema",
         "_运行纯前端"

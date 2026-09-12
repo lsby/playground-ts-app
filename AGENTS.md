@@ -99,7 +99,8 @@
 
 - 结构与目录:
   - 框架基类在 `src/web/base/base.ts`, 各个页面的入口文件放在 `src/web/page/`
-  - 组件均存放在 `src/web/components/` 目录下, 脚本将会在 `src/web/components/index.ts` 中生成统一索引
+  - 组件均存放在 `src/web/components/` 目录下
+  - 页面入口由生成器根据 HTML 中直接使用的自定义元素标签精确生成至 `src/web/page/entry/`, 目录结构与页面保持一致. 不要手工编辑入口文件或建立会注册全部组件的统一入口; 页面新增组件标签后运行生成任务即可
     - 各种通用组件如基础布局, 表单, 表格和标签页存放在 `general/` 下
     - 业务组件放在 `project/` 中
   - 全局使用的管理器存放在 `src/web/global/manager/` 中, 而全局公共样式维护在 `src/web/global/style/global.css`
@@ -181,7 +182,7 @@
   - 运行 `npm run task -- generate:all` 即可触发全量代码生成
   - 所有派生文件都交由生成器覆盖维护. 任何手动修改都会在下次生成时被冲掉, 正确做法是去修改源头定义然后重新生成. 这些派生文件包含:
     - 数据库与接口层面的 `src/types/db.ts`, `src/interface/interface-list.ts` 以及 `src/types/interface-type.ts`
-    - 前端相关与本地数据库层面的 `src/web/components/index.ts`, `src/web/pure-frontend/local-api-list.ts` 和 `src/web/pure-frontend/local-schema.ts`
+    - 前端相关与本地数据库层面的 `src/web/page/entry/**/*.ts`, `src/web/pure-frontend/local-api-list.ts` 和 `src/web/pure-frontend/local-schema.ts`
     - 此外还包括注入到应用里的元信息文件 `src/app/meta-info.ts`
 
 ## Docker 远程部署

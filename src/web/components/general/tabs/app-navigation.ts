@@ -11,6 +11,7 @@ type 标签页项 = {
   图标?: string | undefined
   标识?: string | undefined
   内容: HTMLElement
+  内容面板: HTMLDivElement
   已挂载: boolean
 }
 
@@ -46,7 +47,11 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
     配置: { 标签: string; 图标?: string | undefined; 标识?: string | undefined },
     内容: HTMLElement,
   ): void {
-    this.标签页列表.push({ 标签: 配置.标签, 图标: 配置.图标, 标识: 配置.标识, 内容, 已挂载: false })
+    let 内容面板 = 创建元素('div', {
+      style: { display: 'grid', gridTemplateRows: 'minmax(0, 1fr)', minWidth: '0', minHeight: '0', overflow: 'hidden' },
+    })
+    内容面板.append(内容)
+    this.标签页列表.push({ 标签: 配置.标签, 图标: 配置.图标, 标识: 配置.标识, 内容, 内容面板, 已挂载: false })
   }
 
   protected override async 当加载时(): Promise<void> {
@@ -153,10 +158,10 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
       按钮.setAttribute('aria-controls', 面板标识)
       if (选中 === true) 按钮.setAttribute('aria-current', 'page')
       按钮.tabIndex = 选中 ? 0 : -1
-      项.内容.id = 面板标识
-      项.内容.setAttribute('role', 'region')
-      项.内容.setAttribute('aria-labelledby', 标签标识)
-      项.内容.hidden = 选中 === false
+      项.内容面板.id = 面板标识
+      项.内容面板.setAttribute('role', 'region')
+      项.内容面板.setAttribute('aria-labelledby', 标签标识)
+      项.内容面板.hidden = 选中 === false
 
       if (项.图标 !== undefined && 项.图标 !== '') {
         let 图标元素 = 创建元素('span', {
@@ -183,14 +188,9 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
 
     this.标签页列表.forEach((项, idx) => {
       if (idx === this.当前索引) {
-        项.内容.style.display = 'flex'
-        项.内容.style.flex = '1'
-        项.内容.style.flexDirection = 'column'
-        项.内容.style.minHeight = '0'
-        项.内容.style.minWidth = '0'
-        项.内容.style.overflow = 'hidden'
+        项.内容面板.style.display = 'grid'
       } else {
-        项.内容.style.display = 'none'
+        项.内容面板.style.display = 'none'
       }
     })
   }
@@ -211,7 +211,7 @@ export class App导航组件 extends 组件基类<appNavigation发出事件类�
   private 确保标签页已挂载(index: number): void {
     let 目标项 = this.标签页列表[index]
     if (this.isConnected === false || 目标项 === undefined || 目标项.已挂载 === true) return
-    this.appendChild(目标项.内容)
+    this.appendChild(目标项.内容面板)
     目标项.已挂载 = true
   }
 

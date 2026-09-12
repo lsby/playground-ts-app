@@ -215,9 +215,13 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
   }
 
   public 刷新列表(选项列表: 多选下拉框选项[]): void {
-    this.配置.值 = this.获得值()
+    let 原值 = this.获得值()
+    this.配置.值 = 原值
     this.选项列表 = [...选项列表]
     this.渲染选项列表()
+    let 新值 = this.获得值()
+    this.配置.值 = 新值
+    if (原值.length !== 新值.length || 原值.some((值, 索引): boolean => 值 !== 新值[索引])) this.派发事件('变化', 新值)
     if (this.展开状态 === true) this.更新面板位置()
   }
 

@@ -146,6 +146,7 @@ abstract class 下拉框基类 extends 表单组件基类<下拉框事件, 监�
       let 保留原值 = 原值 !== '' && 选项列表.some((选项): boolean => 选项.值 === 原值 && 选项.禁用 !== true)
       this.下拉框元素.value = 保留原值 ? 原值 : ''
       this.配置.值 = this.下拉框元素.value
+      if (this.配置.值 !== 原值) this.派发事件('变化', this.配置.值)
     }
   }
 }

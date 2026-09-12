@@ -25,7 +25,7 @@ type 发出事件类型 = {}
 type 监听事件类型 = {}
 type 资料数据 = {
   name: string
-  quantity: string
+  quantity: number | null
   category: string
   mode: string
   confirmed: boolean
@@ -130,7 +130,20 @@ export class 演示应用组件 extends 组件基类<发出事件类型, 监听�
     })
     let 表单实例 = new 表单<资料数据>({
       项列表: [
-        { 键: 'name', 标签: '普通文本演示', 组件: new 普通输入框(), 必填: true },
+        {
+          键: 'name',
+          标签: '普通文本演示',
+          组件: new 普通输入框(),
+          必填: true,
+          校验器们: [
+            async (): Promise<string | null> => {
+              await new Promise<void>((完成): void => {
+                setTimeout(完成, 100)
+              })
+              return null
+            },
+          ],
+        },
         { 键: 'quantity', 标签: '数字输入演示', 组件: new 数字输入框({ 最小值: '0', 步长: '1' }) },
         {
           键: 'category',
