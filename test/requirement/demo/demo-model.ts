@@ -164,7 +164,7 @@ export let 管理员登录行为 = new 行为<演示需求流程上下文>(
 export let 导航至用户管理页行为 = new 行为<演示需求流程上下文>(
   '管理员切换至用户管理业务示例',
   async ({ 系统 }): Promise<void> => {
-    await 演示_点击(系统.page.getByRole('button', { name: '业务示例', exact: true }))
+    await 演示_点击(系统.page.getByRole('tab', { name: '业务示例', exact: true }))
     await expect(系统.page.getByRole('button', { name: '添加数据' })).toBeVisible()
   },
 )
@@ -264,7 +264,7 @@ export let 管理员全流程维护用户资料与安全凭据流程 = new 流�
     }),
     new 观察('观察新增用户可使用新密码进入演示系统', async ({ 系统 }) => {
       await expect(系统.page.getByRole('heading', { name: '可运行的组件示例' })).toBeVisible()
-      await 演示_点击(系统.page.getByRole('button', { name: '业务示例', exact: true }))
+      await 演示_点击(系统.page.getByRole('tab', { name: '业务示例', exact: true }))
       await expect(系统.page.getByRole('button', { name: '添加数据' })).toBeVisible()
       await expect(系统.page.getByText('非管理员', { exact: false })).not.toBeVisible()
       return {

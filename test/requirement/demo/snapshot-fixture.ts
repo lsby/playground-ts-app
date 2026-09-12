@@ -86,7 +86,7 @@ export function 创建演示快照配置(快照根目录: string): 快照配置<
       await 演示_输入(上下文.系统.page.getByRole('textbox', { name: '密码' }), '123456')
       await 演示_点击(上下文.系统.page.getByRole('button', { name: '登录演示系统' }))
       await 上下文.系统.page.waitForURL('**/demo/index.html')
-      await 演示_点击(上下文.系统.page.getByRole('button', { name: '业务示例', exact: true }))
+      await 演示_点击(上下文.系统.page.getByRole('tab', { name: '业务示例', exact: true }))
       await expect(上下文.系统.page.getByRole('cell', { name: 新增用户.name, exact: true })).toBeVisible()
     },
   }
