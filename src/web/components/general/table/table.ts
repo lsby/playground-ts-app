@@ -190,6 +190,13 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
   }
 
   private 渲染数据视图(): void {
+    let 当前焦点 = this.shadow.activeElement
+    let 焦点所在列索引: number | undefined
+    if (当前焦点 instanceof HTMLElement && 当前焦点.closest('thead') !== null) {
+      let 所在表头单元格 = 当前焦点.closest('th')
+      if (所在表头单元格 !== null) 焦点所在列索引 = 所在表头单元格.cellIndex
+    }
+
     this.表格行元素映射.clear()
     this.表格单元格元素映射.clear()
     this.表头元素映射.clear()
@@ -198,6 +205,12 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
     let 上下文 = this.创建渲染上下文()
     this.表格元素.replaceChildren(渲染表头(上下文, 操作列宽度), 渲染表体(上下文, 操作列宽度))
     for (let [列索引, 宽度] of this.列宽映射) this.应用列宽到当前元素(列索引, 宽度)
+
+    if (焦点所在列索引 !== undefined) {
+      let 新表头单元格 = this.表格元素.querySelector('thead')?.rows[0]?.cells[焦点所在列索引]
+      let 按钮 = 新表头单元格?.querySelector('button')
+      if (按钮 instanceof HTMLElement) 按钮.focus()
+    }
   }
 
   private 同步状态视图(): void {

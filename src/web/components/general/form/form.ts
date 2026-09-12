@@ -195,8 +195,8 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
       if (运行项.组件 instanceof 组件基类) await 运行项.组件.等待初始化()
       this.显示项错误(运行项, 运行项.当前错误)
     }
-    this.监听冒泡事件('变化', async (event): Promise<void> => await this.处理子项变化(event))
-    this.监听冒泡事件('输入', async (event): Promise<void> => await this.处理子项变化(event))
+    this.监听冒泡事件('变化', (event): void => this.处理子项变化(event))
+    this.监听冒泡事件('输入', (event): void => this.处理子项变化(event))
     this.监听冒泡事件('失焦', async (event): Promise<void> => await this.处理子项失焦(event))
   }
 
@@ -364,7 +364,7 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
     this.运行项映射.set(项.键, 运行项)
   }
 
-  private async 处理子项变化(event: CustomEvent<基础值结构>): Promise<void> {
+  private 处理子项变化(event: CustomEvent<基础值结构>): void {
     let 事件来源 = event.composedPath()[0]
     if (事件来源 === this || 事件来源 instanceof HTMLElement === false) return
     let 运行项 = [...this.运行项映射.values()].find((项) => 项.组件 === 事件来源)
@@ -377,14 +377,12 @@ export class 表单<数据类型 extends 表单数据> extends 组件基类<表�
     ]
     for (let 项 of 受影响项) this.使校验过期(项)
     运行项.已修改 = true
-    await Promise.all(
-      受影响项
-        .filter((项): boolean => 项.变化时校验 === true || 项.已触碰 === true)
-        .map(async (项): Promise<void> => {
-          await this.校验最新值(项, true)
-        }),
-    )
     this.派发事件('变化', this.获得数据())
+    for (let 项 of 受影响项) {
+      if (项.变化时校验 === true || 项.已触碰 === true) {
+        void this.校验最新值(项, true)
+      }
+    }
   }
 
   private async 处理子项失焦(event: CustomEvent<void>): Promise<void> {

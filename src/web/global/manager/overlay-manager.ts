@@ -127,7 +127,7 @@ class 浮层管理器类 {
           事件路径.includes(顶层.内容元素) ||
           顶层.内容元素.contains(目标) ||
           顶层.附加内部元素?.some((元素): boolean => 事件路径.includes(元素) || 元素.contains(目标)) === true
-        let 是遮罩 = 目标 === 顶层.根元素
+        let 是遮罩 = 目标 === 顶层.根元素 && 是内部 === false
         if ((策略 === '任意外部' && 是内部 === false) || (策略 === '仅遮罩' && 是遮罩 === true)) {
           void this.请求关闭(顶层.id).catch((错误: unknown): void => console.error('关闭浮层失败:', 错误))
         }

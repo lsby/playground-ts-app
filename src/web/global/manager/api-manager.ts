@@ -281,7 +281,7 @@ export class API管理器类 {
         }),
         请求选项?.信号,
       )
-      return JSON.parse(请求结果)
+      return z.object({ status: z.enum(['success', 'fail', 'unexpected']), data: z.any() }).parse(JSON.parse(请求结果))
     } catch (e) {
       if (是中止错误(e, 请求选项?.信号) === true) throw e
       console.error(
@@ -320,7 +320,9 @@ export class API管理器类 {
     | { status: 'fail'; data: 已审阅的any }
     | { status: 'success'; data: Record<string, 已审阅的any> }
     | { status: 'unexpected'; data: 已审阅的any } {
-    return typeof x === 'object' && x !== null && 'status' in x && 'data' in x
+    if (typeof x !== 'object' || x === null) return false
+    let obj = x as Record<string, unknown>
+    return (obj['status'] === 'success' || obj['status'] === 'fail' || obj['status'] === 'unexpected') && 'data' in obj
   }
 }
 
