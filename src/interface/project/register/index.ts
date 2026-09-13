@@ -32,7 +32,8 @@ let 接口逻辑实现 = 接口逻辑
         .select('enable_register')
         .where('id', '=', 系统配置ID)
         .executeTakeFirst()
-      if ((配置?.enable_register ?? 0) !== 1) {
+      if (配置 === undefined) throw new Error('系统配置不存在')
+      if (配置.enable_register !== 1) {
         return new Left('注册未启用' as const)
       }
       return new Right({})

@@ -23,7 +23,8 @@ let 接口逻辑实现 = 接口逻辑.空逻辑().绑定(
       .select('enable_register')
       .where('id', '=', 系统配置ID)
       .executeTakeFirst()
-    return new Right({ enable_register: Boolean(配置?.enable_register ?? 0) })
+    if (配置 === undefined) throw new Error('系统配置不存在')
+    return new Right({ enable_register: 配置.enable_register === 1 })
   }),
 )
 

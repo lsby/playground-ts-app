@@ -81,6 +81,7 @@ export class 组合框 extends 表单组件基类<组合框事件, {}, string> {
         boxSizing: 'border-box',
       },
     })
+    面板.setAttribute('popover', 'manual')
     面板.setAttribute('aria-label', `${this.配置.可访问名称 ?? '可搜索选择'}选项`)
     let 容器 = 创建元素('div', { style: { position: 'relative' } })
     容器.append(输入, 面板)

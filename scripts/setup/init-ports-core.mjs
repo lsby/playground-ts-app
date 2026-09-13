@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
-import { 读取环境文件标识 } from './env-files-core.mjs'
+import { 读取Node环境 } from './env-files-core.mjs'
 
 export let 端口键组 = ['APP_PORT', 'WEB_PORT', 'WEB_HMR_PORT', 'TEST_APP_PORT', 'TEST_WEB_PORT', 'TEST_WEB_HMR_PORT']
 
@@ -36,9 +36,9 @@ function 从环境文件读取端口(项目根目录, 文件相对路径, 变量
 export function 推断已有端口表(项目根目录, 环境文件组) {
   let 已有环境文件组 = 环境文件组
     .filter((文件) => fs.existsSync(path.resolve(项目根目录, 文件)) === true)
-    .map((文件) => ({ 文件, 标识: 读取环境文件标识(path.resolve(项目根目录, 文件)) }))
-  let 常规环境文件 = 已有环境文件组.find((环境文件) => 环境文件.标识.NODE_ENV !== 'test')?.文件
-  let 测试环境文件 = 已有环境文件组.find((环境文件) => 环境文件.标识.NODE_ENV === 'test')?.文件
+    .map((文件) => ({ 文件, Node环境: 读取Node环境(path.resolve(项目根目录, 文件)) }))
+  let 常规环境文件 = 已有环境文件组.find((环境文件) => 环境文件.Node环境 !== 'test')?.文件
+  let 测试环境文件 = 已有环境文件组.find((环境文件) => 环境文件.Node环境 === 'test')?.文件
   if (常规环境文件 === undefined || 测试环境文件 === undefined) return null
   let 端口表 = {
     APP_PORT: 从环境文件读取端口(项目根目录, 常规环境文件, 'APP_PORT'),
@@ -120,7 +120,7 @@ export function 应用端口表(项目根目录, 环境文件组, 端口表) {
   for (let 环境文件 of 环境文件组) {
     let 环境文件路径 = path.resolve(项目根目录, 环境文件)
     if (fs.existsSync(环境文件路径) === false) continue
-    let 是否测试环境 = 读取环境文件标识(环境文件路径).NODE_ENV === 'test'
+    let 是否测试环境 = 读取Node环境(环境文件路径) === 'test'
     替换环境文件端口(
       项目根目录,
       环境文件,

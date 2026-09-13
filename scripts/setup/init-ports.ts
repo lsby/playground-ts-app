@@ -1,10 +1,10 @@
 import inquirer from 'inquirer'
 import path from 'path'
-import { 发现环境文件, 获得环境文件 } from './env-files-core.mjs'
+import { 发现环境文件 } from './env-files-core.mjs'
 import { 写入端口状态, 应用端口表, 生成随机端口表 } from './init-ports-core.mjs'
 
 let 项目根目录 = path.resolve(import.meta.dirname, '../..')
-let 环境文件组 = 发现环境文件(项目根目录).map((环境文件) => 获得环境文件(项目根目录, 环境文件))
+let 环境文件组 = 发现环境文件(项目根目录).map((环境文件) => 环境文件.本地文件)
 
 async function 主函数(): Promise<void> {
   let 是否跳过确认 = process.argv.slice(2).includes('--yes')

@@ -4,7 +4,7 @@ import inquirer from 'inquirer'
 import { NodeSSH } from 'node-ssh'
 import * as path from 'path'
 import { z } from 'zod'
-import { 发现环境文件, 获得环境文件 } from '../setup/env-files-core.mjs'
+import { 发现环境文件 } from '../setup/env-files-core.mjs'
 import { 日志类 } from './tools/model'
 import {
   上传文件,
@@ -280,11 +280,12 @@ async function 主函数(): Promise<void> {
     // 步骤: 打包并上传 (仅 build, run, rededeploy 模式需要)
     if (模式 === 'build' || 模式 === 'run' || 模式 === 'redeploy') {
       let Docker环境 = z.enum(['development', 'production']).parse(环境)
-      let envFile = 获得环境文件(本地根目录, { NODE_ENV: Docker环境, BUILD_TARGET: 'web' })
+      let 环境文件名表 = { development: '.env/.env.development.web', production: '.env/.env.production.web' }
+      let envFile = 环境文件名表[Docker环境]
       if (fs.existsSync(path.join(本地根目录, envFile)) === false) {
         throw new Error(`找不到对应的环境变量文件: ${envFile}，请先运行 npm run task -- setup:env`)
       }
-      let 打包环境文件 = `.env/.env.${Docker环境}.web`
+      let 打包环境文件 = envFile
       if (复用本地构建 === true) {
         日志.打印(`📦 正在本地生成、检查并预构建项目 (使用 ${envFile}，避免服务器内存溢出假死)...`)
         await 执行本地命令(`npm run task -- build:all --env ${envFile}`, { 工作目录: 本地根目录 })

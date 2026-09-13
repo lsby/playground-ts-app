@@ -5,6 +5,7 @@ import {
   Sea生产环境文件,
   Web开发环境文件,
   Web生产环境文件,
+  Web预览开发环境文件,
   完整调试环境,
   测试环境文件,
   生成API列表命令,
@@ -18,6 +19,17 @@ import {
 } from './task-common'
 import { 命令, 定义任务 } from './task-runner'
 import { 测试任务表 } from './taskfile-test'
+
+let Web开发服务端命令 = 命令(
+  'tsx',
+  'watch',
+  '--exclude',
+  './src/types/**/*',
+  '--exclude',
+  './src/interface/interface-list.ts',
+  '--inspect',
+  './src/server.ts',
+)
 
 export let 任务表 = 定义任务({
   // 生成
@@ -178,16 +190,13 @@ export let 任务表 = 定义任务({
     说明: '启动 Web 开发服务端',
     环境文件: Web开发环境文件,
     环境变量: 完整调试环境,
-    运行: 命令(
-      'tsx',
-      'watch',
-      '--exclude',
-      './src/types/**/*',
-      '--exclude',
-      './src/interface/interface-list.ts',
-      '--inspect',
-      './src/server.ts',
-    ),
+    运行: Web开发服务端命令,
+  },
+  'run:service:dev:preview': {
+    说明: '启动 Web 预览开发服务端',
+    环境文件: Web预览开发环境文件,
+    环境变量: 完整调试环境,
+    运行: Web开发服务端命令,
   },
   'run:service:prod': {
     说明: '启动 Web 生产服务端',
@@ -204,6 +213,12 @@ export let 任务表 = 定义任务({
   'run:web:dev': {
     说明: '启动 Web 前端开发服务器',
     环境文件: Web开发环境文件,
+    依赖: ['clean:web'],
+    运行: 命令('tsx', 'scripts/web/web-run.ts'),
+  },
+  'run:web:dev:preview': {
+    说明: '启动 Web 预览前端开发服务器',
+    环境文件: Web预览开发环境文件,
     依赖: ['clean:web'],
     运行: 命令('tsx', 'scripts/web/web-run.ts'),
   },
@@ -330,6 +345,25 @@ export let 任务表 = 定义任务({
     公开: false,
   },
   'dev:web': { 说明: '生成派生文件后启动 Web 开发套件', 依赖: ['generate:all', 'dev:web:watch'] },
+  'dev:web:preview:watch': {
+    说明: '并行运行 Web 预览开发服务与监听任务',
+    依赖方式: '并行',
+    依赖: [
+      'watch:type',
+      'watch:lint',
+      'watch:api-list',
+      'watch:api-type',
+      'watch:web-page-entry',
+      'run:service:dev:preview',
+      'run:web:dev:preview',
+    ],
+    公开: false,
+  },
+  'dev:web:preview': {
+    说明: '生成派生文件后启动 Web 预览开发套件',
+    环境文件: Web预览开发环境文件,
+    依赖: ['generate:all', 'dev:web:preview:watch'],
+  },
   'dev:electron:watch': {
     说明: '并行运行 Electron 开发服务与监听任务',
     依赖方式: '并行',

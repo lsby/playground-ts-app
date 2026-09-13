@@ -24,12 +24,13 @@ let 接口逻辑实现 = 接口逻辑
       async (参数, 逻辑附加参数, 请求附加参数) => {
         let _log = 请求附加参数.log.extend(接口路径)
 
-        await 参数.kysely
+        let 更新结果 = await 参数.kysely
           .获得句柄()
           .updateTable('user_config')
           .set({ theme: 参数.json.theme })
           .where('user_id', '=', 逻辑附加参数.userId)
-          .execute()
+          .executeTakeFirstOrThrow()
+        if (更新结果.numUpdatedRows !== 1n) throw new Error('用户配置更新失败：配置不存在')
         return new Right({})
       },
     ),

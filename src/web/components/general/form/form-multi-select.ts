@@ -94,6 +94,7 @@ export class 多选下拉框 extends 组件基类<多选下拉框事件, 监听�
         boxSizing: 'border-box',
       },
     })
+    this.浮动面板.setAttribute('popover', 'manual')
     this.浮动面板.setAttribute('aria-multiselectable', 'true')
     this.浮动面板.setAttribute('aria-label', `${this.配置.可访问名称 ?? '多选'}选项`)
 

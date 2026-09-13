@@ -3,10 +3,9 @@ import fs from 'fs'
 import inquirer from 'inquirer'
 import path from 'path'
 import { z } from 'zod'
-import { 获得环境文件 } from './env-files-core.mjs'
 
 let 项目根目录 = path.resolve(import.meta.dirname, '../..')
-let 环境文件相对路径 = 获得环境文件(项目根目录, { NODE_ENV: 'production', BUILD_TARGET: 'electron' })
+let 环境文件相对路径 = '.env/.env.production.electron'
 let 环境文件路径 = path.resolve(项目根目录, 环境文件相对路径)
 let Secret名称 = 'ELECTRON_ENV_FILE'
 let 仓库信息模式 = z.object({ nameWithOwner: z.string().min(1), url: z.string().url() })

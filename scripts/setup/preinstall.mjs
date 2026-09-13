@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline/promises'
-import { 发现本地环境文件, 发现环境文件, 获得环境文件 } from './env-files-core.mjs'
+import { 发现环境文件 } from './env-files-core.mjs'
 import { 执行开发数据库初始化 } from './init-dev-database.mjs'
 import { 应用端口表, 推断已有端口表, 生成随机端口表, 端口键组 } from './init-ports-core.mjs'
 import { 执行项目重命名, 解析当前包名 } from './rename-project-core.mjs'
@@ -17,8 +17,8 @@ let 目标定义组 = [
   { id: 'cli', 名称: 'CLI', 说明: '命令行应用' },
 ]
 let 环境示例文件组 = 发现环境文件(项目根目录)
-let 所有环境文件组 = 环境示例文件组.map((环境文件) => 获得环境文件(项目根目录, 环境文件))
-let Electron生产环境文件 = 获得环境文件(项目根目录, { NODE_ENV: 'production', BUILD_TARGET: 'electron' })
+let 所有环境文件组 = 环境示例文件组.map((环境文件) => 环境文件.本地文件)
+let Electron生产环境文件 = '.env/.env.production.electron'
 let 初始化状态相对路径 = '.setup-state.json'
 
 function 读取初始化状态() {
@@ -64,7 +64,7 @@ function 写入初始化状态(状态, 状态名称) {
 
 function 是否已有本地配置() {
   return (
-    发现本地环境文件(项目根目录).length > 0 ||
+    所有环境文件组.some((环境文件) => fs.existsSync(path.resolve(项目根目录, 环境文件)) === true) ||
     fs.existsSync(path.resolve(项目根目录, 'deploy/servers.local.json')) === true
   )
 }
@@ -148,7 +148,7 @@ function 从示例创建文件(示例相对路径, 本地相对路径) {
 
 function 初始化全部配置() {
   for (let 环境示例文件 of 环境示例文件组) {
-    let 本地文件 = 获得环境文件(项目根目录, 环境示例文件)
+    let 本地文件 = 环境示例文件.本地文件
     从示例创建文件(环境示例文件.示例文件, 本地文件)
   }
   let 本地服务器配置 = path.resolve(项目根目录, 'deploy/servers.local.json')
