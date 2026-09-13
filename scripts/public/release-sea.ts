@@ -41,7 +41,7 @@ function 确保目录存在(目录路径: string): void {
  * 递归复制文件夹
  */
 function 递归复制(源路径: string, 目标路径: string): void {
-  if (!fs.existsSync(源路径)) return
+  if (fs.existsSync(源路径) === false) throw new Error(`缺少 SEA 发布所需资源目录: ${源路径}`)
   if (!fs.existsSync(目标路径)) fs.mkdirSync(目标路径, { recursive: true })
   let 所有项 = fs.readdirSync(源路径, { withFileTypes: true })
   for (let 项 of 所有项) {
@@ -148,9 +148,8 @@ async function 执行构建(): Promise<void> {
 
     // 拷贝 sqlite wasm (node-sqlite3-wasm 库需要它在二进制运行目录下)
     let WASM路径 = path.join(项目根目录, 'node_modules/node-sqlite3-wasm/dist/node-sqlite3-wasm.wasm')
-    if (fs.existsSync(WASM路径) === true) {
-      fs.copyFileSync(WASM路径, path.join(发布目录, 'node-sqlite3-wasm.wasm'))
-    }
+    if (fs.existsSync(WASM路径) === false) throw new Error(`缺少 SEA 发布所需 SQLite WASM 文件: ${WASM路径}`)
+    fs.copyFileSync(WASM路径, path.join(发布目录, 'node-sqlite3-wasm.wasm'))
 
     // 复制环境变量并修改为 sea 模式
     let 环境目标目录 = path.join(发布目录, '.env')

@@ -13,16 +13,44 @@ function 是端口表(值) {
   )
 }
 
-export function 读取端口状态(项目根目录) {
+export function 读取初始化状态文件(项目根目录) {
   let 状态路径 = path.resolve(项目根目录, '.setup-state.json')
   if (fs.existsSync(状态路径) === false) return null
+  let 状态
   try {
-    let 状态 = JSON.parse(fs.readFileSync(状态路径, 'utf8'))
-    return 是端口表(状态?.ports) === true ? 状态.ports : null
+    状态 = JSON.parse(fs.readFileSync(状态路径, 'utf8'))
   } catch (错误) {
-    console.log(`[忽略] 无法读取 .setup-state.json 中的端口状态：${String(错误)}`)
-    return null
+    throw new Error('.setup-state.json 读取或解析失败', { cause: 错误 })
   }
+  let 状态名称组 = ['configured', 'migrated', 'skipped', 'completed']
+  let 布尔字段组 = [
+    'configureGitHubSecret',
+    'useRandomPorts',
+    'renameProject',
+    'initializeDevDatabase',
+    'devDatabaseInitializationPending',
+  ]
+  if (
+    typeof 状态 !== 'object' ||
+    状态 === null ||
+    Array.isArray(状态) === true ||
+    状态.version !== 1 ||
+    状态名称组.includes(状态.status) === false ||
+    Array.isArray(状态.targets) === false ||
+    状态.targets.length === 0 ||
+    状态.targets.every((目标) => typeof 目标 === 'string' && 目标 !== '') === false ||
+    布尔字段组.every((字段) => typeof 状态[字段] === 'boolean') === false ||
+    Object.hasOwn(状态, 'ports') === false ||
+    (状态.ports !== null && 是端口表(状态.ports) === false)
+  ) {
+    throw new Error('.setup-state.json 内容不符合初始化状态契约')
+  }
+  return 状态
+}
+
+export function 读取端口状态(项目根目录) {
+  let 状态 = 读取初始化状态文件(项目根目录)
+  return 状态 === null ? null : 状态.ports
 }
 
 function 从环境文件读取端口(项目根目录, 文件相对路径, 变量名) {
@@ -139,19 +167,13 @@ export function 写入端口状态(项目根目录, 端口表) {
     status: 'configured',
     targets: ['web'],
     configureGitHubSecret: false,
+    useRandomPorts: true,
+    ports: null,
     renameProject: false,
     initializeDevDatabase: true,
     devDatabaseInitializationPending: false,
   }
-  let 现有状态 = 默认状态
-  if (fs.existsSync(状态路径) === true) {
-    try {
-      let 原始状态 = JSON.parse(fs.readFileSync(状态路径, 'utf8'))
-      if (typeof 原始状态 === 'object' && 原始状态 !== null) 现有状态 = { ...默认状态, ...原始状态 }
-    } catch (错误) {
-      console.log(`[忽略] 无法读取 .setup-state.json，将重建端口状态：${String(错误)}`)
-    }
-  }
+  let 现有状态 = 读取初始化状态文件(项目根目录) ?? 默认状态
   fs.writeFileSync(
     状态路径,
     `${JSON.stringify({ ...现有状态, version: 1, useRandomPorts: true, ports: 端口表 }, null, 2)}\n`,

@@ -4,7 +4,7 @@ import path from 'node:path'
 import readline from 'node:readline/promises'
 import { 发现环境文件 } from './env-files-core.mjs'
 import { 执行开发数据库初始化 } from './init-dev-database.mjs'
-import { 应用端口表, 推断已有端口表, 生成随机端口表, 端口键组 } from './init-ports-core.mjs'
+import { 应用端口表, 推断已有端口表, 生成随机端口表, 读取初始化状态文件 } from './init-ports-core.mjs'
 import { 执行项目重命名, 解析当前包名 } from './rename-project-core.mjs'
 
 let 项目根目录 = path.resolve(import.meta.dirname, '../..')
@@ -22,28 +22,19 @@ let Electron生产环境文件 = '.env/.env.production.electron'
 let 初始化状态相对路径 = '.setup-state.json'
 
 function 读取初始化状态() {
-  let 状态路径 = path.resolve(项目根目录, 初始化状态相对路径)
-  if (fs.existsSync(状态路径) === false) return null
-  try {
-    let 原始状态 = JSON.parse(fs.readFileSync(状态路径, 'utf8'))
-    if (typeof 原始状态 !== 'object' || 原始状态 === null) return null
-    let 有效目标组 = Array.isArray(原始状态.targets)
-      ? 原始状态.targets.filter((目标) => 目标定义组.some((定义) => 定义.id === 目标))
-      : []
-    let 原始端口表 = typeof 原始状态.ports === 'object' && 原始状态.ports !== null ? 原始状态.ports : null
-    let 端口表 = 原始端口表 !== null && 端口键组.every((键) => Number.isInteger(原始端口表[键])) ? 原始端口表 : null
-    return {
-      目标组: 有效目标组.length > 0 ? 有效目标组 : ['web'],
-      是否配置GitHubSecret: 原始状态.configureGitHubSecret === true,
-      是否使用随机端口: 原始状态.useRandomPorts !== false,
-      端口表,
-      是否重命名项目: 原始状态.renameProject === true,
-      是否初始化开发数据库: 原始状态.initializeDevDatabase !== false,
-      是否等待初始化开发数据库: 原始状态.devDatabaseInitializationPending === true,
-    }
-  } catch (错误) {
-    console.log(`[忽略] 无法读取 ${初始化状态相对路径}：${String(错误)}`)
-    return null
+  let 原始状态 = 读取初始化状态文件(项目根目录)
+  if (原始状态 === null) return null
+  if (原始状态.targets.some((目标) => 目标定义组.some((定义) => 定义.id === 目标) === false) === true) {
+    throw new Error(`${初始化状态相对路径} 包含未知运行目标`)
+  }
+  return {
+    目标组: 原始状态.targets,
+    是否配置GitHubSecret: 原始状态.configureGitHubSecret,
+    是否使用随机端口: 原始状态.useRandomPorts,
+    端口表: 原始状态.ports,
+    是否重命名项目: 原始状态.renameProject,
+    是否初始化开发数据库: 原始状态.initializeDevDatabase,
+    是否等待初始化开发数据库: 原始状态.devDatabaseInitializationPending,
   }
 }
 

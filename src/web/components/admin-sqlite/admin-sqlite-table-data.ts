@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { 组件基类 } from '../../base/base'
 import { API管理器 } from '../../global/manager/api-manager'
 import { 显示确认对话框 } from '../../global/manager/dialog-manager'
@@ -185,10 +186,9 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
             { 信号: 参数.信号 },
           )
 
-          let 总数 = 0
-          if (总数结果.rows.length > 0 && 总数结果.rows[0] !== undefined) {
-            总数 = parseInt(String(总数结果.rows[0]['count'] ?? 0))
-          }
+          let 计数行 = 总数结果.rows[0]
+          if (总数结果.rows.length !== 1 || 计数行 === undefined) throw new Error('查询表格总数时未得到唯一计数行')
+          let 总数 = z.number().int().nonnegative().parse(计数行['count'])
 
           // 查询数据
           let 偏移 = (参数.页码 - 1) * 参数.每页数量

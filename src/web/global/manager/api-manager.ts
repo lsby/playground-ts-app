@@ -66,6 +66,22 @@ function 获得错误摘要(错误: unknown): Record<string, string> {
   return { 类型: 错误 instanceof Error ? 错误.name : typeof 错误 }
 }
 
+let 接口响应模式 = z.object({ status: z.enum(['success', 'fail', 'unexpected']), data: z.unknown() })
+
+function 解析接口响应(值: unknown): { status: 'success' | 'fail' | 'unexpected'; data: unknown } {
+  if (typeof 值 !== 'object' || 值 === null || Object.hasOwn(值, 'data') === false) {
+    throw new Error('接口响应缺少必要的 data 字段')
+  }
+  let 响应 = 接口响应模式.parse(值)
+  if (
+    响应.status === 'success' &&
+    (typeof 响应.data !== 'object' || 响应.data === null || Array.isArray(响应.data) === true)
+  ) {
+    throw new Error('接口成功响应的 data 必须是对象')
+  }
+  return { status: 响应.status, data: 响应.data }
+}
+
 export class API管理器类 {
   private 本地存储名称 = 'lsby-api-component-base-token'
   private token: string | null = null
@@ -281,7 +297,7 @@ export class API管理器类 {
         }),
         请求选项?.信号,
       )
-      return z.object({ status: z.enum(['success', 'fail', 'unexpected']), data: z.any() }).parse(JSON.parse(请求结果))
+      return 解析接口响应(JSON.parse(请求结果))
     } catch (e) {
       if (是中止错误(e, 请求选项?.信号) === true) throw e
       console.error(
@@ -300,7 +316,7 @@ export class API管理器类 {
     请求函数: () => Promise<object | { status: 'unexpected'; data: string }>,
   ): Promise<object> {
     let 请求结果 = await 请求函数()
-    if (this.是标准返回格式(请求结果) === false) return 请求结果
+    if (this.是标准返回格式(请求结果) === false) throw new Error(`接口响应格式错误: ${接口路径}`)
 
     if (请求结果.status === 'fail' || 请求结果.status === 'unexpected') {
       let 错误详情: string =
@@ -465,7 +481,7 @@ function withPureFrontendDatabaseLock<T>(task: () => Promise<T>): Promise<T> {
 async function requestPureFrontendWorker(
   message: PureFrontendWorkerRequest,
 ): Promise<object | { status: 'unexpected'; data: string }> {
-  return JSON.parse((await requestPureFrontendWorkerResponse(message)).body) as object
+  return 解析接口响应(JSON.parse((await requestPureFrontendWorkerResponse(message)).body))
 }
 
 function requestPureFrontendWorkerResponse(message: PureFrontendWorkerRequest): Promise<PureFrontendWorkerResponse> {
