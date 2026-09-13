@@ -60,7 +60,7 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
     role: 'alert',
     hidden: true,
     style: {
-      display: 'flex',
+      display: 'none',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 'var(--间距-3)',
@@ -216,6 +216,7 @@ export class 表格组件<数据项> extends 组件基类<发出事件类型<数
   private 同步状态视图(): void {
     this.加载状态元素.hidden = this.加载中 === false
     this.错误状态元素.hidden = this.加载错误 === null
+    this.错误状态元素.style.display = this.加载错误 === null ? 'none' : 'flex'
     this.错误文本元素.textContent = this.加载错误 === null ? '' : `加载失败：${this.加载错误}`
     this.表格元素.setAttribute('aria-busy', this.加载中 ? 'true' : 'false')
     this.分页.更新配置(this.分页配置, this.加载中)

@@ -4,7 +4,7 @@ import { 任意接口, 执行已匹配接口, 默认请求附加参数 } from '@
 import bcrypt from 'bcryptjs'
 import { sql } from 'kysely'
 import { 环境变量 } from '../../global/env'
-import { globalLog, kysely管理器, 检查数据库是否可用 } from '../../global/global'
+import { globalLog, kysely管理器 } from '../../global/global'
 import { init } from '../../init/init'
 import { 已审阅的any } from '../../tools/types'
 import { 本地接口列表 } from './local-api-list'
@@ -30,9 +30,10 @@ let initializationPromise: Promise<void> | undefined
 
 function 初始化纯前端(): Promise<void> {
   initializationPromise ??= (async (): Promise<void> => {
-    try {
-      await 检查数据库是否可用()
-    } catch {
+    let 已有表 = await sql<{
+      name: string
+    }>`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`.execute(kysely管理器.获得句柄())
+    if (已有表.rows.length === 0) {
       for (let statement of 初始建表SQL
         .split(';')
         .map((item) => item.trim())

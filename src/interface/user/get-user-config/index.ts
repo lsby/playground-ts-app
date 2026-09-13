@@ -31,13 +31,7 @@ let 接口逻辑实现 = 接口逻辑
 
       if (配置 === undefined) return new Left('用户配置不存在' as const)
 
-      let 主题: '系统' | '亮色' | '暗色'
-      try {
-        主题 = z.enum(['系统', '亮色', '暗色']).parse(配置.theme)
-      } catch (_e) {
-        主题 = '系统'
-      }
-
+      let 主题 = z.enum(['系统', '亮色', '暗色']).parse(配置.theme)
       return new Right({ id: 配置.id, theme: 主题 })
     }),
   )

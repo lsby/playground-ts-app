@@ -109,6 +109,22 @@
       "group": { "kind": "build", "isDefault": true }
     },
     {
+      "label": "_运行web预览后端",
+      "type": "shell",
+      "command": "npm run task -- run:service:dev:preview",
+      "isBackground": true,
+      "presentation": { "reveal": "never" },
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "_运行web预览前端",
+      "type": "shell",
+      "command": "npm run task -- run:web:dev:preview",
+      "isBackground": true,
+      "presentation": { "reveal": "never" },
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
       "label": "_运行electron后端",
       "type": "shell",
       "command": "npm run task -- run:electron:dev",
@@ -127,6 +143,20 @@
         "_持续生成web页面入口",
         "_运行web后端",
         "_运行前端"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "运行web样例模式开发套件",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "_持续类型检查",
+        "_持续ESLint检查",
+        "_持续生成API接口列表",
+        "_持续生成API接口类型",
+        "_持续生成web页面入口",
+        "_运行web预览后端",
+        "_运行web预览前端"
       ],
       "problemMatcher": []
     },

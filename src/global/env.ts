@@ -1,6 +1,9 @@
 import { z } from 'zod'
 import { getRawEnv } from './env-provider'
 
+let 非空字符串 = z.string().refine((值): boolean => 值.trim() !== '', '不能为空')
+let 端口 = z.coerce.number().int().min(1).max(65535)
+
 export let 环境变量 = getRawEnv(
   z.object({
     // 环境名称
@@ -29,17 +32,19 @@ export let 环境变量 = getRawEnv(
      */
     BUILD_TARGET: z.enum(['web', 'electron', 'sea', 'pure-frontend']),
     // 调试名称
-    DEBUG_NAME: z.string(),
+    DEBUG_NAME: 非空字符串,
     // 本地免登录模式
     LOCAL_MODE: z.enum(['true', 'false']).transform((值): boolean => 值 === 'true'),
+    // 业务样例模式, 仅由显式选择的接口模拟数据
+    PREVIEW_MODE: z.enum(['true', 'false']).transform((值): boolean => 值 === 'true'),
     // ========= 数据库部分 开始 =========
-    DB_TYPE: z.enum(['sqlite', 'pg', 'mysql']),
+    DB_TYPE: z.enum(['sqlite', 'pg', 'mysql']).refine((类型): boolean => 类型 === 'sqlite', '当前仅支持 sqlite 数据库'),
     // sqlite
-    DB_PATH: z.string(),
-    DB_BACKUP_PATH: z.string(),
-    DB_BACKUP_PREFIX: z.string(),
-    DB_BACKUP_AUTO_PREFIX: z.string(),
-    DB_BACKUP_RETENTION_DAYS: z.coerce.number(),
+    DB_PATH: 非空字符串,
+    DB_BACKUP_PATH: 非空字符串,
+    DB_BACKUP_PREFIX: 非空字符串,
+    DB_BACKUP_AUTO_PREFIX: 非空字符串,
+    DB_BACKUP_RETENTION_DAYS: z.coerce.number().int().positive(),
     // pg/mysql
     // DB_USER: z.string(),
     // DB_PWD: z.string(),
@@ -49,18 +54,18 @@ export let 环境变量 = getRawEnv(
     // SHADOW_DB_NAME: z.string(),
     // ========= 数据库部分 结束 =========
     // 应用端口
-    APP_PORT: z.coerce.number(),
-    WEB_PORT: z.coerce.number(),
-    WEB_HMR_PORT: z.coerce.number(),
+    APP_PORT: 端口,
+    WEB_PORT: 端口,
+    WEB_HMR_PORT: 端口,
     // 系统用户
-    DEFAULT_SYSTEM_USER: z.string(),
+    DEFAULT_SYSTEM_USER: 非空字符串,
     DEFAULT_SYSTEM_PWD: z.string(),
     // 文件上传
-    UPLOAD_MAX_FILE_SIZE: z.coerce.number(),
+    UPLOAD_MAX_FILE_SIZE: z.coerce.number().finite().positive(),
     // JWT
     DEFAULT_JWT_SECRET: z.string(),
-    JWT_EXPIRES_IN: z.string(),
+    JWT_EXPIRES_IN: 非空字符串,
     // bcrypt
-    BCRYPT_ROUNDS: z.coerce.number(),
+    BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(31),
   }),
 )

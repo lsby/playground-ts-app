@@ -7,20 +7,19 @@ export let 主题管理器 = {
 
   async 初始化(从数据库加载: boolean = true): Promise<void> {
     if (从数据库加载) {
-      try {
-        let 结果 = await API管理器.请求postJson('/api/user/get-user-config', {})
-        if (结果.status === 'success') {
+      let 结果 = await API管理器.请求postJson('/api/user/get-user-config', {})
+      switch (结果.status) {
+        case 'success':
           this.当前主题 = 结果.data.theme
-          this.应用主题()
-        } else {
+          break
+        case 'fail':
+          if (结果.data !== '未登录') throw new Error(`加载主题失败：${结果.data}`)
           this.当前主题 = '系统'
-          this.应用主题()
-        }
-      } catch (_e) {
-        // 如果获取失败，使用系统主题
-        this.当前主题 = '系统'
-        this.应用主题()
+          break
+        case 'unexpected':
+          throw new Error(`加载主题失败：${结果.data}`)
       }
+      this.应用主题()
     } else {
       // 不尝试从数据库加载，直接使用系统主题
       this.当前主题 = '系统'

@@ -21,6 +21,7 @@ export type 浮层句柄 = { id: number; 关闭: () => Promise<void> }
 type 浮层记录 = 浮层选项 & {
   id: number
   原焦点: HTMLElement | null
+  原弹出层属性: string | null
   正在关闭: boolean
   位置监听器: AbortController | null
 }
@@ -41,7 +42,14 @@ class 浮层管理器类 {
 
   public 打开(选项: 浮层选项): 浮层句柄 {
     this.序号 += 1
-    let 记录: 浮层记录 = { ...选项, id: this.序号, 原焦点: this.获得当前焦点(), 正在关闭: false, 位置监听器: null }
+    let 记录: 浮层记录 = {
+      ...选项,
+      id: this.序号,
+      原焦点: this.获得当前焦点(),
+      原弹出层属性: 选项.根元素.getAttribute('popover'),
+      正在关闭: false,
+      位置监听器: null,
+    }
     记录.根元素.style.zIndex = `calc(var(--浮层起始层级) + ${String(this.栈.length * 2)})`
     记录.根元素.dataset['overlayId'] = String(记录.id)
     if (记录.挂载方式 === '原位弹出层') {
@@ -68,7 +76,8 @@ class 浮层管理器类 {
     记录.位置监听器?.abort()
     if (记录.挂载方式 === '原位弹出层') {
       if (记录.根元素.matches(':popover-open') === true) 记录.根元素.hidePopover()
-      记录.根元素.removeAttribute('popover')
+      if (记录.原弹出层属性 === null) 记录.根元素.removeAttribute('popover')
+      else 记录.根元素.setAttribute('popover', 记录.原弹出层属性)
     } else 记录.根元素.remove()
     this.同步页面滚动()
     this.同步背景可交互性()
