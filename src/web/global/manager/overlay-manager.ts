@@ -35,6 +35,7 @@ class 浮层管理器类 {
   private 原页面滚动状态: 页面滚动状态 | null = null
   private 原惰性状态 = new Map<HTMLElement, boolean>()
   private 门户根: HTMLDivElement | null = null
+  private 外部按下浮层 = new Map<number, number>()
 
   public constructor() {
     this.绑定全局事件()
@@ -73,6 +74,9 @@ class 浮层管理器类 {
     记录.正在关闭 = true
     let 索引 = this.栈.findIndex((项) => 项.id === 记录.id)
     if (索引 >= 0) this.栈.splice(索引, 1)
+    for (let [指针编号, 浮层编号] of this.外部按下浮层) {
+      if (浮层编号 === 记录.id) this.外部按下浮层.delete(指针编号)
+    }
     记录.位置监听器?.abort()
     if (记录.挂载方式 === '原位弹出层') {
       if (记录.根元素.matches(':popover-open') === true) 记录.根元素.hidePopover()
@@ -127,21 +131,54 @@ class 浮层管理器类 {
     document.addEventListener(
       'pointerdown',
       (event: PointerEvent): void => {
+        this.外部按下浮层.delete(event.pointerId)
         let 顶层 = this.获得顶层()
-        let 目标 = event.target
-        if (顶层 === undefined || 目标 instanceof Node === false) return
-        let 策略 = 顶层.外部关闭 ?? '不关闭'
-        let 事件路径 = event.composedPath()
-        let 是内部 =
-          事件路径.includes(顶层.内容元素) ||
-          顶层.内容元素.contains(目标) ||
-          顶层.附加内部元素?.some((元素): boolean => 事件路径.includes(元素) || 元素.contains(目标)) === true
-        let 是遮罩 = 目标 === 顶层.根元素 && 是内部 === false
-        if ((策略 === '任意外部' && 是内部 === false) || (策略 === '仅遮罩' && 是遮罩 === true)) {
-          void this.请求关闭(顶层.id).catch((错误: unknown): void => console.error('关闭浮层失败:', 错误))
-        }
+        if (顶层 !== undefined && this.是可关闭的外部位置(顶层, event) === true)
+          this.外部按下浮层.set(event.pointerId, 顶层.id)
       },
       { capture: true, signal: this.全局监听器.signal },
+    )
+    document.addEventListener(
+      'pointerup',
+      (event: PointerEvent): void => {
+        let 浮层编号 = this.外部按下浮层.get(event.pointerId)
+        this.外部按下浮层.delete(event.pointerId)
+        let 顶层 = this.获得顶层()
+        if (浮层编号 === undefined || 顶层?.id !== 浮层编号 || this.是可关闭的外部位置(顶层, event) === false) return
+        void this.请求关闭(浮层编号).catch((错误: unknown): void => console.error('关闭浮层失败:', 错误))
+      },
+      { capture: true, signal: this.全局监听器.signal },
+    )
+    document.addEventListener(
+      'pointercancel',
+      (event: PointerEvent): void => {
+        this.外部按下浮层.delete(event.pointerId)
+      },
+      { capture: true, signal: this.全局监听器.signal },
+    )
+  }
+
+  private 是可关闭的外部位置(记录: 浮层记录, event: PointerEvent): boolean {
+    let 是内部 =
+      this.坐标在元素内(记录.内容元素, event) === true ||
+      记录.附加内部元素?.some((元素): boolean => this.坐标在元素内(元素, event)) === true
+    switch (记录.外部关闭 ?? '不关闭') {
+      case '不关闭':
+        return false
+      case '仅遮罩':
+        return 是内部 === false && this.坐标在元素内(记录.根元素, event) === true
+      case '任意外部':
+        return 是内部 === false
+    }
+  }
+
+  private 坐标在元素内(元素: HTMLElement, event: PointerEvent): boolean {
+    let 矩形 = 元素.getBoundingClientRect()
+    return (
+      event.clientX >= 矩形.left &&
+      event.clientX <= 矩形.right &&
+      event.clientY >= 矩形.top &&
+      event.clientY <= 矩形.bottom
     )
   }
 

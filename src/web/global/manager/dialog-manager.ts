@@ -96,7 +96,7 @@ export function 显示对话框(消息: string): Promise<void> {
       内容元素: 面板,
       模态: true,
       允许Escape关闭: true,
-      外部关闭: '不关闭',
+      外部关闭: '仅遮罩',
       请求关闭: 完成,
     })
   })
@@ -124,7 +124,7 @@ export function 显示确认对话框(消息: string, 提示?: string): Promise<
       内容元素: 面板,
       模态: true,
       允许Escape关闭: true,
-      外部关闭: '不关闭',
+      外部关闭: '仅遮罩',
       请求关闭: async (): Promise<void> => await 完成(false),
     })
   })
@@ -160,7 +160,7 @@ export function 显示输入对话框(消息: string, 默认值?: string, 提示
       内容元素: 面板,
       模态: true,
       允许Escape关闭: true,
-      外部关闭: '不关闭',
+      外部关闭: '仅遮罩',
       初始焦点: 输入框,
       请求关闭: async (): Promise<void> => await 完成(null),
     })
