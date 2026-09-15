@@ -56,12 +56,28 @@
   - 生产, 测试和打包环境只使用 `prisma migrate deploy` 或项目中等价的部署任务应用已有 migration, 以保证不同环境执行同一份可追踪变更
   - 当迁移 SQL 需要手工调整时, 使用例外流程. 先运行 `npm run task -- db:migrate:create:dev:web -- --name <迁移名称>` 仅生成 migration, 修改并检查新生成的 `migration.sql`, 再运行 `npm run task -- db:push:dev:web` 应用迁移
 
+## 领域模型与接口逻辑
+
+- `src/model/` 存放可脱离具体入口和基础设施复用的领域模型:
+  - 包括领域数据结构与 Zod Schema, 值对象, 业务错误, 业务不变量, 状态转换, 命令执行, 差异计算和确定性的领域计算
+  - 模型既可以由接口逻辑使用, 也可以由 Web 前端, 定时任务或其他运行目标共享
+  - 模型不得依赖接口协议, `@lsby/net-core` 插件, Kysely 或数据库类型, 环境变量, HTTP 客户端, OpenAI 客户端, 文件系统等基础设施
+  - 模型之间可以按领域边界依赖, 但不得反向依赖 `src/interface-logic/`, `src/interface/`, `src/web/` 或 `src/job/`
+- `src/interface-logic/` 存放可被多个接口或后台入口复用的应用过程与副作用编排:
+  - 包括仓储读写, 事务边界, 跨表或跨模型校验, 当前用户与权限处理, 外部服务调用, 以及把领域模型与基础设施组合成完整用例
+  - 接口逻辑可以依赖 `src/model/` 和基础设施, 领域模型不得依赖接口逻辑
+  - 仅仅把类型或纯函数命名为 `model.ts` 并不会使它成为接口逻辑; 应根据依赖方向和职责决定目录
+- `src/interface/` 是协议适配层, 负责声明输入输出契约, 组合插件, 调用接口逻辑并使用返回器输出, 不在入口中重复实现领域规则
+- Web 前端需要共享领域类型或纯计算时, 应引用 `src/model/` 或生成的接口类型, 不应引用 `src/interface-logic/`
+- 不为了满足分层而创建没有行为价值的类, 仓储包装或重复 DTO. 现有的判别联合, Zod Schema 和纯函数能够清晰表达领域时应直接保留这种形式
+- 样例模式的硬编码展示数据属于样例接口逻辑, 不进入 `src/model/`; 只有正式业务也成立的契约与规则才属于领域模型
+
 ## 接口
 
 - 核心建模:
   - 接口层基于 `@lsby/net-core`, 核心分层为:
     - 插件负责解析和校验输入, 注入能力及承载副作用
-    - 接口逻辑负责组合可复用的业务过程
+    - 接口逻辑负责组合可复用的应用过程与副作用
     - 返回器负责协议适配和输出
   - 请求参数, 响应, 错误, 上下文和 WebSocket 消息都应处于类型契约内
   - 同一份接口逻辑既可以作为 HTTP 接口运行, 也可以在其他接口中直接调用
@@ -71,7 +87,7 @@
     - 其中演示用接口放在 `src/interface/demo/`
     - 项目定制业务接口放在 `src/interface/project/`
     - 通用的系统, 用户和管理能力按职责放在现有的 `system/`, `user/` 等目录中
-  - 通用的接口处理逻辑放在 `src/interface-logic/`
+  - 可复用的接口业务编排放在 `src/interface-logic/`, 纯领域契约与规则放在 `src/model/`
   - 生成器会自动输出:
     - 接口路由列表文件至 `src/interface/interface-list.ts`
     - 接口的 TypeScript 类型定义至 `src/types/interface-type.ts`
