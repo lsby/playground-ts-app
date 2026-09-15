@@ -215,6 +215,7 @@
   - `preinstall` 脚本执行时各种第三方包还没下载完毕, 因此只能使用 Node.js 的内置模块
   - 整个初始化流程必须保证幂等
   - 初始化流程中不能向控制台泄漏敏感 Secret
+  - 初始化会准备全部运行目标的本地配置，不询问单个目标；运行 `npm run setup:all -- --help` 可查看所有交互选项对应的 CLI 参数
   - 系统级别的通用文件监听统一借助 `scripts/watch/watch.ts` 实现
 - 文件生成机制:
   - 运行 `npm run task -- generate:all` 即可触发全量代码生成

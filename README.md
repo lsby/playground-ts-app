@@ -24,6 +24,12 @@ pnpm install
 ```
 
 首次交互式安装会启动初始化向导。
+项目始终初始化全部运行目标的本地配置，不需要预先选择单个目标。重新运行向导及查看可用的非交互参数：
+
+```powershell
+npm run setup:all
+npm run setup:all -- --help
+```
 
 依赖安装完成后，推荐在 VS Code 中按 `F1`，选择“运行任务”，然后启动：
 
