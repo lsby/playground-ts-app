@@ -109,7 +109,7 @@
       "group": { "kind": "build", "isDefault": true }
     },
     {
-      "label": "_运行web预览后端",
+      "label": "_运行web样例模式后端",
       "type": "shell",
       "command": "npm run task -- run:service:dev:preview",
       "isBackground": true,
@@ -117,7 +117,7 @@
       "group": { "kind": "build", "isDefault": true }
     },
     {
-      "label": "_运行web预览前端",
+      "label": "_运行web样例模式前端",
       "type": "shell",
       "command": "npm run task -- run:web:dev:preview",
       "isBackground": true,
@@ -155,8 +155,8 @@
         "_持续生成API接口列表",
         "_持续生成API接口类型",
         "_持续生成web页面入口",
-        "_运行web预览后端",
-        "_运行web预览前端"
+        "_运行web样例模式后端",
+        "_运行web样例模式前端"
       ],
       "problemMatcher": []
     },

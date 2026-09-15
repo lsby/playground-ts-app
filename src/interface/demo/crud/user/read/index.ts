@@ -37,9 +37,9 @@ let 接口逻辑实现 = 接口逻辑
       if (环境变量.SAMPLE_MODE === true) {
         return new Right({
           data: [
-            { id: 'preview-user-1', name: '预览用户一' },
-            { id: 'preview-user-2', name: '预览用户二' },
-            { id: 'preview-user-3', name: '预览管理员' },
+            { id: 'preview-user-1', name: '用户一' },
+            { id: 'preview-user-2', name: '用户二' },
+            { id: 'preview-user-3', name: '管理员' },
           ],
           total: 3,
         })

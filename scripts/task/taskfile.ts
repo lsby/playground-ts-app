@@ -4,8 +4,8 @@ import {
   Parcel基础参数,
   Sea生产环境文件,
   Web开发环境文件,
+  Web样例开发环境文件,
   Web生产环境文件,
-  Web预览开发环境文件,
   完整调试环境,
   测试环境文件,
   生成API列表命令,
@@ -193,8 +193,8 @@ export let 任务表 = 定义任务({
     运行: Web开发服务端命令,
   },
   'run:service:dev:preview': {
-    说明: '启动 Web 预览开发服务端',
-    环境文件: Web预览开发环境文件,
+    说明: '启动 Web 样例开发服务端',
+    环境文件: Web样例开发环境文件,
     环境变量: 完整调试环境,
     运行: Web开发服务端命令,
   },
@@ -217,8 +217,8 @@ export let 任务表 = 定义任务({
     运行: 命令('tsx', 'scripts/web/web-run.ts'),
   },
   'run:web:dev:preview': {
-    说明: '启动 Web 预览前端开发服务器',
-    环境文件: Web预览开发环境文件,
+    说明: '启动 Web 样例前端开发服务器',
+    环境文件: Web样例开发环境文件,
     依赖: ['clean:web'],
     运行: 命令('tsx', 'scripts/web/web-run.ts'),
   },
@@ -346,7 +346,7 @@ export let 任务表 = 定义任务({
   },
   'dev:web': { 说明: '生成派生文件后启动 Web 开发套件', 依赖: ['generate:all', 'dev:web:watch'] },
   'dev:web:preview:watch': {
-    说明: '并行运行 Web 预览开发服务与监听任务',
+    说明: '并行运行 Web 样例开发服务与监听任务',
     依赖方式: '并行',
     依赖: [
       'watch:type',
@@ -360,8 +360,8 @@ export let 任务表 = 定义任务({
     公开: false,
   },
   'dev:web:preview': {
-    说明: '生成派生文件后启动 Web 预览开发套件',
-    环境文件: Web预览开发环境文件,
+    说明: '生成派生文件后启动 Web 样例开发套件',
+    环境文件: Web样例开发环境文件,
     依赖: ['generate:all', 'dev:web:preview:watch'],
   },
   'dev:electron:watch': {
