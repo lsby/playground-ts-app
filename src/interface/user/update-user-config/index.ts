@@ -9,7 +9,7 @@ import {
 } from '@lsby/net-core'
 import { Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
-import { jwt插件, kysely插件 } from '../../../global/plugin'
+import { kysely插件 } from '../../../global/plugin'
 import { 检查登录 } from '../../../interface-logic/check/check-login-jwt'
 
 let 接口路径 = '/api/user/update-user-config' as const
@@ -17,7 +17,7 @@ let 接口方法 = 'post' as const
 
 let 接口逻辑实现 = 接口逻辑
   .空逻辑()
-  .绑定(new 检查登录([jwt插件.解析器, kysely插件], () => ({ 表名: 'user', id字段: 'id' })))
+  .绑定(检查登录)
   .绑定(
     接口逻辑.构造(
       [new JSON参数解析插件(z.object({ theme: z.enum(['系统', '亮色', '暗色']) }), {}), kysely插件],

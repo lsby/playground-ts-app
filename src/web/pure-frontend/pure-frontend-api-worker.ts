@@ -6,6 +6,7 @@ import { sql } from 'kysely'
 import { 环境变量 } from '../../global/env'
 import { globalLog, kysely管理器 } from '../../global/global'
 import { init } from '../../init/init'
+import { 验证密码 } from '../../model/user/user-validation'
 import { 已审阅的any } from '../../tools/types'
 import { 本地接口列表 } from './local-api-list'
 import { 初始建表SQL } from './local-schema'
@@ -65,7 +66,7 @@ async function handleCommand(command: LocalWorkerCommand): Promise<LocalApiRespo
   await 初始化纯前端()
   if (command.command === 'reset-admin-password') {
     let password = command.password
-    let error = validatePassword(password)
+    let error = 验证密码(password)
     if (error !== undefined) return localResponse(command.id, 'fail', error)
     let admin = await kysely管理器
       .获得句柄()
@@ -95,14 +96,6 @@ async function handleCommand(command: LocalWorkerCommand): Promise<LocalApiRespo
   }
   await init()
   return localResponse(command.id, 'success', {})
-}
-
-function validatePassword(password: string): string | undefined {
-  if (password.includes(' ')) return '密码不能包含空格'
-  if (password === '') return '密码不能为空'
-  if (password.length < 6) return '密码过短'
-  if (password.length > 32) return '密码过长'
-  return undefined
 }
 
 function localResponse(id: number, status: 'success' | 'fail' | 'unexpected', data: unknown): LocalApiResponse {

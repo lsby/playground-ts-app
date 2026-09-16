@@ -14,7 +14,7 @@ import { CompiledQuery } from 'kysely'
 import path from 'path'
 import { z } from 'zod'
 import { 环境变量 } from '../../../global/env'
-import { jwt插件, kysely插件 } from '../../../global/plugin'
+import { kysely插件 } from '../../../global/plugin'
 import { 检查管理员登录 } from '../../../interface-logic/check/check-login-jwt-admin'
 
 let 接口路径 = '/api/admin-sqlite/backup-database' as const
@@ -22,7 +22,7 @@ let 接口方法 = 'post' as const
 
 let 接口逻辑实现 = 接口逻辑
   .空逻辑()
-  .绑定(new 检查管理员登录([jwt插件.解析器, kysely插件], () => ({ 表名: 'user', id字段: 'id', 标识字段: 'is_admin' })))
+  .绑定(检查管理员登录)
   .绑定(
     接口逻辑.构造([], async (_参数, _逻辑附加参数, _请求附加参数) => {
       return new Right({ isAuto: false })
