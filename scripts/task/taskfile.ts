@@ -462,4 +462,8 @@ export let 任务表 = 定义任务({
     依赖: ['release:version', 'release:verify'],
     运行: 命令('tsx', 'scripts/release/release.ts'),
   },
+  'release:push': {
+    说明: '推送当前的发布提交与版本标签到远程仓库',
+    运行: [命令('git', 'push'), 命令('git', 'push', '--tags')],
+  },
 })
