@@ -121,29 +121,6 @@ function 替换环境文件端口(项目根目录, 文件相对路径, 端口表
   console.log(`[完成] 已更新端口：${文件相对路径}`)
 }
 
-function 更新Docker端口(项目根目录, 应用端口) {
-  let 部署目录 = path.resolve(项目根目录, 'deploy')
-  let 部署环境目录组 = fs
-    .readdirSync(部署目录, { withFileTypes: true })
-    .filter((目录项) => 目录项.isDirectory() === true)
-    .sort((左, 右) => 左.name.localeCompare(右.name))
-  for (let 部署环境目录 of 部署环境目录组) {
-    let Compose路径 = path.resolve(部署目录, 部署环境目录.name, 'docker-compose.yml')
-    let Dockerfile路径 = path.resolve(部署目录, 部署环境目录.name, 'dockerfile')
-    if (fs.existsSync(Compose路径) === true) {
-      let 原内容 = fs.readFileSync(Compose路径, 'utf8')
-      let 新内容 = 原内容.replace(/(^\s*#\s*setup-port:\s*app\s*\r?\n\s*-\s*"?\d+:)\d+("?)/gmu, `$1${应用端口}$2`)
-      if (新内容 !== 原内容) fs.writeFileSync(Compose路径, 新内容)
-    }
-    if (fs.existsSync(Dockerfile路径) === true) {
-      let 原内容 = fs.readFileSync(Dockerfile路径, 'utf8')
-      let 新内容 = 原内容.replace(/(^\s*#\s*setup-port:\s*app\s*\r?\n\s*EXPOSE\s+)\d+/gmu, `$1${应用端口}`)
-      if (新内容 !== 原内容) fs.writeFileSync(Dockerfile路径, 新内容)
-    }
-  }
-  console.log(`[完成] 已同步 Docker 端口：${应用端口}`)
-}
-
 export function 应用端口表(项目根目录, 环境文件组, 端口表) {
   for (let 环境文件 of 环境文件组) {
     let 环境文件路径 = path.resolve(项目根目录, 环境文件)
@@ -157,7 +134,6 @@ export function 应用端口表(项目根目录, 环境文件组, 端口表) {
         : { APP_PORT: 端口表.APP_PORT, WEB_PORT: 端口表.WEB_PORT, WEB_HMR_PORT: 端口表.WEB_HMR_PORT },
     )
   }
-  更新Docker端口(项目根目录, 端口表.APP_PORT)
 }
 
 export function 写入端口状态(项目根目录, 端口表) {

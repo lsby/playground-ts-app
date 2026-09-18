@@ -73,8 +73,5 @@ COPY --from=builder /opt/app/dist /opt/app/dist
 COPY --from=builder /opt/app/public /opt/app/public
 COPY --from=builder /opt/app/prisma /opt/app/prisma
 COPY --from=builder /opt/app/prisma.config.ts /opt/app/prisma.config.ts
-
-# setup-port: app
-EXPOSE 34656
-
+
 CMD ["sh", "-c", "mkdir -p /opt/app/db; if [ ! -f /opt/app/db/prod-web.db ]; then echo 'Initializing database from default'; cp /opt/app/db-default-prod-web.db /opt/app/db/prod-web.db; else echo 'Database already exists'; fi; ENV_FILE_PATH=./.env/.env.production.web node ./dist/scripts/db/push-prod.js && exec env DEBUG='@lsby:*,@lsby:playground-ts-app:*,-@lsby:ts-env*' ENV_FILE_PATH=./.env/.env.production.web node ./dist/src/server.js"]

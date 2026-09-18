@@ -11,10 +11,13 @@ import {
   下载文件,
   压缩项目,
   执行远程命令,
+  检查远程删除目标,
   清理旧镜像,
   获取Compose命令,
   获取Compose镜像列表,
   获取完整忽略名单,
+  获得安全远程项目根目录,
+  获得相对环境文件路径,
   转义PosixShell参数,
   远程路径是否存在,
 } from './tools/tools'
@@ -48,39 +51,6 @@ let { name: 原始项目名称 } = 包信息模式.parse(
 let 项目名称 = 原始项目名称.replace('@', '').replace(/\//g, '-')
 if (/^[a-z0-9][a-z0-9._-]*$/u.test(项目名称) === false)
   throw new Error(`package.json 中的项目名称无法安全用于部署路径: ${原始项目名称}`)
-
-function 获得安全远程项目根目录(部署根目录: string): { 部署根目录: string; 项目根目录: string } {
-  let 规范化部署根目录 = path.posix.normalize(部署根目录.trim())
-  if (规范化部署根目录 === '' || path.posix.isAbsolute(规范化部署根目录) === false) {
-    throw new Error(`远程部署根目录必须是非空的 POSIX 绝对路径: ${部署根目录}`)
-  }
-  let 项目根目录 = path.posix.resolve(规范化部署根目录, 项目名称)
-  let 相对路径 = path.posix.relative(规范化部署根目录, 项目根目录)
-  if (
-    相对路径 === '' ||
-    相对路径 === '..' ||
-    相对路径.startsWith('../') === true ||
-    path.posix.isAbsolute(相对路径) === true
-  ) {
-    throw new Error(`远程项目目录必须严格位于部署根目录内: ${项目根目录}`)
-  }
-  return { 部署根目录: 规范化部署根目录, 项目根目录 }
-}
-
-function 检查远程删除目标(项目根目录: string, 删除目标: string, 是否允许项目根目录 = false): void {
-  let 规范化项目根目录 = path.posix.resolve(项目根目录)
-  let 规范化删除目标 = path.posix.resolve(删除目标)
-  if (是否允许项目根目录 === true && 规范化删除目标 === 规范化项目根目录) return
-  let 相对路径 = path.posix.relative(规范化项目根目录, 规范化删除目标)
-  if (
-    相对路径 === '' ||
-    相对路径 === '..' ||
-    相对路径.startsWith('../') === true ||
-    path.posix.isAbsolute(相对路径) === true
-  ) {
-    throw new Error(`拒绝删除项目目录边界外的路径: ${删除目标}`)
-  }
-}
 
 // 本地
 let 本地压缩包路径: string = path.join(本地根目录, `${项目名称}.tar.gz`)
@@ -232,7 +202,10 @@ async function 主函数(): Promise<void> {
     // 获取远程部署根目录并初始化路径
     let 原始远程部署根目录 =
       目标服务器.deployRootDir ?? (await 执行远程命令(sshClient, 'echo $HOME', { 打印输出: false })).stdout.trim()
-    let { 部署根目录: 远程部署根目录, 项目根目录: 远程项目根目录 } = 获得安全远程项目根目录(原始远程部署根目录)
+    let { 部署根目录: 远程部署根目录, 项目根目录: 远程项目根目录 } = 获得安全远程项目根目录(
+      原始远程部署根目录,
+      项目名称,
+    )
     let 远程上传目录 = path.posix.resolve(远程项目根目录, 'upload')
     let 远程压缩包路径: string = path.posix.resolve(远程上传目录, `${项目名称}.tar.gz`)
     let 远程构建目录 =
@@ -261,12 +234,19 @@ async function 主函数(): Promise<void> {
       let 某个docker文件目录 = path.posix.resolve(远程运行部署目录, 环境)
 
       if ((await 远程路径是否存在(sshClient, 某个docker文件目录)) === true) {
-        重部署前镜像列表 = await 获取Compose镜像列表(sshClient, 某个docker文件目录, `${项目名称}-${环境}`, compose命令)
+        let 相对环境文件 = 获得相对环境文件路径(环境)
+        重部署前镜像列表 = await 获取Compose镜像列表(
+          sshClient,
+          某个docker文件目录,
+          `${项目名称}-${环境}`,
+          compose命令,
+          相对环境文件,
+        )
 
         日志.打印(`🛑 [redeploy] 为了避免删目录时与 Docker Daemon 产生权限冲突，先停止旧容器...`)
         await 执行远程命令(
           sshClient,
-          `${compose命令} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} down --remove-orphans`,
+          `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} down --remove-orphans`,
           { 工作目录: 某个docker文件目录, 抛出错误: false },
         )
       }
@@ -349,7 +329,8 @@ async function 主函数(): Promise<void> {
 
       日志.打印(`🔨 正在使用 ${compose命令} 构建镜像...`)
       let 构建目录 = path.posix.resolve(远程构建docker目录, 环境)
-      let 构建命令 = `${compose命令} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} build ${镜像参数}`
+      let 相对环境文件 = 获得相对环境文件路径(环境)
+      let 构建命令 = `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} build ${镜像参数}`
       if (使用缓存 === false) {
         构建命令 += ' --no-cache'
       }
@@ -365,8 +346,15 @@ async function 主函数(): Promise<void> {
       日志.打印(`📂 确保远程运行目录存在: ${远程运行目录}`)
       await 执行远程命令(sshClient, `mkdir -p -- ${转义PosixShell参数(远程运行目录)}`)
 
+      let 相对环境文件 = 获得相对环境文件路径(环境)
       日志.打印(`🔍 记录部署前的镜像 ID...`)
-      let 旧镜像列表 = await 获取Compose镜像列表(sshClient, docker文件目录, `${项目名称}-${环境}`, compose命令)
+      let 旧镜像列表 = await 获取Compose镜像列表(
+        sshClient,
+        docker文件目录,
+        `${项目名称}-${环境}`,
+        compose命令,
+        相对环境文件,
+      )
       日志.打印(`📊 当前项目使用的镜像 ID 列表: [${旧镜像列表.join(', ') === '' ? '无' : 旧镜像列表.join(', ')}]`)
 
       日志.打印(`📦 解压到运行目录...`)
@@ -376,7 +364,7 @@ async function 主函数(): Promise<void> {
       )
 
       日志.打印(`🔨 正在构建项目镜像 (此时旧服务仍在运行)...`)
-      let 构建命令 = `${compose命令} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} build ${镜像参数}`
+      let 构建命令 = `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} build ${镜像参数}`
       if (使用缓存 === false) {
         构建命令 += ' --no-cache'
       }
@@ -385,12 +373,18 @@ async function 主函数(): Promise<void> {
       日志.打印(`🚀 正在启动新服务 (实现极短停机更新)...`)
       await 执行远程命令(
         sshClient,
-        `${compose命令} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} up -d --remove-orphans`,
+        `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} up -d --remove-orphans`,
         { 工作目录: docker文件目录 },
       )
 
       日志.打印(`✅ 确认部署后的新镜像状态...`)
-      let 新镜像列表 = await 获取Compose镜像列表(sshClient, docker文件目录, `${项目名称}-${环境}`, compose命令)
+      let 新镜像列表 = await 获取Compose镜像列表(
+        sshClient,
+        docker文件目录,
+        `${项目名称}-${环境}`,
+        compose命令,
+        相对环境文件,
+      )
       日志.打印(`📊 部署后项目使用的镜像 ID 列表: [${新镜像列表.join(', ') === '' ? '无' : 新镜像列表.join(', ')}]`)
 
       日志.打印(`🧹 正在对比并清理不再使用的旧镜像...`)
@@ -410,14 +404,21 @@ async function 主函数(): Promise<void> {
         return
       }
 
+      let 相对环境文件 = 获得相对环境文件路径(环境)
       日志.打印(`🔍 停止前的镜像 ID...`)
-      let 待清理镜像列表 = await 获取Compose镜像列表(sshClient, docker文件目录, `${项目名称}-${环境}`, compose命令)
+      let 待清理镜像列表 = await 获取Compose镜像列表(
+        sshClient,
+        docker文件目录,
+        `${项目名称}-${环境}`,
+        compose命令,
+        相对环境文件,
+      )
       日志.打印(`📊 待清理的镜像 ID 列表: [${待清理镜像列表.join(', ') === '' ? '无' : 待清理镜像列表.join(', ')}]`)
 
       日志.打印(`🛑 正在停止并移除容器...`)
       await 执行远程命令(
         sshClient,
-        `${compose命令} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} down --remove-orphans`,
+        `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} down --remove-orphans`,
         { 工作目录: docker文件目录 },
       )
 
@@ -438,10 +439,13 @@ async function 主函数(): Promise<void> {
         return
       }
 
+      let 相对环境文件 = 获得相对环境文件路径(环境)
       日志.打印(`🔄 正在重启容器...`)
-      await 执行远程命令(sshClient, `${compose命令} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} restart`, {
-        工作目录: docker文件目录,
-      })
+      await 执行远程命令(
+        sshClient,
+        `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} restart`,
+        { 工作目录: docker文件目录 },
+      )
 
       日志.打印(`✨ 重启指令已发送`)
     }
@@ -464,11 +468,18 @@ async function 主函数(): Promise<void> {
         for (let 某个环境 of 环境列表) {
           let 某个环境目录 = path.posix.resolve(运行根目录, 某个环境, 'deploy', 某个环境)
           if ((await 远程路径是否存在(sshClient, 某个环境目录)) === true) {
+            let 相对环境文件 = 获得相对环境文件路径(某个环境)
             日志.打印(`🛑 正在停止并清理环境: ${某个环境} ...`)
-            let 镜像ID列表 = await 获取Compose镜像列表(sshClient, 某个环境目录, `${项目名称}-${某个环境}`, compose命令)
+            let 镜像ID列表 = await 获取Compose镜像列表(
+              sshClient,
+              某个环境目录,
+              `${项目名称}-${某个环境}`,
+              compose命令,
+              相对环境文件,
+            )
             await 执行远程命令(
               sshClient,
-              `${compose命令} -p ${转义PosixShell参数(`${项目名称}-${某个环境}`)} down --remove-orphans`,
+              `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${某个环境}`)} down --remove-orphans`,
               { 工作目录: 某个环境目录, 抛出错误: false },
             )
             await 清理旧镜像(sshClient, 镜像ID列表, [], 日志)
@@ -552,10 +563,11 @@ async function 主函数(): Promise<void> {
     // ====================
     if (模式 === 'logs' || 模式 === 'run' || 模式 === 'restart' || 模式 === 'redeploy') {
       let docker文件目录 = path.posix.resolve(远程运行部署目录, 环境)
+      let 相对环境文件 = 获得相对环境文件路径(环境)
       日志.打印('--- 正在同步服务器实时日志 (按 Ctrl+C 退出) ---')
       await 执行远程命令(
         sshClient,
-        `${compose命令} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} logs -f --tail 500`,
+        `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} logs -f --tail 500`,
         { 工作目录: docker文件目录 },
       )
     }

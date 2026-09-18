@@ -137,6 +137,7 @@ export async function 获取Compose镜像列表(
   工作目录: string,
   项目名称?: string,
   compose命令?: string,
+  环境文件路径?: string,
 ): Promise<string[]> {
   if ((await 远程路径是否存在(ssh, 工作目录)) === false) {
     return []
@@ -145,6 +146,9 @@ export async function 获取Compose镜像列表(
   let 最终compose命令 = compose命令 ?? (await 获取Compose命令(ssh))
 
   let 命令 = 最终compose命令
+  if (环境文件路径 !== undefined) {
+    命令 += ` --env-file ${转义PosixShell参数(环境文件路径)}`
+  }
   if (项目名称 !== undefined) {
     命令 += ` -p ${转义PosixShell参数(项目名称)}`
   }
@@ -235,4 +239,52 @@ export async function 下载文件(ssh: NodeSSH, 远程路径: string, 本地路
       writeStream.on('error', reject)
     })
   })
+}
+
+export function 获得安全远程项目根目录(
+  部署根目录: string,
+  项目名称: string,
+): { 部署根目录: string; 项目根目录: string } {
+  let 规范化部署根目录 = path.posix.normalize(部署根目录.trim())
+  if (规范化部署根目录 === '' || path.posix.isAbsolute(规范化部署根目录) === false) {
+    throw new Error(`远程部署根目录必须是非空的 POSIX 绝对路径: ${部署根目录}`)
+  }
+  let 项目根目录 = path.posix.resolve(规范化部署根目录, 项目名称)
+  let 相对路径 = path.posix.relative(规范化部署根目录, 项目根目录)
+  if (
+    相对路径 === '' ||
+    相对路径 === '..' ||
+    相对路径.startsWith('../') === true ||
+    path.posix.isAbsolute(相对路径) === true
+  ) {
+    throw new Error(`远程项目目录必须严格位于部署根目录内: ${项目根目录}`)
+  }
+  return { 部署根目录: 规范化部署根目录, 项目根目录 }
+}
+
+export function 检查远程删除目标(项目根目录: string, 删除目标: string, 是否允许项目根目录 = false): void {
+  let 规范化项目根目录 = path.posix.resolve(项目根目录)
+  let 规范化删除目标 = path.posix.resolve(删除目标)
+  if (是否允许项目根目录 === true && 规范化删除目标 === 规范化项目根目录) return
+  let 相对路径 = path.posix.relative(规范化项目根目录, 规范化删除目标)
+  if (
+    相对路径 === '' ||
+    相对路径 === '..' ||
+    相对路径.startsWith('../') === true ||
+    path.posix.isAbsolute(相对路径) === true
+  ) {
+    throw new Error(`拒绝删除项目目录边界外的路径: ${删除目标}`)
+  }
+}
+
+export function 获得相对环境文件路径(某个环境: string): string {
+  let 环境文件名表: Record<string, string> = {
+    development: '.env/.env.development.web',
+    production: '.env/.env.production.web',
+  }
+  let 环境文件 = 环境文件名表[某个环境]
+  if (环境文件 === undefined) {
+    throw new Error(`未知环境: ${某个环境}`)
+  }
+  return `../../${环境文件}`
 }
