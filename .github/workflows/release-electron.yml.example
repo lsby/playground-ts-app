@@ -41,11 +41,24 @@ jobs:
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
 
-      - name: 创建 Electron 生产环境配置
+      - name: 创建 Electron 生产环境配置 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         env:
           ELECTRON_ENV_FILE: ${{ secrets.ELECTRON_ENV_FILE }}
         run: |
-          node -e 'let fs = require("fs"); let value = process.env.ELECTRON_ENV_FILE; if (value === undefined || value === "") throw new Error("缺少仓库 Secret ELECTRON_ENV_FILE"); fs.mkdirSync(".env", { recursive:true }); fs.writeFileSync(".env/.env.production.electron", value.endsWith("\n") ? value : value + "\n")'
+          if (-not $env:ELECTRON_ENV_FILE) { throw "缺少仓库 Secret ELECTRON_ENV_FILE" }
+          New-Item -ItemType Directory -Force -Path .env | Out-Null
+          Set-Content -Path .env/.env.production.electron -Value $env:ELECTRON_ENV_FILE
+
+      - name: 创建 Electron 生产环境配置 (macOS)
+        if: runner.os != 'Windows'
+        env:
+          ELECTRON_ENV_FILE: ${{ secrets.ELECTRON_ENV_FILE }}
+        run: |
+          if [ -z "$ELECTRON_ENV_FILE" ]; then echo "缺少仓库 Secret ELECTRON_ENV_FILE" && exit 1; fi
+          mkdir -p .env
+          printf '%s\n' "$ELECTRON_ENV_FILE" > .env/.env.production.electron
 
       - name: 准备 Electron 数据库 (Windows)
         if: runner.os == 'Windows'
