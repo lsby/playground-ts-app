@@ -147,6 +147,14 @@ export async function 获取Compose镜像列表(
 
   let 命令 = 最终compose命令
   if (环境文件路径 !== undefined) {
+    let 绝对环境文件路径 = path.posix.resolve(工作目录, 环境文件路径)
+    let 检查环境文件结果 = await 执行远程命令(ssh, `[ -f ${转义PosixShell参数(绝对环境文件路径)} ]`, {
+      打印输出: false,
+      抛出错误: false,
+    })
+    if (检查环境文件结果.code !== 0) {
+      return []
+    }
     命令 += ` --env-file ${转义PosixShell参数(环境文件路径)}`
   }
   if (项目名称 !== undefined) {
@@ -154,7 +162,10 @@ export async function 获取Compose镜像列表(
   }
   命令 += ' images -q'
 
-  let 结果 = await 执行远程命令(ssh, 命令, { 工作目录: 工作目录, 打印输出: false })
+  let 结果 = await 执行远程命令(ssh, 命令, { 工作目录: 工作目录, 打印输出: false, 抛出错误: false })
+  if (结果.code !== 0) {
+    return []
+  }
   return 结果.stdout.split(/\s+/).filter((id: string) => id.length > 0)
 }
 
