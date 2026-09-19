@@ -99,8 +99,10 @@ if (执行器参数.includes('--help') === true || 执行器参数.includes('-h'
     if (任务名称 !== undefined) throw new Error(`只能指定一个任务，已收到: ${任务名称}、${参数}`)
     任务名称 = 参数
   }
-  任务名称 ??= await 选择任务()
-  await 保存上次任务(任务名称)
+  if (任务名称 === undefined) {
+    任务名称 = await 选择任务()
+    await 保存上次任务(任务名称)
+  }
 
   let 退出状态: { 处理Promise: Promise<void> | null; 信号: 'SIGINT' | 'SIGTERM' | null } = {
     处理Promise: null,
