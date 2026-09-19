@@ -282,18 +282,18 @@ async function 主函数(): Promise<void> {
       let 覆盖文本文件组: Array<{ 相对路径: string; 内容: string }> = [
         { 相对路径: 打包环境文件, 内容: fs.readFileSync(path.resolve(本地根目录, envFile), 'utf8') },
       ]
+      let Docker忽略文件相对路径 = '.dockerignore'
+      let Docker忽略内容 = fs
+        .readFileSync(path.resolve(本地根目录, Docker忽略文件相对路径), 'utf8')
+        .replaceAll('\r\n', '\n')
       if (复用本地构建 === true) {
         忽略名单 = 忽略名单.filter((项) => {
           return 项 !== 'dist' && 项 !== 'dist/**' && 项 !== '/dist' && 项 !== '/dist/**'
         })
-        let Docker忽略文件相对路径 = '.dockerignore'
-        let Docker忽略内容 = fs.readFileSync(path.resolve(本地根目录, Docker忽略文件相对路径), 'utf8')
-        忽略名单.push(Docker忽略文件相对路径)
-        覆盖文本文件组.push({
-          相对路径: Docker忽略文件相对路径,
-          内容: `${Docker忽略内容.trimEnd()}\n\n# 远程部署复用本地构建产物\n!dist\n!dist/**\n`,
-        })
+        Docker忽略内容 = `${Docker忽略内容.trimEnd()}\n\n# 远程部署复用本地构建产物\n!dist\n!dist/**\n`
       }
+      忽略名单.push(Docker忽略文件相对路径)
+      覆盖文本文件组.push({ 相对路径: Docker忽略文件相对路径, 内容: Docker忽略内容 })
       await 压缩项目({ 输出路径: 本地压缩包路径, 源码目录: 本地根目录, 忽略名单, 日志, 强制包含文件组, 覆盖文本文件组 })
 
       日志.打印(`🧹 清理并创建远程上传目录...`)

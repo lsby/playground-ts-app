@@ -104,23 +104,19 @@ export let 任务表 = 定义任务({
   // 构建
   'build:post': { 说明: '执行构建后处理', 运行: 命令('tsx', 'scripts/post-build/index.ts'), 公开: false },
   'build:all': {
-    说明: '生成、检查并构建服务端和 Web',
-    依赖: ['generate:all', 'check:all', 'clean:all', 'compile:service', 'bundle:web', 'build:post'],
+    说明: '生成、自愈并构建服务端和 Web',
+    依赖: ['tidy:all', 'clean:all', 'compile:service', 'bundle:web', 'build:post'],
     需要环境文件: true,
   },
-  'build:web': {
-    说明: '生成、检查并构建普通 Web',
-    依赖: ['generate:all', 'check:all', 'clean:web', 'bundle:web'],
-    需要环境文件: true,
-  },
+  'build:web': { 说明: '生成、自愈并构建普通 Web', 依赖: ['tidy:all', 'clean:web', 'bundle:web'], 需要环境文件: true },
   'build:web:no-scope-hoist': {
-    说明: '生成、检查并构建禁用 Scope Hoisting 的 Web',
-    依赖: ['generate:all', 'check:all', 'clean:web', 'bundle:web-no-scope-hoist'],
+    说明: '生成、自愈并构建禁用 Scope Hoisting 的 Web',
+    依赖: ['tidy:all', 'clean:web', 'bundle:web-no-scope-hoist'],
     需要环境文件: true,
   },
   'build:web:pure-frontend': {
-    说明: '生成、检查并构建纯前端版本',
-    依赖: ['generate:all', 'check:all', 'clean:web', 'bundle:web-no-scope-hoist'],
+    说明: '生成、自愈并构建纯前端版本',
+    依赖: ['tidy:all', 'clean:web', 'bundle:web-no-scope-hoist'],
     需要环境文件: true,
   },
   'build:web:test': {
