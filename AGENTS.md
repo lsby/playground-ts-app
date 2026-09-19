@@ -282,7 +282,6 @@
 
 ### 修改完成后的验证
 
-- 普通源码修改至少运行 `npm run check:all`, 它会依次检查格式, ESLint 和 TypeScript 类型
-- 修改派生文件的源头定义后, 先运行 `npm run task -- generate:all`, 再运行 `npm run check:all`, 并确认生成结果已同步更新
-- 也可以直接运行 `npm run tidy:all`, 一键串行完成派生代码生成, 代码自动修复格式化与静态检查
+- 普通源码修改优先运行 `npm run tidy:all`, 它会自动生成派生文件、自动修复代码格式与可自愈的 ESLint 规则, 并执行静态检查; 需要严格只读检查时可运行 `npm run check:all`
+- 修改派生文件的源头定义后, 优先运行 `npm run tidy:all`, 并确认生成结果已同步更新
 - 修改数据库 Schema 时使用本文件规定的迁移任务, 并检查生成的 migration 与数据库类型

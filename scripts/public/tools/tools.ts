@@ -67,7 +67,7 @@ export async function 压缩项目(参数: 压缩项目参数): Promise<void> {
     if (相对路径 === '' || 相对路径.startsWith('..') === true || path.isAbsolute(相对路径) === true) {
       throw new Error(`覆盖的打包文件必须位于项目内: ${文件.相对路径}`)
     }
-    return { ...文件, 相对路径: 相对路径.replace(/\\/g, '/') }
+    return { ...文件, 内容: 文件.内容.replaceAll('\r\n', '\n'), 相对路径: 相对路径.replace(/\\/g, '/') }
   })
 
   return new Promise((resolve, reject) => {
