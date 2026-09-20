@@ -20,7 +20,6 @@ generator kysely {
 model system_config {
   id         String   @id @default("SYSTEM_DEFAULT")
   created_at DateTime @default(now())
-  updated_at DateTime @default(now()) @updatedAt
 
   is_initialized            Boolean @default(false) // 是否已初始化
   enable_register           Boolean // 启用注册
@@ -33,7 +32,6 @@ model system_config {
 model user_config {
   id         String   @id
   created_at DateTime @default(now())
-  updated_at DateTime @default(now()) @updatedAt
 
   user_id String @unique // 所属用户id(唯一)
   user    user   @relation(fields: [user_id], references: [id], onUpdate: Restrict, onDelete: Restrict)
@@ -45,7 +43,6 @@ model user_config {
 model user {
   id         String   @id
   created_at DateTime @default(now())
-  updated_at DateTime @default(now()) @updatedAt
 
   name     String  @unique // 用户名
   pwd      String // 密码

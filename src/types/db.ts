@@ -7,7 +7,6 @@ export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 export type system_config = {
     id: Generated<string>;
     created_at: Generated<string>;
-    updated_at: Generated<string>;
     is_initialized: Generated<number>;
     enable_register: number;
     enable_get_interface_type: Generated<number>;
@@ -17,7 +16,6 @@ export type system_config = {
 export type user = {
     id: string;
     created_at: Generated<string>;
-    updated_at: Generated<string>;
     name: string;
     pwd: string;
     is_admin: number;
@@ -25,7 +23,6 @@ export type user = {
 export type user_config = {
     id: string;
     created_at: Generated<string>;
-    updated_at: Generated<string>;
     user_id: string;
     theme: string;
 };
