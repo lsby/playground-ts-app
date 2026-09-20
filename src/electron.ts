@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { 应用单例 } from './app/app'
 import { 计算补偿后的窗口配置, 验证并修正窗口 } from './electron/multi-display'
-import { 检查端口可用, 获取随机可用端口 } from './electron/port-utils'
+import { 检查端口可用, 等待端口就绪, 获取随机可用端口 } from './electron/port-utils'
 import { 保存窗口状态, 检查窗口是否在可见区域内, 获取默认窗口位置, 读取窗口状态 } from './electron/window-state'
 import { 环境变量 } from './global/env'
 import { globalLog } from './global/global'
@@ -86,6 +86,16 @@ async function 创建主窗口(): Promise<void> {
     if (已经启动服务器 === false) {
       已经启动服务器 = true
       await main()
+    }
+
+    await log.info(`开发环境: 等待前端开发服务就绪 (127.0.0.1:${端口})...`)
+    let 前端就绪 = await 等待端口就绪(端口, 60, 500)
+    if (前端就绪 === false) {
+      await log.error(
+        `前端服务未能在规定时间内就绪 (127.0.0.1:${端口})，Electron 退出。请检查前端开发服务是否正常启动。`,
+      )
+      await 关闭并退出Electron(1)
+      throw new Error(`前端服务未能在规定时间内就绪 (127.0.0.1:${端口})`)
     }
   }
 
