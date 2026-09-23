@@ -2,140 +2,218 @@
 
 import { 任意接口, 执行已匹配接口, 默认请求附加参数 } from '@lsby/net-core'
 import bcrypt from 'bcryptjs'
+import { Request, Response } from 'express'
 import { sql } from 'kysely'
-import { 环境变量 } from '../../global/env'
-import { globalLog, kysely管理器 } from '../../global/global'
-import { init } from '../../init/init'
+import { 项目标识 } from '../../app/meta-info'
+import { 数据库快照, 数据库快照模式 } from '../../model/local-first/sync-model'
 import { 验证密码 } from '../../model/user/user-validation'
-import { 已审阅的any } from '../../tools/types'
-import { 本地接口列表 } from './local-api-list'
-import { 初始建表SQL } from './local-schema'
+import { 设置浏览器运行时数据库文件名 } from '../mock/db-dialect-mock'
+import { 创建浏览器数据库管理器, 导入数据库快照, 导出数据库快照, 应用浏览器迁移 } from './browser-database'
 
 declare let self: DedicatedWorkerGlobalScope
 
-type LocalApiRequest = {
+type 本地API请求 = {
   id: number
   path: string
   method: string
   headers: Record<string, string>
   body: string | null
+  databaseFileName?: string
+  localFirstUserId?: string
 }
-
-type LocalApiResponse = { id: number; status: number; body: string }
-type LocalWorkerCommand =
-  | { id: number; command: 'reset-admin-password'; password: string }
-  | { id: number; command: 'reset-database' }
-type LocalWorkerMessage = LocalApiRequest | LocalWorkerCommand
-
-let initializationPromise: Promise<void> | undefined
-
-function 初始化纯前端(): Promise<void> {
-  initializationPromise ??= (async (): Promise<void> => {
-    let 已有表 = await sql<{
-      name: string
-    }>`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`.execute(kysely管理器.获得句柄())
-    if (已有表.rows.length === 0) {
-      for (let statement of 初始建表SQL
-        .split(';')
-        .map((item) => item.trim())
-        .filter(Boolean)) {
-        await sql.raw(statement).execute(kysely管理器.获得句柄())
-      }
+type 本地Worker命令 =
+  | { id: number; command: 'reset-admin-password'; password: string; databaseFileName?: string }
+  | { id: number; command: 'reset-database'; databaseFileName?: string }
+  | { id: number; command: 'read-sync-pair'; databaseFileName: string; baselineFileName: string; tables: string[] }
+  | { id: number; command: 'validate-snapshot'; fileName: string; database: 数据库快照 }
+  | {
+      id: number
+      command: 'replace-sync-pair'
+      currentFileName: string
+      baselineFileName: string
+      database: 数据库快照
     }
-    await init()
-  })()
-  return initializationPromise
+type 本地Worker消息 = 本地API请求 | 本地Worker命令
+type 本地API响应 = { id: number; status: number; body: string }
+type 运行时 = {
+  数据库文件名: string
+  纯前端已初始化: boolean
+  全局: typeof import('../../global/global')
+  环境: typeof import('../../global/env')
+  初始化: typeof import('../../init/init')
+  接口清单: typeof import('./local-api-list')
 }
 
-self.addEventListener('message', (event: MessageEvent<LocalWorkerMessage>) => {
-  let message = event.data
-  let task = 'command' in message ? handleCommand(message) : handleRequest(message)
-  void task.then(
-    (response) => self.postMessage(response),
-    (error: unknown) => {
-      let errorMessage = error instanceof Error ? error.message : String(error)
+let 运行时Promise: Promise<运行时> | undefined
+
+async function 获得运行时(数据库文件名?: string, 是否应用迁移 = true): Promise<运行时> {
+  let 环境数据库文件名 = process.env['DB_PATH']?.split(/[/\\]/).pop() ?? 'local.db'
+  let 目标文件名 = 数据库文件名 ?? `${项目标识}-${环境数据库文件名}`
+  if (运行时Promise === undefined) {
+    设置浏览器运行时数据库文件名(目标文件名)
+    运行时Promise = (async (): Promise<运行时> => {
+      let [全局, 环境, 初始化, 接口清单] = await Promise.all([
+        import('../../global/global'),
+        import('../../global/env'),
+        import('../../init/init'),
+        import('./local-api-list'),
+      ])
+      return { 数据库文件名: 目标文件名, 纯前端已初始化: false, 全局, 环境, 初始化, 接口清单 }
+    })()
+  }
+  let 运行时 = await 运行时Promise
+  if (运行时.数据库文件名 !== 目标文件名)
+    throw new Error(`Worker 已绑定数据库 ${运行时.数据库文件名}，不能切换到 ${目标文件名}`)
+  if (是否应用迁移 === true) await 应用浏览器迁移(运行时.全局.kysely管理器.获得句柄())
+  if (运行时.环境.环境变量.BUILD_TARGET === 'pure-frontend' && 运行时.纯前端已初始化 === false) {
+    await 运行时.初始化.init()
+    运行时.纯前端已初始化 = true
+  }
+  return 运行时
+}
+
+self.addEventListener('message', (event: MessageEvent<本地Worker消息>) => {
+  let 消息 = event.data
+  let 任务 = 'command' in 消息 ? 处理命令(消息) : 处理请求(消息)
+  void 任务.then(
+    (响应) => self.postMessage(响应),
+    (错误: unknown) => {
+      let 错误消息 = 错误 instanceof Error ? 错误.message : String(错误)
       self.postMessage({
-        id: message.id,
+        id: 消息.id,
         status: 500,
-        body: JSON.stringify({ status: 'unexpected', data: `纯前端模式执行异常: ${errorMessage}` }),
-      } satisfies LocalApiResponse)
+        body: JSON.stringify({ status: 'unexpected', data: `浏览器本地执行异常: ${错误消息}` }),
+      } satisfies 本地API响应)
     },
   )
 })
-async function handleCommand(command: LocalWorkerCommand): Promise<LocalApiResponse> {
-  await 初始化纯前端()
-  if (command.command === 'reset-admin-password') {
-    let password = command.password
-    let error = 验证密码(password)
-    if (error !== undefined) return localResponse(command.id, 'fail', error)
-    let admin = await kysely管理器
-      .获得句柄()
-      .selectFrom('user')
-      .select('id')
-      .where('name', '=', 环境变量.DEFAULT_SYSTEM_USER)
-      .executeTakeFirst()
-    if (admin === undefined) return localResponse(command.id, 'unexpected', '未找到本机管理员账号')
-    await kysely管理器
-      .获得句柄()
-      .updateTable('user')
-      .set({ pwd: await bcrypt.hash(password, 环境变量.BCRYPT_ROUNDS) })
-      .where('id', '=', admin.id)
-      .execute()
-    return localResponse(command.id, 'success', {})
-  }
 
-  let 数据库 = kysely管理器.获得句柄()
-  await sql`PRAGMA foreign_keys = OFF`.execute(数据库)
+async function 创建并导入数据库(文件名: string, 数据库快照: 数据库快照): Promise<void> {
+  let 管理器 = 创建浏览器数据库管理器(文件名)
   try {
-    let tables = await sql<{
-      name: string
-    }>`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`.execute(数据库)
-    for (let table of tables.rows) await sql.raw(`DELETE FROM "${table.name.replaceAll('"', '""')}"`).execute(数据库)
+    await 应用浏览器迁移(管理器.获得句柄())
+    await 导入数据库快照(管理器.获得句柄(), 数据库快照)
   } finally {
-    await sql`PRAGMA foreign_keys = ON`.execute(数据库)
+    await 管理器.销毁()
   }
-  await init()
-  return localResponse(command.id, 'success', {})
 }
 
-function localResponse(id: number, status: 'success' | 'fail' | 'unexpected', data: unknown): LocalApiResponse {
+async function 处理命令(命令: 本地Worker命令): Promise<本地API响应> {
+  switch (命令.command) {
+    case 'read-sync-pair': {
+      let 运行时 = await 获得运行时(命令.databaseFileName, false)
+      let 基线管理器 = 创建浏览器数据库管理器(命令.baselineFileName)
+      try {
+        let 当前Schema指纹: string | undefined
+        let 基线Schema指纹: string | undefined
+        let 迁移失败列表: Array<{ database: 'current' | 'baseline'; fileName: string; message: string }> = []
+        try {
+          当前Schema指纹 = await 应用浏览器迁移(运行时.全局.kysely管理器.获得句柄())
+        } catch (错误) {
+          迁移失败列表.push({
+            database: 'current',
+            fileName: 命令.databaseFileName,
+            message: 错误 instanceof Error ? 错误.message : String(错误),
+          })
+        }
+        try {
+          基线Schema指纹 = await 应用浏览器迁移(基线管理器.获得句柄())
+        } catch (错误) {
+          迁移失败列表.push({
+            database: 'baseline',
+            fileName: 命令.baselineFileName,
+            message: 错误 instanceof Error ? 错误.message : String(错误),
+          })
+        }
+        if (迁移失败列表.length > 0)
+          return 本地返回(命令.id, 'fail', { code: 'LOCAL_FIRST_MIGRATION_FAILED', failures: 迁移失败列表 })
+        if (当前Schema指纹 === undefined || 基线Schema指纹 === undefined)
+          throw new Error('迁移成功后未获得 Schema 指纹')
+        let 当前数据库 = await 导出数据库快照(运行时.全局.kysely管理器.获得句柄(), 命令.tables)
+        let 基线数据库 = await 导出数据库快照(基线管理器.获得句柄(), 命令.tables)
+        return 本地返回(命令.id, 'success', { 当前Schema指纹, 基线Schema指纹, 当前数据库, 基线数据库 })
+      } finally {
+        await 基线管理器.销毁()
+      }
+    }
+    case 'validate-snapshot':
+      await 创建并导入数据库(命令.fileName, 数据库快照模式.parse(命令.database))
+      return 本地返回(命令.id, 'success', {})
+    case 'replace-sync-pair':
+      await 创建并导入数据库(命令.currentFileName, 数据库快照模式.parse(命令.database))
+      await 创建并导入数据库(命令.baselineFileName, 数据库快照模式.parse(命令.database))
+      return 本地返回(命令.id, 'success', {})
+    case 'reset-admin-password': {
+      let 运行时 = await 获得运行时(命令.databaseFileName)
+      let 密码错误 = 验证密码(命令.password)
+      if (密码错误 !== undefined) return 本地返回(命令.id, 'fail', 密码错误)
+      let 管理员 = await 运行时.全局.kysely管理器
+        .获得句柄()
+        .selectFrom('user')
+        .select('id')
+        .where('name', '=', 运行时.环境.环境变量.DEFAULT_SYSTEM_USER)
+        .executeTakeFirst()
+      if (管理员 === undefined) return 本地返回(命令.id, 'unexpected', '未找到本机管理员账号')
+      await 运行时.全局.kysely管理器
+        .获得句柄()
+        .updateTable('user')
+        .set({ pwd: await bcrypt.hash(命令.password, 运行时.环境.环境变量.BCRYPT_ROUNDS) })
+        .where('id', '=', 管理员.id)
+        .execute()
+      return 本地返回(命令.id, 'success', {})
+    }
+    case 'reset-database': {
+      let 运行时 = await 获得运行时(命令.databaseFileName)
+      let 数据库 = 运行时.全局.kysely管理器.获得句柄()
+      await sql`PRAGMA foreign_keys = OFF`.execute(数据库)
+      try {
+        let 表结果 = await sql<{ name: string }>`
+          SELECT name FROM sqlite_master
+          WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != '_prisma_migrations'
+        `.execute(数据库)
+        for (let 表 of 表结果.rows) await sql.raw(`DELETE FROM "${表.name.replaceAll('"', '""')}"`).execute(数据库)
+      } finally {
+        await sql`PRAGMA foreign_keys = ON`.execute(数据库)
+      }
+      await 运行时.初始化.init()
+      return 本地返回(命令.id, 'success', {})
+    }
+  }
+}
+
+function 本地返回(id: number, status: 'success' | 'fail' | 'unexpected', data: unknown): 本地API响应 {
   return { id, status: 200, body: JSON.stringify({ status, data }) }
 }
-async function handleRequest(request: LocalApiRequest): Promise<LocalApiResponse> {
-  await 初始化纯前端()
-  let url = new URL(request.path, self.location.origin)
-  let matchedApi: 任意接口 | undefined
-  for (let api of 本地接口列表) {
-    if (api.匹配路径(url.pathname) === true && api.获得方法().toLowerCase() === request.method.toLowerCase()) {
-      matchedApi = api
+
+async function 处理请求(请求: 本地API请求): Promise<本地API响应> {
+  let 运行时 = await 获得运行时(请求.databaseFileName)
+  let url = new URL(请求.path, self.location.origin)
+  let 匹配接口: 任意接口 | undefined
+  for (let 本地接口 of 运行时.接口清单.本地接口列表) {
+    if (
+      本地接口.接口.匹配路径(url.pathname) === true &&
+      本地接口.接口.获得方法().toLowerCase() === 请求.method.toLowerCase() &&
+      (运行时.环境.环境变量.BUILD_TARGET === 'pure-frontend' || 本地接口.浏览器支持 === '本地优先')
+    ) {
+      匹配接口 = 本地接口.接口
       break
     }
   }
-  if (matchedApi === undefined) {
-    console.warn(
-      '[pure-frontend] unavailable local API: ' +
-        request.method +
-        ' ' +
-        url.pathname +
-        '. Mark it with { 支持纯前端模式: true } and ensure its dependencies run in a browser Worker.',
-    )
-    return {
-      id: request.id,
-      status: 404,
-      body: JSON.stringify({ status: 'fail', data: '纯前端模式未找到对应的本地接口' }),
-    }
-  }
+  if (匹配接口 === undefined)
+    return { id: 请求.id, status: 404, body: JSON.stringify({ status: 'fail', data: '浏览器本地未找到对应接口' }) }
 
   let body: unknown = {}
-  if (request.body !== null && request.body !== '') {
-    let contentType = Object.entries(request.headers).find(([name]) => name.toLowerCase() === 'content-type')?.[1] ?? ''
-    body = contentType.includes('application/json') ? (JSON.parse(request.body) as unknown) : request.body
+  if (请求.body !== null && 请求.body !== '') {
+    let contentType = Object.entries(请求.headers).find(([名称]) => 名称.toLowerCase() === 'content-type')?.[1] ?? ''
+    body = contentType.includes('application/json') ? (JSON.parse(请求.body) as unknown) : 请求.body
   }
+  let 头 = { ...请求.headers }
+  if (请求.localFirstUserId !== undefined) 头['x-local-first-user-id'] = 请求.localFirstUserId
   let reqMock: Record<string, unknown> = {
     body,
     query: Object.fromEntries(url.searchParams.entries()),
-    headers: request.headers,
-    method: request.method,
+    headers: 头,
+    method: 请求.method,
     path: url.pathname,
     ip: '127.0.0.1',
   }
@@ -165,12 +243,10 @@ async function handleRequest(request: LocalApiRequest): Promise<LocalApiResponse
     setHeader: () => resMock,
   }
   await 执行已匹配接口({
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    req: reqMock as 已审阅的any,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    res: resMock as 已审阅的any,
-    目标接口: matchedApi,
-    请求附加参数: { ...默认请求附加参数, log: globalLog.extend(url.pathname), 请求id: String(request.id) },
+    req: reqMock as unknown as Request,
+    res: resMock as unknown as Response,
+    目标接口: 匹配接口,
+    请求附加参数: { ...默认请求附加参数, log: 运行时.全局.globalLog.extend(url.pathname), 请求id: String(请求.id) },
   })
-  return { id: request.id, status: responseStatus, body: JSON.stringify(responseBody) }
+  return { id: 请求.id, status: responseStatus, body: JSON.stringify(responseBody) }
 }

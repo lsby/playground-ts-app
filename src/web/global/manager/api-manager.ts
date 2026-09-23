@@ -1,12 +1,50 @@
 import { web请求 } from '@lsby/ts-http-extend'
 import { z } from 'zod'
+import { 项目标识 } from '../../../app/meta-info'
 import { 环境变量 } from '../../../global/env'
+import { 三方合并数据库, 同步快照, 同步快照模式, 数据库快照 } from '../../../model/local-first/sync-model'
 import { 已审阅的any } from '../../../tools/types'
 import { InterfaceType } from '../../../types/interface-type'
+import { 本地数据库Schema指纹, 本地数据库主键表 } from '../../../types/local-first-database-meta'
 import { 错误提示 } from '../manager/toast-manager'
 import { 是中止错误, 等待可取消任务 } from '../tools/abort'
+import { 脱敏请求头, 获得请求体摘要, 获得错误摘要 } from './api-log'
+import { 是标准接口响应, 解析接口响应 } from './api-response'
+import {
+  停用本地优先状态,
+  删除本地优先状态,
+  本地优先同步失败处理器,
+  本地优先同步问题解决器,
+  获得接口浏览器支持,
+  读取本地优先状态,
+} from './local-first-state'
+import {
+  解决本地优先数据问题,
+  读取本地优先同步数据库对,
+  采用本地优先权威快照,
+  验证本地优先数据库,
+} from './local-first-sync'
+import { 注册离线资源缓存 } from './offline-resource-manager'
+import {
+  使用纯前端数据库锁,
+  添加本地优先上下文,
+  终止纯前端Worker,
+  请求纯前端Worker响应,
+  请求纯前端命令,
+  请求纯前端接口,
+} from './pure-frontend-client'
+export type {
+  同步数据库副本,
+  本地优先同步失败处理器,
+  本地优先同步解决方案,
+  本地优先同步问题,
+  本地优先同步问题解决器,
+  本地优先迁移失败项,
+} from './local-first-state'
 
 export type API请求选项 = { 信号?: AbortSignal }
+
+let 正在执行本地优先同步 = false
 
 export type 取接口<
   P extends InterfaceType[number]['path'],
@@ -44,62 +82,141 @@ type 所有GET文本路径 = InterfaceType extends readonly (infer Item)[]
 type GET查询参数组<接口路径 extends 所有GET文本路径> = [取QUERY输入<取接口<接口路径>>] extends [never]
   ? []
   : [参数: 取QUERY输入<取接口<接口路径>>]
-
 let API前缀 = ''
-let serviceWorkerReady: Promise<void> | undefined
-
-function 脱敏请求头(头: Record<string, string>): Record<string, string> {
-  let 结果: Record<string, string> = {}
-  for (let [键, 值] of Object.entries(头)) {
-    let 小写键 = 键.toLowerCase()
-    结果[键] = 小写键 === 'authorization' || 小写键 === 'cookie' ? '[已隐藏]' : 值
-  }
-  return 结果
-}
-
-function 获得请求体摘要(请求体: string | FormData): Record<string, string | number> {
-  if (请求体 instanceof FormData) return { 类型: 'FormData', 字段数量: [...请求体.keys()].length }
-  return { 类型: '文本', 字符数量: 请求体.length }
-}
-
-function 获得错误摘要(错误: unknown): Record<string, string> {
-  return { 类型: 错误 instanceof Error ? 错误.name : typeof 错误 }
-}
-
-let 接口响应模式 = z.object({ status: z.enum(['success', 'fail', 'unexpected']), data: z.unknown() })
-
-function 解析接口响应(值: unknown): { status: 'success' | 'fail' | 'unexpected'; data: unknown } {
-  if (typeof 值 !== 'object' || 值 === null || Object.hasOwn(值, 'data') === false) {
-    throw new Error('接口响应缺少必要的 data 字段')
-  }
-  let 响应 = 接口响应模式.parse(值)
-  if (
-    响应.status === 'success' &&
-    (typeof 响应.data !== 'object' || 响应.data === null || Array.isArray(响应.data) === true)
-  ) {
-    throw new Error('接口成功响应的 data 必须是对象')
-  }
-  return { status: 响应.status, data: 响应.data }
+let 离线资源准备任务 = 注册离线资源缓存()
+if (离线资源准备任务 !== undefined) {
+  void 离线资源准备任务.catch((错误: unknown) => {
+    console.error('离线资源缓存初始化失败，在线功能不受影响: %o', 获得错误摘要(错误))
+  })
 }
 
 export class API管理器类 {
-  private 本地存储名称 = 'lsby-api-component-base-token'
+  private 本地存储名称 = `${项目标识}-api-token`
   private token: string | null = null
+  private 本地优先同步任务: Promise<void> | undefined
 
   public constructor() {
     let storedToken = localStorage.getItem(this.本地存储名称)
-    if (storedToken !== null) {
-      this.token = storedToken
+    if (storedToken !== null) this.token = storedToken
+  }
+
+  public 设置token(token: string): Promise<void> {
+    this.token = token
+    localStorage.setItem(this.本地存储名称, token)
+    if (环境变量.BUILD_TARGET !== 'pure-frontend') 停用本地优先状态()
+    return Promise.resolve()
+  }
+  public 清除token(): Promise<void> {
+    this.token = null
+    localStorage.removeItem(this.本地存储名称)
+    停用本地优先状态()
+    return Promise.resolve()
+  }
+
+  public 已设置token(): boolean {
+    return this.token !== null
+  }
+
+  public async 本地优先同步(问题解决器: 本地优先同步问题解决器, 失败处理器: 本地优先同步失败处理器): Promise<void> {
+    if (环境变量.BUILD_TARGET === 'pure-frontend') return
+    let 同步任务 = this.本地优先同步任务
+    if (同步任务 === undefined) {
+      同步任务 = this.执行本地优先同步(问题解决器)
+      this.本地优先同步任务 = 同步任务
+      void 同步任务
+        .finally((): void => {
+          if (this.本地优先同步任务 === 同步任务) this.本地优先同步任务 = undefined
+        })
+        .catch((): void => {})
+    }
+    try {
+      await 同步任务
+    } catch (错误) {
+      await 失败处理器(错误)
+      throw 错误
     }
   }
 
-  public 设置token(token: string): void {
-    this.token = token
-    localStorage.setItem(this.本地存储名称, token)
-  }
-  public 清除token(): void {
-    this.token = null
-    localStorage.removeItem(this.本地存储名称)
+  private async 执行本地优先同步(问题解决器: 本地优先同步问题解决器): Promise<void> {
+    if (this.token === null) throw new Error('本地优先同步需要先登录')
+    正在执行本地优先同步 = true
+    try {
+      await 使用纯前端数据库锁(async (): Promise<void> => {
+        for (let 尝试次数 = 0; 尝试次数 < 3; 尝试次数 += 1) {
+          let 远程快照 = await this.拉取本地优先快照()
+          if (远程快照.schemaFingerprint !== 本地数据库Schema指纹) {
+            停用本地优先状态()
+            终止纯前端Worker()
+            throw new Error('服务器 Schema 与当前前端版本不一致，请先更新应用资源')
+          }
+          let 已有状态 = 读取本地优先状态(远程快照.userId)
+          if (已有状态 === undefined) {
+            await 采用本地优先权威快照(远程快照)
+            return
+          }
+
+          let 数据库对 = await 读取本地优先同步数据库对(已有状态, Object.keys(远程快照.database))
+          if (数据库对.状态 === '迁移失败') {
+            let 解决方案 = await 问题解决器({
+              type: 'migration-failed',
+              userId: 远程快照.userId,
+              targetSchemaFingerprint: 远程快照.schemaFingerprint,
+              failures: 数据库对.failures,
+            })
+            switch (解决方案.action) {
+              case 'discard-and-reinitialize':
+                删除本地优先状态(远程快照.userId)
+                终止纯前端Worker()
+                await 采用本地优先权威快照(远程快照, true)
+                return
+              case 'abort':
+                throw new Error('本地数据库迁移失败，已取消同步')
+              case 'use-database':
+                throw new Error('迁移失败时不允许修复或提交本地数据库')
+            }
+          }
+          if (
+            远程快照.schemaFingerprint !== 数据库对.基线Schema指纹 ||
+            远程快照.schemaFingerprint !== 数据库对.当前Schema指纹
+          )
+            throw new Error('本地数据库完成迁移后与服务器 Schema 仍不一致')
+          let 最终数据库: 数据库快照
+          let 合并结果 = 三方合并数据库(远程快照.database, 数据库对.基线数据库, 数据库对.当前数据库, 本地数据库主键表)
+          if (合并结果.状态 === '成功') 最终数据库 = 合并结果.数据库
+          else
+            最终数据库 = await 解决本地优先数据问题(问题解决器, {
+              type: 'data-conflict',
+              conflicts: 合并结果.冲突列表,
+              remoteDatabase: { schemaFingerprint: 远程快照.schemaFingerprint, database: 远程快照.database },
+              baselineDatabase: { schemaFingerprint: 数据库对.基线Schema指纹, database: 数据库对.基线数据库 },
+              localDatabase: { schemaFingerprint: 数据库对.当前Schema指纹, database: 数据库对.当前数据库 },
+              targetSchemaFingerprint: 远程快照.schemaFingerprint,
+            })
+
+          try {
+            await 验证本地优先数据库(最终数据库)
+          } catch (错误) {
+            最终数据库 = await 解决本地优先数据问题(问题解决器, {
+              type: 'constraint-violation',
+              detail: 错误 instanceof Error ? 错误.message : String(错误),
+              remoteDatabase: { schemaFingerprint: 远程快照.schemaFingerprint, database: 远程快照.database },
+              baselineDatabase: { schemaFingerprint: 数据库对.基线Schema指纹, database: 数据库对.基线数据库 },
+              localDatabase: { schemaFingerprint: 数据库对.当前Schema指纹, database: 数据库对.当前数据库 },
+              targetSchemaFingerprint: 远程快照.schemaFingerprint,
+            })
+            await 验证本地优先数据库(最终数据库)
+          }
+
+          let 提交结果 = await this.提交本地优先快照(远程快照, 最终数据库)
+          if (提交结果 === 'REMOTE_DATA_CHANGED') continue
+          await 采用本地优先权威快照(提交结果)
+          return
+        }
+        throw new Error('远程数据在同步期间持续变化，请稍后重试')
+      })
+    } finally {
+      正在执行本地优先同步 = false
+    }
   }
 
   public async 请求get文本<接口路径 extends 所有GET文本路径>(
@@ -117,15 +234,17 @@ export class API管理器类 {
     if (this.token !== null) 头['authorization'] = 'Bearer ' + this.token
 
     try {
-      if (环境变量.BUILD_TARGET === 'pure-frontend') {
-        let 响应 = await withPureFrontendDatabaseLock(() =>
-          requestPureFrontendWorkerResponse({ path: 完整路径, headers: 头, method: 'GET', body: '' }),
+      let 浏览器支持 = 获得接口浏览器支持(完整路径, 'GET')
+      if (环境变量.BUILD_TARGET === 'pure-frontend' || (浏览器支持 === '本地优先' && this.token !== null)) {
+        await this.确保本地优先已初始化()
+        if (正在执行本地优先同步 === true) throw new Error('同步期间不能调用本地优先接口')
+        let 响应 = await 使用纯前端数据库锁(() =>
+          请求纯前端Worker响应(添加本地优先上下文({ path: 完整路径, headers: 头, method: 'GET', body: '' })),
         )
         let 数据 = z.string().parse(JSON.parse(响应.body))
         return { status: 响应.status >= 200 && 响应.status < 300 ? 'success' : 'fail', data: 数据 } as 已审阅的any
       }
 
-      if (serviceWorkerReady !== undefined) await serviceWorkerReady
       let 响应 = await fetch(API前缀 + 完整路径, { method: 'GET', headers: 头 })
       return { status: 响应.ok === true ? 'success' : 'fail', data: await 响应.text() } as 已审阅的any
     } catch (e) {
@@ -216,18 +335,51 @@ export class API管理器类 {
     )) as 已审阅的any
   }
 
+  private async 确保本地优先已初始化(): Promise<void> {
+    if (环境变量.BUILD_TARGET === 'pure-frontend') return
+    let 同步任务 = this.本地优先同步任务
+    if (同步任务 !== undefined) await 同步任务
+    if (读取本地优先状态() === undefined)
+      throw new Error('本地优先数据库尚未初始化，请先显式调用 API管理器.本地优先同步')
+  }
+
+  private async 请求远程同步接口(路径: string, 参数: object): Promise<{ status: string; data: unknown }> {
+    let 头: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (this.token !== null) 头['authorization'] = `Bearer ${this.token}`
+    let 请求结果 = await web请求({ url: API前缀 + 路径, body: JSON.stringify(参数), headers: 头, method: 'POST' })
+    return 解析接口响应(JSON.parse(请求结果))
+  }
+
+  private async 拉取本地优先快照(): Promise<同步快照> {
+    let 结果 = await this.请求远程同步接口('/api/system/local-first/pull', {})
+    if (结果.status !== 'success') throw new Error(`后到前同步失败: ${JSON.stringify(结果.data)}`)
+    return 同步快照模式.parse(结果.data)
+  }
+
+  private async 提交本地优先快照(远程快照: 同步快照, 数据库: 数据库快照): Promise<同步快照 | 'REMOTE_DATA_CHANGED'> {
+    let 结果 = await this.请求远程同步接口('/api/system/local-first/push', {
+      schemaFingerprint: 远程快照.schemaFingerprint,
+      expectedDataHash: 远程快照.dataHash,
+      database: 数据库,
+    })
+    if (结果.status === 'success') return 同步快照模式.parse(结果.data)
+    let 错误代码 = z.object({ code: z.string(), message: z.string() }).strict().safeParse(结果.data)
+    if (错误代码.success === true && 错误代码.data.code === 'REMOTE_DATA_CHANGED') return 'REMOTE_DATA_CHANGED'
+    throw new Error(`前到后同步失败: ${JSON.stringify(结果.data)}`)
+  }
+
   public async 重置纯前端管理员密码(password: string): Promise<void> {
     if (环境变量.BUILD_TARGET !== 'pure-frontend') throw new Error('仅纯前端模式支持本机管理员密码重设')
-    let result = await requestPureFrontendCommand({ command: 'reset-admin-password', password })
-    if (this.是标准返回格式(result) === false || result.status !== 'success')
-      throw new Error(this.是标准返回格式(result) ? String(result.data) : '重设管理员密码失败')
+    let result = await 请求纯前端命令({ command: 'reset-admin-password', password })
+    if (是标准接口响应(result) === false || result.status !== 'success')
+      throw new Error(是标准接口响应(result) ? String(result.data) : '重设管理员密码失败')
   }
 
   public async 重置纯前端数据库(): Promise<void> {
     if (环境变量.BUILD_TARGET !== 'pure-frontend') throw new Error('仅纯前端模式支持本机数据库重置')
-    let result = await requestPureFrontendCommand({ command: 'reset-database' })
-    if (this.是标准返回格式(result) === false || result.status !== 'success')
-      throw new Error(this.是标准返回格式(result) ? String(result.data) : '重置本机数据库失败')
+    let result = await 请求纯前端命令({ command: 'reset-database' })
+    if (是标准接口响应(result) === false || result.status !== 'success')
+      throw new Error(是标准接口响应(result) ? String(result.data) : '重置本机数据库失败')
   }
   private async 通用请求(
     接口路径: string,
@@ -279,11 +431,12 @@ export class API管理器类 {
       }
 
       // console.log('请求:\n路径: %o\n头: %o\n方法: %o\nbody: %o\n结果: %o', 接口路径, 头, 方法, body, 请求结果)
-      if (环境变量.BUILD_TARGET === 'pure-frontend') {
-        return await 等待可取消任务(requestPureFrontendApi(接口路径, 头, 方法, body), 请求选项?.信号)
+      let 浏览器支持 = 获得接口浏览器支持(接口路径, 方法)
+      if (环境变量.BUILD_TARGET === 'pure-frontend' || (浏览器支持 === '本地优先' && this.token !== null)) {
+        await this.确保本地优先已初始化()
+        if (正在执行本地优先同步 === true) throw new Error('同步期间不能调用本地优先接口')
+        return await 等待可取消任务(请求纯前端接口(接口路径, 头, 方法, body), 请求选项?.信号)
       }
-      if (serviceWorkerReady !== undefined) await 等待可取消任务(serviceWorkerReady, 请求选项?.信号)
-
       请求结果 = await 等待可取消任务(
         web请求({
           url: API前缀 + 接口路径,
@@ -316,7 +469,7 @@ export class API管理器类 {
     请求函数: () => Promise<object | { status: 'unexpected'; data: string }>,
   ): Promise<object> {
     let 请求结果 = await 请求函数()
-    if (this.是标准返回格式(请求结果) === false) throw new Error(`接口响应格式错误: ${接口路径}`)
+    if (是标准接口响应(请求结果) === false) throw new Error(`接口响应格式错误: ${接口路径}`)
 
     if (请求结果.status === 'fail' || 请求结果.status === 'unexpected') {
       let 错误详情: string =
@@ -329,165 +482,6 @@ export class API管理器类 {
     }
     return 请求结果.data as 已审阅的any
   }
-
-  private 是标准返回格式(
-    x: unknown,
-  ): x is
-    | { status: 'fail'; data: 已审阅的any }
-    | { status: 'success'; data: Record<string, 已审阅的any> }
-    | { status: 'unexpected'; data: 已审阅的any } {
-    if (typeof x !== 'object' || x === null) return false
-    let obj = x as Record<string, unknown>
-    return (obj['status'] === 'success' || obj['status'] === 'fail' || obj['status'] === 'unexpected') && 'data' in obj
-  }
 }
 
 export let API管理器 = new API管理器类()
-
-if ('serviceWorker' in navigator && 环境变量.BUILD_TARGET === 'pure-frontend') {
-  serviceWorkerReady = navigator.serviceWorker
-    .register(new URL('../../pure-frontend/sw.ts', import.meta.url), { type: 'module' })
-    .then(() => {
-      console.log('ServiceWorker 注册成功')
-    })
-}
-
-type PureFrontendWorkerResponse = { id: number; status: number; body: string }
-
-let pureFrontendWorker: Worker | undefined
-let pureFrontendRequestId = 0
-let pureFrontendPendingRequests = new Map<
-  number,
-  { resolve: (value: PureFrontendWorkerResponse) => void; reject: (reason: unknown) => void }
->()
-let pureFrontendDatabaseLockName = 'lsby-pure-frontend:local.db'
-
-type PureFrontendWorkerRequest =
-  | { path: string; headers: Record<string, string>; method: string; body: string }
-  | { command: 'reset-admin-password'; password: string }
-  | { command: 'reset-database' }
-
-function getPureFrontendWorker(): Worker {
-  if (pureFrontendWorker === undefined) {
-    pureFrontendWorker = new Worker(new URL('../../pure-frontend/pure-frontend-api-worker.ts', import.meta.url), {
-      type: 'module',
-      name: 'lsby-pure-frontend-sqlite',
-    })
-    pureFrontendWorker.addEventListener('message', (event: MessageEvent<PureFrontendWorkerResponse>) => {
-      let pending = pureFrontendPendingRequests.get(event.data.id)
-      if (pending === undefined) return
-      pureFrontendPendingRequests.delete(event.data.id)
-      pending.resolve(event.data)
-    })
-    pureFrontendWorker.addEventListener('error', (event) => {
-      for (let pending of pureFrontendPendingRequests.values()) pending.reject(event.error)
-      pureFrontendPendingRequests.clear()
-    })
-  }
-  return pureFrontendWorker
-}
-
-if (环境变量.BUILD_TARGET === 'pure-frontend') {
-  window.addEventListener('pagehide', () => {
-    pureFrontendWorker?.terminate()
-    pureFrontendWorker = undefined
-  })
-}
-function 打印纯前端HTTP日志(
-  路径: string,
-  方法: string,
-  头信息: Record<string, string>,
-  请求体: string | FormData,
-  响应结果: object | { status: 'unexpected'; data: string },
-  耗时毫秒: number,
-): void {
-  let 是否成功 = false
-  if (
-    typeof 响应结果 === 'object' &&
-    'status' in 响应结果 &&
-    (响应结果 as { status: unknown }).status !== 'fail' &&
-    (响应结果 as { status: unknown }).status !== 'unexpected'
-  ) {
-    是否成功 = true
-  }
-
-  let 状态文本 = 是否成功 === true ? '200 OK' : '500 Internal Error'
-  let 状态样式 =
-    是否成功 === true
-      ? 'background: #047857; color: #ffffff; padding: 2px 6px; border-radius: 3px; font-weight: bold;'
-      : 'background: #b91c1c; color: #ffffff; padding: 2px 6px; border-radius: 3px; font-weight: bold;'
-
-  let 耗时文本 = 耗时毫秒.toFixed(1) + 'ms'
-
-  console.groupCollapsed(
-    `%c[Pure-Frontend HTTP]%c %c${方法}%c ${路径} %c${状态文本}%c (${耗时文本})`,
-    'background: #2563eb; color: #ffffff; padding: 2px 6px; border-radius: 3px; font-weight: bold;',
-    '',
-    'font-weight: bold; color: #3b82f6;',
-    '',
-    状态样式,
-    'color: #888888;',
-  )
-
-  console.log('请求头 (Headers):', 脱敏请求头(头信息))
-  console.log('请求体 (Body):', 获得请求体摘要(请求体))
-  console.log('响应状态 (Response Status):', 状态文本)
-
-  console.groupEnd()
-}
-
-async function requestPureFrontendApi(
-  path: string,
-  headers: Record<string, string>,
-  method: string,
-  body: string | FormData,
-): Promise<object | { status: 'unexpected'; data: string }> {
-  if (body instanceof FormData) {
-    let 错误结果: { status: 'unexpected'; data: string } = {
-      status: 'unexpected',
-      data: '纯前端模式暂不支持 FormData 接口',
-    }
-    打印纯前端HTTP日志(path, method, headers, body, 错误结果, 0)
-    return 错误结果
-  }
-  let 开始时间 = performance.now()
-  let 响应结果 = await withPureFrontendDatabaseLock(() => requestPureFrontendWorker({ path, headers, method, body }))
-  let 耗时毫秒 = performance.now() - 开始时间
-  打印纯前端HTTP日志(path, method, headers, body, 响应结果, 耗时毫秒)
-  return 响应结果
-}
-
-type PureFrontendWorkerCommand = Extract<PureFrontendWorkerRequest, { command: string }>
-
-function requestPureFrontendCommand(
-  command: PureFrontendWorkerCommand,
-): Promise<object | { status: 'unexpected'; data: string }> {
-  return withPureFrontendDatabaseLock(() => requestPureFrontendWorker(command))
-}
-
-function withPureFrontendDatabaseLock<T>(task: () => Promise<T>): Promise<T> {
-  if ('locks' in navigator === false) {
-    return Promise.reject(new Error('当前浏览器不支持 Web Locks API，无法安全地在多个页面间使用本地数据库'))
-  }
-  // 锁覆盖一次本地 API 或管理命令的完整执行过程。每个标签页可以拥有自己的
-  // 长生命周期 Worker，但任意时刻只有一个标签页可以操作 IndexedDB 中的 SQLite。
-  return navigator.locks.request<T>(
-    pureFrontendDatabaseLockName,
-    { mode: 'exclusive' },
-    task as unknown as LockGrantedCallback<T>,
-  )
-}
-
-async function requestPureFrontendWorker(
-  message: PureFrontendWorkerRequest,
-): Promise<object | { status: 'unexpected'; data: string }> {
-  return 解析接口响应(JSON.parse((await requestPureFrontendWorkerResponse(message)).body))
-}
-
-function requestPureFrontendWorkerResponse(message: PureFrontendWorkerRequest): Promise<PureFrontendWorkerResponse> {
-  let id = ++pureFrontendRequestId
-  return new Promise((resolve, reject) => {
-    pureFrontendPendingRequests.set(id, { resolve, reject })
-    getPureFrontendWorker().postMessage({ id, ...message })
-  })
-}

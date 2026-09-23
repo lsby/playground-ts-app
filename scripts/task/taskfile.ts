@@ -95,9 +95,29 @@ export let 任务表 = 定义任务({
     运行: 命令('parcel', ...Parcel基础参数, '--no-scope-hoist', '--dist-dir', 'dist/src/web'),
     公开: false,
   },
+  'bundle:service-worker': {
+    说明: '将离线资源 Service Worker 打包到 Web 根目录',
+    运行: 命令(
+      'parcel',
+      'build',
+      '--no-autoinstall',
+      '--no-cache',
+      '--no-source-maps',
+      '--no-content-hash',
+      'src/web/pure-frontend/sw.ts',
+      '--dist-dir',
+      'dist/src/web',
+    ),
+    公开: false,
+  },
   'bundle:web-test': {
     说明: '打包端到端测试使用的 Web 前端',
     运行: 命令('parcel', ...Parcel基础参数, '--dist-dir', 'test-outputs/web-test'),
+    公开: false,
+  },
+  'generate:offline-assets': {
+    说明: '为 Web 构建产物生成离线资源清单',
+    运行: 命令('tsx', 'scripts/gen/gen-offline-assets.ts'),
     公开: false,
   },
 
@@ -105,18 +125,30 @@ export let 任务表 = 定义任务({
   'build:post': { 说明: '执行构建后处理', 运行: 命令('tsx', 'scripts/post-build/index.ts'), 公开: false },
   'build:all': {
     说明: '生成、自愈并构建服务端和 Web',
-    依赖: ['tidy:all', 'clean:all', 'compile:service', 'bundle:web', 'build:post'],
+    依赖: [
+      'tidy:all',
+      'clean:all',
+      'compile:service',
+      'bundle:web',
+      'bundle:service-worker',
+      'generate:offline-assets',
+      'build:post',
+    ],
     需要环境文件: true,
   },
-  'build:web': { 说明: '生成、自愈并构建普通 Web', 依赖: ['tidy:all', 'clean:web', 'bundle:web'], 需要环境文件: true },
+  'build:web': {
+    说明: '生成、自愈并构建普通 Web',
+    依赖: ['tidy:all', 'clean:web', 'bundle:web', 'bundle:service-worker', 'generate:offline-assets'],
+    需要环境文件: true,
+  },
   'build:web:no-scope-hoist': {
     说明: '生成、自愈并构建禁用 Scope Hoisting 的 Web',
-    依赖: ['tidy:all', 'clean:web', 'bundle:web-no-scope-hoist'],
+    依赖: ['tidy:all', 'clean:web', 'bundle:web-no-scope-hoist', 'bundle:service-worker', 'generate:offline-assets'],
     需要环境文件: true,
   },
   'build:web:pure-frontend': {
     说明: '生成、自愈并构建纯前端版本',
-    依赖: ['tidy:all', 'clean:web', 'bundle:web-no-scope-hoist'],
+    依赖: ['tidy:all', 'clean:web', 'bundle:web-no-scope-hoist', 'bundle:service-worker', 'generate:offline-assets'],
     需要环境文件: true,
   },
   'build:web:test': {

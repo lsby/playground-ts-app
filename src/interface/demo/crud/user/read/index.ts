@@ -78,5 +78,5 @@ let 接口错误类型描述 = z.enum(['未登录', '非管理员'])
 let 接口正确类型描述 = z.object({ data: z.object({ id: z.string(), name: z.string() }).array(), total: z.number() })
 
 export default new 接口(接口路径, 接口方法, 接口逻辑实现, new 常用接口返回器(接口错误类型描述, 接口正确类型描述), {
-  支持纯前端模式: true,
+  浏览器支持: '纯前端',
 })

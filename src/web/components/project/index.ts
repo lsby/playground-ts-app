@@ -2,6 +2,7 @@ import { 组件基类 } from '../../base/base'
 import { API管理器 } from '../../global/manager/api-manager'
 import { 创建元素 } from '../../global/tools/create-element'
 import { 普通按钮 } from '../general/base/base-button'
+import { 尝试同步项目本地优先数据 } from './local-first-sync'
 
 type 发出事件类型 = {}
 type 监听事件类型 = {}
@@ -29,8 +30,9 @@ export class 首页组件 extends 组件基类<发出事件类型, 监听事件�
       创建元素('h1', { textContent: '项目首页', style: { margin: '0' } }),
       new 普通按钮({
         文本: '退出登录',
-        点击处理函数: (): void => {
-          API管理器.清除token()
+        点击处理函数: async (): Promise<void> => {
+          await 尝试同步项目本地优先数据('退出登录')
+          await API管理器.清除token()
           window.location.assign('/login.html')
         },
       }),

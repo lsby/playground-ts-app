@@ -4,6 +4,7 @@ import { 创建元素 } from '../../global/tools/create-element'
 import { 主要按钮 } from '../general/base/base-button'
 import { 表单 } from '../general/form/form'
 import { 密码输入框, 普通输入框 } from '../general/form/form-input'
+import { 同步项目本地优先数据 } from '../project/local-first-sync'
 
 type 登录数据 = { username: string; password: string }
 type 发出事件类型 = {}
@@ -32,7 +33,8 @@ export class 演示登录组件 extends 组件基类<发出事件类型, 监听�
             userName: 数据.username,
             userPassword: 数据.password,
           })
-          API管理器.设置token(响应.token)
+          await API管理器.设置token(响应.token)
+          await 同步项目本地优先数据()
           window.location.assign('/demo/index.html')
         } catch (错误) {
           结果.textContent = 错误 instanceof Error ? 错误.message : '登录失败'

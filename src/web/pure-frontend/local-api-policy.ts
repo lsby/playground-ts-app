@@ -1,0 +1,21 @@
+// 该文件由脚本自动生成, 请勿修改.
+export let 本地接口策略列表: { 路径: string; 方法: string; 浏览器支持: '纯前端' | '本地优先' }[] = [
+  { 路径: '/api/demo/auth/is-login', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/demo/auth/login', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/demo/base/add', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/demo/crud/user/create', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/demo/crud/user/delete', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/demo/crud/user/read', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/demo/crud/user/update', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/project/is-login', 方法: 'post', 浏览器支持: '本地优先' },
+  { 路径: '/api/project/local-login', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/project/login', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/project/register', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/system/get-enable-registration', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/system/get-system-config', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/system/update-system-config', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/user-admin/update-password', 方法: 'post', 浏览器支持: '纯前端' },
+  { 路径: '/api/user/get-user-config', 方法: 'post', 浏览器支持: '本地优先' },
+  { 路径: '/api/user/get-user-info', 方法: 'post', 浏览器支持: '本地优先' },
+  { 路径: '/api/user/update-user-config', 方法: 'post', 浏览器支持: '本地优先' },
+]

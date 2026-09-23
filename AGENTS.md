@@ -138,12 +138,41 @@
   - 底层数据存储依赖 SQLite Worker 并依托 IndexedDB 持久化, 相关实现在 `src/web/pure-frontend/local-sqlite-worker.ts`
   - 对 Node 运行时的模拟实现在 `src/web/mock/` 目录中, 并通过 `package.json` 的 `browser` 与 `alias` 字段进行替换配置
 - **生成与配置**:
-  - 构建系统会派生出纯前端专用的可用接口列表 `src/web/pure-frontend/local-api-list.ts` 和本地数据库 Schema `src/web/pure-frontend/local-schema.ts`
-  - 并不是所有接口都自动进入前端环境, 只有明确带有 `{ 支持纯前端模式: true }` 声明的接口才会被生成器收录
-    - 可以参考 `src/interface/demo/auth/is-login/index.ts`
+  - 构建系统会派生浏览器可用接口列表 `src/web/pure-frontend/local-api-list.ts`, 轻量路由策略 `src/web/pure-frontend/local-api-policy.ts`, 本地数据库 Schema `src/web/pure-frontend/local-schema.ts`, 以及迁移和主键元信息 `src/types/local-first-database-meta.ts`
+  - 并不是所有接口都自动进入浏览器环境, 只有明确带有 `{ 浏览器支持: '纯前端' | '本地优先' }` 声明的接口才会被生成器收录
+    - `'纯前端'` 表示接口及依赖可以打包到浏览器, 仅在纯前端构建中本地执行
+    - `'本地优先'` 是纯前端能力的超集, 在普通 Web 构建中也会基于用户的本地同步数据库执行
+    - 可以参考 `src/interface/demo/auth/is-login/index.ts` 和 `src/interface/user/get-user-config/index.ts`
 - **运行与并发**:
   - 启动开发环境时, 必须运行完整的 `npm run task -- dev:pure-frontend` 任务, 这样才能同时监听本地 API 列表和 Schema 等派生文件的更新
   - 为了保证并发安全, 在本地执行 API 调用或 DB 管理命令期间, 系统必须持有 Web Locks 的排他锁, 防止多标签页同时写入 IndexedDB 内的 SQLite 数据库
+  - 普通 Web 构建的本地优先同步同样持有该排他锁, 同步期间禁止执行本地接口
+
+### 本地优先
+
+- **核心概念与定位**:
+  - **概念定义**: 本地优先 (Local-First) 是介于“传统 Web 远程调用”与“纯前端单机模式”之间的混合架构. 在具备后端权威服务的 Web 环境中, 将标注为 `{ 浏览器支持: '本地优先' }` 的特定业务接口直接路由到浏览器本地执行并读写本地 SQLite, 赋予应用**零网络延迟、即时响应以及原生离线可用**的能力.
+  - **与纯前端的区别**: “纯前端”用于无后端的完全离线单机场景, 整个应用运行在浏览器沙盒中; 而“本地优先”依赖远程权威后端, 仅将特定用户私有数据子集下沉到本地, 并通过显式的双向同步机制保证云端与多端数据最终一致.
+  - **请求路由机制**: `API管理器` 会依据自动派生的 `local-api-policy.ts` 识别接口特性. 用户登录状态下, 带有 `'本地优先'` 标识的接口自动下沉至 API Worker 本地运行, 普通接口继续走远程 HTTP; 未登录时仍 fallback 到远程网络调用.
+- **架构设计与双库模型**:
+  - **基线与当前双库**: 为实现离线修改与远程数据的安全同步, 前端在 IndexedDB SQLite 中使用 A/B 槽位轮转维护两套数据库:
+    - **基线数据库 (Baseline)**: 记录上一次与服务端成功同步时的权威快照, 作为三方合并的共同祖先.
+    - **当前数据库 (Current)**: 本地接口日常读写的活动数据库, 包含本地发生但尚未同步的变更.
+  - **字段级三方合并**: 同步时使用“远程快照 (Remote)”、“基线快照 (Baseline)”与“本地快照 (Current)”进行类似 Git 的字段级三方合并. 双方修改不同字段时自动安全合流, 仅在同一主键记录的相同字段发生不一致修改时判定为数据冲突.
+- **同步边界与协议**:
+  - **数据子集与安全隔离**: 并非全库同步, 项目必须在 `src/interface-logic/local-first/project-sync.ts` 中实现当前用户可下发的数据查询和回写逻辑 (`user`, `user_config` 等); 数据表与字段必须保持真实数据库结构, 字段遮蔽属于项目约定 (如密码设为 `<不显示>`), 框架不解释遮蔽值.
+  - **双向同步接口契约**:
+    - `src/interface/system/local-first/pull/` 是后到前接口, 返回当前登录用户权限范围的快照、Schema 指纹和 SHA-256 数据哈希. 首次同步或用户变化时直接采用远程权威快照初始化基线与当前数据库.
+    - `src/interface/system/local-first/push/` 是前到后接口, 客户端在本地三方合并完成后向服务端提交快照. 服务端在事务中通过期望哈希比对校验远程数据是否被并发修改, 若被并发修改返回 `REMOTE_DATA_CHANGED` 错误码驱动前端重试; 回写成功后直接返回重新查询的权威快照.
+  - **权威快照替换**: 客户端同步成功后, 并不直接采用本地提交值, 而是采用服务端重新下发的最新权威快照同时覆盖前端的基线与当前数据库, 确保两端绝对一致.
+- **生命周期与触发机制**:
+  - **显式同步触发**: 本地接口的读写操作是纯本地执行, 不会自动静默上传. 业务代码应在合适的业务边界显式调用 `API管理器.本地优先同步(问题解决回调, 失败回调)`. `设置token` 和 `清除token` 只修改认证状态, 不隐式触发同步.
+  - **系统级同步点**: 项目在页面启动恢复登录、新登录成功和退出登录前显式调用同步. 本地接口可等待已由业务代码启动的同步任务, 但不会自行启动同步. 启动和退出登录时可按最佳努力处理, 以保持离线可用性; 新登录和其他需要保证同步成功的业务流程必须等待同步调用完成.
+  - **并发排他保护**: 执行本地接口读写以及本地优先同步时, 必须持有 Web Locks 排他锁, 防止多标签页并发写入损坏数据; 同步期间排他锁定, 禁止调用本地接口.
+- **迁移、冲突与离线保证**:
+  - **跨端统一迁移**: 浏览器数据库使用 `prisma/migrations/` 中的同一批 SQL 和 checksum 维护 `_prisma_migrations`, 在读取与同步前应用待执行迁移.
+  - **迁移与冲突边界**: 远程 Schema 是唯一权威, 与当前前端支持的 Schema 不一致时立即失败. 同步在导出数据前完整迁移当前库和基线库; 任一迁移失败时不导出、不修复、不上传, 由本次同步的问题解决回调决定中止或丢弃本地状态并从远程重建. 只有字段级数据冲突和约束校验失败可由回调返回最终数据库快照.
+  - **离线资源预缓存**: 生产 Web 构建会生成 `dist/src/web/offline-assets.json`, Service Worker 在安装阶段完整缓存清单内的所有构建资源, 缓存完成后才接管页面, 从而实现完全断网环境下的页面加载与离线运行.
 
 ### 样例模式
 
@@ -229,8 +258,8 @@
   - 运行 `npm run task -- generate:all` 即可触发全量代码生成
   - 所有派生文件都交由生成器覆盖维护. 任何手动修改都会在下次生成时被冲掉, 正确做法是去修改源头定义然后重新生成. 这些派生文件包含:
     - 数据库与接口层面的 `src/types/db.ts`, `src/interface/interface-list.ts` 以及 `src/types/interface-type.ts`
-    - 前端相关与本地数据库层面的 `src/web/page/entry/**/*.ts`, `src/web/pure-frontend/local-api-list.ts` 和 `src/web/pure-frontend/local-schema.ts`
-    - 此外还包括注入到应用里的元信息文件 `src/app/meta-info.ts`
+    - 前端相关与本地数据库层面的 `src/web/page/entry/**/*.ts`, `src/web/pure-frontend/local-api-list.ts`, `src/web/pure-frontend/local-api-policy.ts`, `src/web/pure-frontend/local-schema.ts` 和 `src/types/local-first-database-meta.ts`
+    - 此外还包括注入到应用里的元信息文件 `src/app/meta-info.ts`, 其中项目标识由 `package.json` 的包名派生, 浏览器持久化键名和数据库文件名应复用该标识
 
 ### Docker 远程部署
 

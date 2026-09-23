@@ -73,7 +73,7 @@ export class 用户设置组件 extends 组件基类<设置事件, 监听设置�
           if (确认 === true) {
             if (环境变量.BUILD_TARGET === 'pure-frontend') {
               await API管理器.重置纯前端数据库()
-              API管理器.清除token()
+              await API管理器.清除token()
               await 显示对话框('本机数据库已彻底清除并重新初始化。请在登录页重设管理员密码后登录。')
               window.location.href = '/login.html'
               return

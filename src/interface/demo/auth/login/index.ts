@@ -46,5 +46,5 @@ export default new 接口(
   接口方法,
   接口逻辑实现,
   new 常用接口返回器(z.enum(['用户不存在或密码错误']), z.object({ token: z.string() })),
-  { 支持纯前端模式: true },
+  { 浏览器支持: '纯前端' },
 )
