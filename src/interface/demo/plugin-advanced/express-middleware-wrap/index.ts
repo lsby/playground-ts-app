@@ -7,14 +7,14 @@ import { z } from 'zod'
 // 假设我们直接复用 Express 官方提供的 express.json 中间件
 let 原生JSON中间件 = express.json({})
 
-let 错误响应描述Zod = z.object({ code: z.literal(400), data: z.string() })
+let 错误响应描述Zod = z.object({ code: z.literal(400), data: z.string() }).strict()
 
 export class 包装版JSON解析插件<目标Zod extends z.AnyZodObject> extends 插件<
   typeof 错误响应描述Zod,
   z.ZodObject<{ parsedBody: 目标Zod }>
 > {
   public constructor(private 验证器Zod: 目标Zod) {
-    let 正确响应描述Zod = z.object({ parsedBody: 验证器Zod })
+    let 正确响应描述Zod = z.object({ parsedBody: 验证器Zod }).strict()
 
     super(
       错误响应描述Zod,
@@ -51,7 +51,7 @@ export class 包装版JSON解析插件<目标Zod extends z.AnyZodObject> extends
 let 接口路径 = '/api/demo/plugin-advanced/express-middleware-wrap' as const
 let 接口方法 = 'post' as const
 
-let 目标数据验证 = z.object({ a: z.number(), b: z.number() })
+let 目标数据验证 = z.object({ a: z.number(), b: z.number() }).strict()
 
 let 接口逻辑实现 = 接口逻辑.构造(
   [new 包装版JSON解析插件(目标数据验证)],
@@ -64,6 +64,6 @@ let 接口逻辑实现 = 接口逻辑.构造(
   },
 )
 
-let 接口返回器 = new 常用接口返回器(z.never(), z.object({ result: z.number() }))
+let 接口返回器 = new 常用接口返回器(z.never(), z.object({ result: z.number() }).strip())
 
 export default new 接口(接口路径, 接口方法, 接口逻辑实现, 接口返回器)

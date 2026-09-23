@@ -31,14 +31,15 @@ export async function 读取窗口状态(窗口状态路径: string): Promise<�
     let 文件内容 = fs.readFileSync(窗口状态路径, 'utf-8')
     let data = z
       .object({
-        width: z.number(),
-        height: z.number(),
-        x: z.number(),
-        y: z.number(),
+        width: z.number().int().positive(),
+        height: z.number().int().positive(),
+        x: z.number().int(),
+        y: z.number().int(),
         isMaximized: z.boolean(),
         isFullScreen: z.boolean(),
-        displayId: z.number().optional(),
+        displayId: z.number().int().optional(),
       })
+      .strict()
       .parse(JSON.parse(文件内容))
 
     return {

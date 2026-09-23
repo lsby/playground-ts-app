@@ -1,3 +1,4 @@
+import { JSON值 } from '../../../model/json-value'
 import { 组件基类 } from '../../base/base'
 import { API管理器 } from '../../global/manager/api-manager'
 import { 创建元素 } from '../../global/tools/create-element'
@@ -11,7 +12,8 @@ type 监听事件类型 = {}
 
 type 选项卡数据 = { id: string; 标题: string; sql: string }
 
-type 查询结果数据 = { rows: Record<string, any>[]; numAffectedRows?: number | undefined; insertId?: number | undefined }
+type 查询结果行 = Record<string, JSON值>
+type 查询结果数据 = { rows: 查询结果行[]; numAffectedRows?: number | undefined; insertId?: number | undefined }
 
 export class 数据库执行查询组件 extends 组件基类<发出事件类型, 监听事件类型> {
   static {
@@ -37,7 +39,7 @@ export class 数据库执行查询组件 extends 组件基类<发出事件类型
       sql输入: HTMLTextAreaElement
       执行按钮: 普通按钮
       结果容器: HTMLDivElement
-      表格组件: 表格组件<Record<string, any>> | null
+      表格组件: 表格组件<查询结果行> | null
     }
   > = new Map()
   private 选项卡结果映射: Map<string, 查询结果数据 | null> = new Map()
@@ -170,7 +172,7 @@ export class 数据库执行查询组件 extends 组件基类<发出事件类型
     sql输入: HTMLTextAreaElement
     执行按钮: 普通按钮
     结果容器: HTMLDivElement
-    表格组件: 表格组件<Record<string, any>> | null
+    表格组件: 表格组件<查询结果行> | null
   } {
     let 内容 = this.选项卡内容映射.get(tabId)
     if (内容 !== undefined) {
@@ -302,7 +304,7 @@ export class 数据库执行查询组件 extends 组件基类<发出事件类型
       sql输入: HTMLTextAreaElement
       执行按钮: 普通按钮
       结果容器: HTMLDivElement
-      表格组件: 表格组件<Record<string, any>> | null
+      表格组件: 表格组件<查询结果行> | null
     },
     数据: 查询结果数据,
   ): void {
@@ -342,13 +344,11 @@ export class 数据库执行查询组件 extends 组件基类<发出事件类型
     let 列配置 = Object.keys(第一行).map((列名) => ({ 字段名: 列名, 显示名: 列名, 可排序: false }))
 
     // 每次都重新创建表格以确保数据更新
-    内容.表格组件 = new 表格组件<Record<string, any>>({
+    内容.表格组件 = new 表格组件<查询结果行>({
       行键: (数据项, 索引): string => `${JSON.stringify(数据项)}-${索引}`,
       列配置,
       每页数量: 20,
-      加载数据: async (
-        参数: 数据表加载数据参数<Record<string, any>>,
-      ): Promise<{ 数据: Record<string, any>[]; 总数: number }> => {
+      加载数据: async (参数: 数据表加载数据参数<查询结果行>): Promise<{ 数据: 查询结果行[]; 总数: number }> => {
         // 在内存中分页
         let 开始 = (参数.页码 - 1) * 参数.每页数量
         let 结束 = 开始 + 参数.每页数量
@@ -364,7 +364,7 @@ export class 数据库执行查询组件 extends 组件基类<发出事件类型
       sql输入: HTMLTextAreaElement
       执行按钮: 普通按钮
       结果容器: HTMLDivElement
-      表格组件: 表格组件<Record<string, any>> | null
+      表格组件: 表格组件<查询结果行> | null
     },
     消息: string,
   ): void {

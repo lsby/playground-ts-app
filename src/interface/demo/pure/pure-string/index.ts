@@ -14,7 +14,7 @@ let 接口路径 = '/api/demo/pure/pure-string' as const
 let 接口方法 = 'get' as const
 
 let 接口逻辑实现 = 接口逻辑.构造(
-  [new Query参数解析插件(z.object({ name: z.string() }))],
+  [new Query参数解析插件(z.object({ name: z.string() }).strict())],
   async (参数, _逻辑附加参数, _请求附加参数): Promise<Either<'名称不能为空', { data: string }>> => {
     let 姓名 = 参数.query.name
     if (姓名 === '') {
@@ -29,7 +29,7 @@ type _接口逻辑错误返回 = 计算接口逻辑错误结果<typeof 接口逻
 type _接口逻辑正确返回 = 计算接口逻辑正确结果<typeof 接口逻辑实现>
 
 let 接口错误类型描述 = z.enum(['名称不能为空'])
-let 接口正确类型描述 = z.object({ data: z.string() })
+let 接口正确类型描述 = z.object({ data: z.string() }).strip()
 
 let 自定义返回处理器 = new 自定义接口返回器(
   接口错误类型描述,

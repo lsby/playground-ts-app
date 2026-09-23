@@ -5,10 +5,14 @@ import bcrypt from 'bcryptjs'
 import { Request, Response } from 'express'
 import { sql } from 'kysely'
 import { 项目标识 } from '../../app/meta-info'
+import { 环境变量 } from '../../global/env'
+import { globalLog, kysely管理器 } from '../../global/global'
+import { init } from '../../init/init'
 import { 数据库快照, 数据库快照模式 } from '../../model/local-first/sync-model'
 import { 验证密码 } from '../../model/user/user-validation'
 import { 设置浏览器运行时数据库文件名 } from '../mock/db-dialect-mock'
 import { 创建浏览器数据库管理器, 导入数据库快照, 导出数据库快照, 应用浏览器迁移 } from './browser-database'
+import { 本地接口列表 } from './local-api-list'
 
 declare let self: DedicatedWorkerGlobalScope
 
@@ -35,38 +39,22 @@ type 本地Worker命令 =
     }
 type 本地Worker消息 = 本地API请求 | 本地Worker命令
 type 本地API响应 = { id: number; status: number; body: string }
-type 运行时 = {
-  数据库文件名: string
-  纯前端已初始化: boolean
-  全局: typeof import('../../global/global')
-  环境: typeof import('../../global/env')
-  初始化: typeof import('../../init/init')
-  接口清单: typeof import('./local-api-list')
-}
+type 运行时 = { 数据库文件名: string; 纯前端已初始化: boolean }
 
-let 运行时Promise: Promise<运行时> | undefined
+let 运行时: 运行时 | undefined
 
 async function 获得运行时(数据库文件名?: string, 是否应用迁移 = true): Promise<运行时> {
   let 环境数据库文件名 = process.env['DB_PATH']?.split(/[/\\]/).pop() ?? 'local.db'
   let 目标文件名 = 数据库文件名 ?? `${项目标识}-${环境数据库文件名}`
-  if (运行时Promise === undefined) {
+  if (运行时 === undefined) {
     设置浏览器运行时数据库文件名(目标文件名)
-    运行时Promise = (async (): Promise<运行时> => {
-      let [全局, 环境, 初始化, 接口清单] = await Promise.all([
-        import('../../global/global'),
-        import('../../global/env'),
-        import('../../init/init'),
-        import('./local-api-list'),
-      ])
-      return { 数据库文件名: 目标文件名, 纯前端已初始化: false, 全局, 环境, 初始化, 接口清单 }
-    })()
+    运行时 = { 数据库文件名: 目标文件名, 纯前端已初始化: false }
   }
-  let 运行时 = await 运行时Promise
   if (运行时.数据库文件名 !== 目标文件名)
     throw new Error(`Worker 已绑定数据库 ${运行时.数据库文件名}，不能切换到 ${目标文件名}`)
-  if (是否应用迁移 === true) await 应用浏览器迁移(运行时.全局.kysely管理器.获得句柄())
-  if (运行时.环境.环境变量.BUILD_TARGET === 'pure-frontend' && 运行时.纯前端已初始化 === false) {
-    await 运行时.初始化.init()
+  if (是否应用迁移 === true) await 应用浏览器迁移(kysely管理器.获得句柄())
+  if (环境变量.BUILD_TARGET === 'pure-frontend' && 运行时.纯前端已初始化 === false) {
+    await init()
     运行时.纯前端已初始化 = true
   }
   return 运行时
@@ -93,6 +81,11 @@ async function 创建并导入数据库(文件名: string, 数据库快照: 数�
   try {
     await 应用浏览器迁移(管理器.获得句柄())
     await 导入数据库快照(管理器.获得句柄(), 数据库快照)
+  } catch (错误) {
+    throw new Error(
+      `创建并导入浏览器数据库失败 (${JSON.stringify(文件名)}): ${错误 instanceof Error ? 错误.message : String(错误)}`,
+      { cause: 错误 },
+    )
   } finally {
     await 管理器.销毁()
   }
@@ -101,14 +94,14 @@ async function 创建并导入数据库(文件名: string, 数据库快照: 数�
 async function 处理命令(命令: 本地Worker命令): Promise<本地API响应> {
   switch (命令.command) {
     case 'read-sync-pair': {
-      let 运行时 = await 获得运行时(命令.databaseFileName, false)
+      await 获得运行时(命令.databaseFileName, false)
       let 基线管理器 = 创建浏览器数据库管理器(命令.baselineFileName)
       try {
         let 当前Schema指纹: string | undefined
         let 基线Schema指纹: string | undefined
         let 迁移失败列表: Array<{ database: 'current' | 'baseline'; fileName: string; message: string }> = []
         try {
-          当前Schema指纹 = await 应用浏览器迁移(运行时.全局.kysely管理器.获得句柄())
+          当前Schema指纹 = await 应用浏览器迁移(kysely管理器.获得句柄())
         } catch (错误) {
           迁移失败列表.push({
             database: 'current',
@@ -129,7 +122,7 @@ async function 处理命令(命令: 本地Worker命令): Promise<本地API响应
           return 本地返回(命令.id, 'fail', { code: 'LOCAL_FIRST_MIGRATION_FAILED', failures: 迁移失败列表 })
         if (当前Schema指纹 === undefined || 基线Schema指纹 === undefined)
           throw new Error('迁移成功后未获得 Schema 指纹')
-        let 当前数据库 = await 导出数据库快照(运行时.全局.kysely管理器.获得句柄(), 命令.tables)
+        let 当前数据库 = await 导出数据库快照(kysely管理器.获得句柄(), 命令.tables)
         let 基线数据库 = await 导出数据库快照(基线管理器.获得句柄(), 命令.tables)
         return 本地返回(命令.id, 'success', { 当前Schema指纹, 基线Schema指纹, 当前数据库, 基线数据库 })
       } finally {
@@ -144,27 +137,27 @@ async function 处理命令(命令: 本地Worker命令): Promise<本地API响应
       await 创建并导入数据库(命令.baselineFileName, 数据库快照模式.parse(命令.database))
       return 本地返回(命令.id, 'success', {})
     case 'reset-admin-password': {
-      let 运行时 = await 获得运行时(命令.databaseFileName)
+      await 获得运行时(命令.databaseFileName)
       let 密码错误 = 验证密码(命令.password)
       if (密码错误 !== undefined) return 本地返回(命令.id, 'fail', 密码错误)
-      let 管理员 = await 运行时.全局.kysely管理器
+      let 管理员 = await kysely管理器
         .获得句柄()
         .selectFrom('user')
         .select('id')
-        .where('name', '=', 运行时.环境.环境变量.DEFAULT_SYSTEM_USER)
+        .where('name', '=', 环境变量.DEFAULT_SYSTEM_USER)
         .executeTakeFirst()
       if (管理员 === undefined) return 本地返回(命令.id, 'unexpected', '未找到本机管理员账号')
-      await 运行时.全局.kysely管理器
+      await kysely管理器
         .获得句柄()
         .updateTable('user')
-        .set({ pwd: await bcrypt.hash(命令.password, 运行时.环境.环境变量.BCRYPT_ROUNDS) })
+        .set({ pwd: await bcrypt.hash(命令.password, 环境变量.BCRYPT_ROUNDS) })
         .where('id', '=', 管理员.id)
         .execute()
       return 本地返回(命令.id, 'success', {})
     }
     case 'reset-database': {
-      let 运行时 = await 获得运行时(命令.databaseFileName)
-      let 数据库 = 运行时.全局.kysely管理器.获得句柄()
+      await 获得运行时(命令.databaseFileName)
+      let 数据库 = kysely管理器.获得句柄()
       await sql`PRAGMA foreign_keys = OFF`.execute(数据库)
       try {
         let 表结果 = await sql<{ name: string }>`
@@ -175,7 +168,7 @@ async function 处理命令(命令: 本地Worker命令): Promise<本地API响应
       } finally {
         await sql`PRAGMA foreign_keys = ON`.execute(数据库)
       }
-      await 运行时.初始化.init()
+      await init()
       return 本地返回(命令.id, 'success', {})
     }
   }
@@ -186,14 +179,14 @@ function 本地返回(id: number, status: 'success' | 'fail' | 'unexpected', dat
 }
 
 async function 处理请求(请求: 本地API请求): Promise<本地API响应> {
-  let 运行时 = await 获得运行时(请求.databaseFileName)
+  await 获得运行时(请求.databaseFileName)
   let url = new URL(请求.path, self.location.origin)
   let 匹配接口: 任意接口 | undefined
-  for (let 本地接口 of 运行时.接口清单.本地接口列表) {
+  for (let 本地接口 of 本地接口列表) {
     if (
       本地接口.接口.匹配路径(url.pathname) === true &&
       本地接口.接口.获得方法().toLowerCase() === 请求.method.toLowerCase() &&
-      (运行时.环境.环境变量.BUILD_TARGET === 'pure-frontend' || 本地接口.浏览器支持 === '本地优先')
+      (环境变量.BUILD_TARGET === 'pure-frontend' || 本地接口.浏览器支持 === '本地优先')
     ) {
       匹配接口 = 本地接口.接口
       break
@@ -246,7 +239,7 @@ async function 处理请求(请求: 本地API请求): Promise<本地API响应> {
     req: reqMock as unknown as Request,
     res: resMock as unknown as Response,
     目标接口: 匹配接口,
-    请求附加参数: { ...默认请求附加参数, log: 运行时.全局.globalLog.extend(url.pathname), 请求id: String(请求.id) },
+    请求附加参数: { ...默认请求附加参数, log: globalLog.extend(url.pathname), 请求id: String(请求.id) },
   })
   return { id: 请求.id, status: responseStatus, body: JSON.stringify(responseBody) }
 }

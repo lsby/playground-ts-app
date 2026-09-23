@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { JSON值 } from '../../../model/json-value'
+import { 数据库标量模式 } from '../../../model/local-first/sync-model'
 import { 组件基类 } from '../../base/base'
 import { API管理器 } from '../../global/manager/api-manager'
 import { 显示确认对话框 } from '../../global/manager/dialog-manager'
@@ -14,7 +16,7 @@ import { 数据表加载数据参数 } from '../general/table/types'
 type 发出事件类型 = {}
 type 监听事件类型 = {}
 
-type 数据项 = Record<string, string | number>
+type 数据项 = Record<string, JSON值>
 
 export class 数据库数据组件 extends 组件基类<发出事件类型, 监听事件类型> {
   static {
@@ -337,7 +339,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
 
     let 列列表: string[] = []
     let 值列表: string[] = []
-    let 参数列表: (string | number)[] = []
+    let 参数列表: z.infer<typeof 数据库标量模式>[] = []
 
     for (let [列名, 值] of Object.entries(数据)) {
       let 列 = this.列列表.find((c) => c.name === 列名)
@@ -385,7 +387,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
 
     // 构建 SET 语句
     let 设置条件列表: string[] = []
-    let 参数列表: (string | number)[] = []
+    let 参数列表: z.infer<typeof 数据库标量模式>[] = []
 
     for (let [列名, 值] of Object.entries(数据)) {
       设置条件列表.push(`\`${列名}\` = ?`)
@@ -399,7 +401,7 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
       let 主键值 = 行数据[主键列名]
       if (主键值 === undefined) throw new Error('意外的空数据')
       where条件列表.push(`\`${主键列名}\` = ?`)
-      参数列表.push(主键值)
+      参数列表.push(数据库标量模式.parse(主键值))
     }
 
     let sql = `UPDATE \`${表名}\` SET ${设置条件列表.join(', ')} WHERE ${where条件列表.join(' AND ')}`
@@ -427,13 +429,13 @@ export class 数据库数据组件 extends 组件基类<发出事件类型, 监�
 
     // 构建 WHERE 语句
     let where条件列表: string[] = []
-    let 参数列表: (string | number)[] = []
+    let 参数列表: z.infer<typeof 数据库标量模式>[] = []
 
     for (let 主键列名 of this.主键列) {
       let 主键值 = 行数据[主键列名]
       if (主键值 === undefined) throw new Error('意外的空数据')
       where条件列表.push(`\`${主键列名}\` = ?`)
-      参数列表.push(主键值)
+      参数列表.push(数据库标量模式.parse(主键值))
     }
 
     let sql = `DELETE FROM \`${表名}\` WHERE ${where条件列表.join(' AND ')}`

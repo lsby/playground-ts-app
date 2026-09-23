@@ -56,10 +56,16 @@ class App {
           '/favicon.ico',
           'get',
           接口逻辑.构造([], async () => new Right({})),
-          new 自定义接口返回器(z.never(), z.object({}), z.string(), z.object({}), (req, res, _data) => {
-            res.statusCode = 404
-            return res.end()
-          }),
+          new 自定义接口返回器(
+            z.never(),
+            z.object({}).strict(),
+            z.string(),
+            z.object({}).strict(),
+            (req, res, _data) => {
+              res.statusCode = 404
+              return res.end()
+            },
+          ),
         ),
         new 接口(
           new RegExp('/public/.*'),

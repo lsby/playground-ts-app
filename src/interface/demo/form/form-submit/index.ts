@@ -14,7 +14,7 @@ let 接口路径 = '/api/demo/form/form-submit' as const
 let 接口方法 = 'post' as const
 
 let 接口逻辑实现 = 接口逻辑.构造(
-  [new UrlEncoded参数解析插件(z.object({ username: z.string(), email: z.string().email() }), {})],
+  [new UrlEncoded参数解析插件(z.object({ username: z.string(), email: z.string().email() }).strict(), {})],
   async (参数, _逻辑附加参数, _请求附加参数): Promise<Either<'用户名已存在', { 注册成功: boolean; 详情: string }>> => {
     let 用户名 = 参数.urlencoded.username
     let 邮箱 = 参数.urlencoded.email
@@ -32,7 +32,7 @@ type _接口逻辑错误返回 = 计算接口逻辑错误结果<typeof 接口逻
 type _接口逻辑正确返回 = 计算接口逻辑正确结果<typeof 接口逻辑实现>
 
 let 接口错误类型描述 = z.enum(['用户名已存在'])
-let 接口正确类型描述 = z.object({ 注册成功: z.boolean(), 详情: z.string() })
+let 接口正确类型描述 = z.object({ 注册成功: z.boolean(), 详情: z.string() }).strip()
 
 let 接口返回器 = new 常用接口返回器(接口错误类型描述, 接口正确类型描述)
 

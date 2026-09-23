@@ -20,7 +20,11 @@ class JWT单例 {
       .executeTakeFirst()
     let jwt密钥 = 系统数据?.jwt_secret
     if (jwt密钥 === undefined) throw new Error('无法加载jwt密钥')
-    this.jwt句柄 = new JWT异步插件(z.object({ userId: z.string().or(z.undefined()) }), jwt密钥, 环境变量.JWT_EXPIRES_IN)
+    this.jwt句柄 = new JWT异步插件(
+      z.object({ userId: z.string().or(z.undefined()) }).passthrough(),
+      jwt密钥,
+      环境变量.JWT_EXPIRES_IN,
+    )
     return this.jwt句柄
   }
 }

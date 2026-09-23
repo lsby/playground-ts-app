@@ -190,7 +190,7 @@ test.describe('演示组件 E2E', (): void => {
     let 多选下拉 = page.getByRole('combobox', { name: '多选下拉演示' })
     let 多选下拉组件 = page.locator('lsby-form-multi-select')
     await 演示_点击(多选下拉)
-    await 演示_点击(page.getByText('前端', { exact: true }))
+    await 演示_点击(page.getByRole('option', { name: '前端', exact: true }))
     await expect(多选下拉).toContainText('已选 1 项')
 
     await page.keyboard.press('ArrowDown')
@@ -214,7 +214,8 @@ test.describe('演示组件 E2E', (): void => {
         { 文本: '测试', 值: 'testing' },
       ])
     })
-    await 演示_点击(page.getByText('前端', { exact: true }))
+    await 演示_点击(多选下拉)
+    await 演示_点击(page.getByRole('option', { name: '前端', exact: true }))
     await expect(多选下拉).toContainText('已选 2 项')
     await page.mouse.click(1, 1)
     await expect(多选下拉).toHaveAttribute('aria-expanded', 'false')

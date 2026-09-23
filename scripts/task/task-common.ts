@@ -16,6 +16,9 @@ export let 纯前端生产环境文件 = '.env/.env.production.pure-frontend'
 export let 测试环境文件 = '.env/.env.test.web'
 export let Web入口 = 'src/web/page/**/*.html'
 export let Parcel基础参数 = ['build', '--no-autoinstall', '--no-cache', '--no-source-maps', Web入口]
+export let ParcelWorker入口 = 'src/web/pure-frontend/pure-frontend-api-worker.ts'
+export let ParcelWorker选项 = ['--no-autoinstall', '--no-cache', '--no-source-maps', '--no-content-hash']
+export let ParcelWorker基础参数 = ['build', ...ParcelWorker选项, '--no-scope-hoist', ParcelWorker入口]
 export let 生成API列表命令 = 命令(
   'lsby-net-core-gen-api-list',
   './tsconfig.json',

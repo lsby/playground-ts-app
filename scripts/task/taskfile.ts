@@ -1,6 +1,7 @@
 import {
   Electron开发环境文件,
   Electron生产环境文件,
+  ParcelWorker基础参数,
   Parcel基础参数,
   Sea生产环境文件,
   Web开发环境文件,
@@ -87,12 +88,18 @@ export let 任务表 = 定义任务({
   // 打包
   'bundle:web': {
     说明: '打包普通 Web 前端',
-    运行: 命令('parcel', ...Parcel基础参数, '--dist-dir', 'dist/src/web'),
+    运行: [
+      命令('parcel', ...ParcelWorker基础参数, '--dist-dir', 'dist/src/web/worker-assets'),
+      命令('parcel', ...Parcel基础参数, '--dist-dir', 'dist/src/web'),
+    ],
     公开: false,
   },
   'bundle:web-no-scope-hoist': {
     说明: '以禁用 Scope Hoisting 的方式打包 Web 前端',
-    运行: 命令('parcel', ...Parcel基础参数, '--no-scope-hoist', '--dist-dir', 'dist/src/web'),
+    运行: [
+      命令('parcel', ...ParcelWorker基础参数, '--dist-dir', 'dist/src/web/worker-assets'),
+      命令('parcel', ...Parcel基础参数, '--no-scope-hoist', '--dist-dir', 'dist/src/web'),
+    ],
     公开: false,
   },
   'bundle:service-worker': {
@@ -112,7 +119,15 @@ export let 任务表 = 定义任务({
   },
   'bundle:web-test': {
     说明: '打包端到端测试使用的 Web 前端',
-    运行: 命令('parcel', ...Parcel基础参数, '--dist-dir', 'test-outputs/web-test'),
+    运行: [
+      命令('parcel', ...ParcelWorker基础参数, '--dist-dir', 'test-outputs/web-test/worker-assets'),
+      命令('parcel', ...Parcel基础参数, '--dist-dir', 'test-outputs/web-test'),
+    ],
+    公开: false,
+  },
+  'bundle:worker:dev': {
+    说明: '预构建开发环境使用的纯前端 Worker',
+    运行: 命令('parcel', ...ParcelWorker基础参数, '--dist-dir', 'dist/src/web/worker-assets'),
     公开: false,
   },
   'generate:offline-assets': {
@@ -148,7 +163,7 @@ export let 任务表 = 定义任务({
   },
   'build:web:pure-frontend': {
     说明: '生成、自愈并构建纯前端版本',
-    依赖: ['tidy:all', 'clean:web', 'bundle:web-no-scope-hoist', 'bundle:service-worker', 'generate:offline-assets'],
+    依赖: ['tidy:all', 'clean:web', 'bundle:web', 'bundle:service-worker', 'generate:offline-assets'],
     需要环境文件: true,
   },
   'build:web:test': {
@@ -245,19 +260,19 @@ export let 任务表 = 定义任务({
   'run:web:dev': {
     说明: '启动 Web 前端开发服务器',
     环境文件: Web开发环境文件,
-    依赖: ['clean:web'],
+    依赖: ['clean:web', 'bundle:worker:dev'],
     运行: 命令('tsx', 'scripts/web/web-run.ts'),
   },
   'run:web:dev:preview': {
     说明: '启动 Web 样例前端开发服务器',
     环境文件: Web样例开发环境文件,
-    依赖: ['clean:web'],
+    依赖: ['clean:web', 'bundle:worker:dev'],
     运行: 命令('tsx', 'scripts/web/web-run.ts'),
   },
   'run:pure-frontend:dev': {
     说明: '启动纯前端开发服务器',
     环境文件: 纯前端开发环境文件,
-    依赖: ['clean:web'],
+    依赖: ['clean:web', 'bundle:worker:dev'],
     运行: 命令('tsx', 'scripts/web/web-run.ts'),
   },
   'run:electron:dev': {

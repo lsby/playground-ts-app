@@ -43,7 +43,7 @@ type _接口逻辑错误返回 = 计算接口逻辑错误结果<typeof 接口逻
 type _接口逻辑正确返回 = 计算接口逻辑正确结果<typeof 接口逻辑实现>
 
 let 接口错误类型描述 = z.enum(['该接口未开放'])
-let 接口正确类型描述 = z.object({ data: z.string() })
+let 接口正确类型描述 = z.object({ data: z.string() }).strip()
 
 let 自定义返回处理器 = new 自定义接口返回器(
   接口错误类型描述,

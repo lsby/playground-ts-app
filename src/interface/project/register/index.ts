@@ -21,7 +21,7 @@ let 接口方法 = 'post' as const
 
 let 接口逻辑实现 = 接口逻辑.空逻辑().绑定(
   接口逻辑.构造(
-    [new JSON参数解析插件(z.object({ userName: z.string(), userPassword: z.string() }), {}), kysely插件],
+    [new JSON参数解析插件(z.object({ userName: z.string(), userPassword: z.string() }).strict(), {}), kysely插件],
     async (参数, _逻辑附加参数, 请求附加参数) => {
       let _log = 请求附加参数.log.extend(接口路径)
       let 注册参数 = 参数.json
@@ -82,7 +82,7 @@ let 接口错误类型描述 = z.enum([
   '密码过长',
   '注册未启用',
 ])
-let 接口正确类型描述 = z.object({})
+let 接口正确类型描述 = z.object({}).strip()
 
 export default new 接口(接口路径, 接口方法, 接口逻辑实现, new 常用接口返回器(接口错误类型描述, 接口正确类型描述), {
   浏览器支持: '纯前端',

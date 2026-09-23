@@ -9,42 +9,38 @@ import type { 演示需求流程上下文 } from './demo-model'
 
 let 快照数据文件名 = 'checkpoint-data.json'
 
-let 系统配置Schema = z.object({
-  id: z.string(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  is_initialized: z.number().int(),
-  enable_register: z.number().int(),
-  enable_get_interface_type: z.number().int(),
-  version: z.string(),
-  jwt_secret: z.string(),
-})
+let 系统配置Schema = z
+  .object({
+    id: z.string(),
+    created_at: z.string(),
+    is_initialized: z.number().int(),
+    enable_register: z.number().int(),
+    enable_get_interface_type: z.number().int(),
+    version: z.string(),
+    jwt_secret: z.string(),
+  })
+  .strict()
 
-let 用户Schema = z.object({
-  id: z.string(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  name: z.string(),
-  pwd: z.string(),
-  is_admin: z.number().int(),
-})
+let 用户Schema = z
+  .object({ id: z.string(), created_at: z.string(), name: z.string(), pwd: z.string(), is_admin: z.number().int() })
+  .strict()
 
-let 用户配置Schema = z.object({
-  id: z.string(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  user_id: z.string(),
-  theme: z.string(),
-})
+let 用户配置Schema = z
+  .object({ id: z.string(), created_at: z.string(), user_id: z.string(), theme: z.string() })
+  .strict()
 
-let 快照数据Schema = z.object({
-  记录时间: z.string(),
-  数据库: z.object({
-    系统配置列表: z.array(系统配置Schema),
-    用户列表: z.array(用户Schema),
-    用户配置列表: z.array(用户配置Schema),
-  }),
-})
+let 快照数据Schema = z
+  .object({
+    记录时间: z.string(),
+    数据库: z
+      .object({
+        系统配置列表: z.array(系统配置Schema),
+        用户列表: z.array(用户Schema),
+        用户配置列表: z.array(用户配置Schema),
+      })
+      .strict(),
+  })
+  .strict()
 
 export function 创建演示快照配置(快照根目录: string): 快照配置<演示需求流程上下文> {
   return {

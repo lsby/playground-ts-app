@@ -72,4 +72,4 @@ let 接口错误类型描述 = z.discriminatedUnion('code', [
   z.object({ code: z.literal('INVALID_SYNC_DATABASE'), message: z.string() }).strict(),
 ])
 
-export default new 接口(接口路径, 接口方法, 接口逻辑实现, new 常用接口返回器(接口错误类型描述, 同步快照模式))
+export default new 接口(接口路径, 接口方法, 接口逻辑实现, new 常用接口返回器(接口错误类型描述, 同步快照模式.strip()))

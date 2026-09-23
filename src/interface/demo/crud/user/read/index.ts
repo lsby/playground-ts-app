@@ -23,14 +23,16 @@ let 接口逻辑实现 = 接口逻辑
     接口逻辑.构造(
       [
         new JSON参数解析插件(
-          z.object({
-            page: z.number(),
-            size: z.number(),
-            orderBy: z
-              .array(z.object({ field: z.enum(['id', 'name']), direction: z.enum(['asc', 'desc']) }))
-              .optional(),
-            filter: z.object({ id: z.string().optional(), name: z.string().optional() }).optional(),
-          }),
+          z
+            .object({
+              page: z.number().int().positive(),
+              size: z.number().int().min(1).max(100),
+              orderBy: z
+                .array(z.object({ field: z.enum(['id', 'name']), direction: z.enum(['asc', 'desc']) }).strict())
+                .optional(),
+              filter: z.object({ id: z.string().optional(), name: z.string().optional() }).strict().optional(),
+            })
+            .strict(),
           {},
         ),
         kysely插件,
@@ -49,7 +51,6 @@ let 接口逻辑实现 = 接口逻辑
         }
 
         let { page, size, orderBy, filter } = 参数.json
-        if (page <= 0) throw new Error('当前页从1开始')
         let 查询 = 参数.kysely.获得句柄().selectFrom('user')
         if (filter !== undefined) {
           if (filter.id !== undefined) 查询 = 查询.where('id', 'like', `%${filter.id}%`)
@@ -75,7 +76,9 @@ type _接口逻辑错误返回 = 计算接口逻辑错误结果<typeof 接口逻
 type _接口逻辑正确返回 = 计算接口逻辑正确结果<typeof 接口逻辑实现>
 
 let 接口错误类型描述 = z.enum(['未登录', '非管理员'])
-let 接口正确类型描述 = z.object({ data: z.object({ id: z.string(), name: z.string() }).array(), total: z.number() })
+let 接口正确类型描述 = z
+  .object({ data: z.object({ id: z.string(), name: z.string() }).strict().array(), total: z.number() })
+  .strip()
 
 export default new 接口(接口路径, 接口方法, 接口逻辑实现, new 常用接口返回器(接口错误类型描述, 接口正确类型描述), {
   浏览器支持: '纯前端',

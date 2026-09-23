@@ -15,7 +15,7 @@ let 推送目标列表 = [
 
 // 读取 package.json 文件并解析
 let 包信息路径 = path.resolve(import.meta.dirname, '../../package.json')
-let 包信息模式 = z.object({ name: z.string(), version: z.string() })
+let 包信息模式 = z.object({ name: z.string(), version: z.string() }).passthrough()
 let 包信息 = 包信息模式.parse(JSON.parse(fs.readFileSync(包信息路径, 'utf-8')))
 
 // 默认项目名称，如果项目名称以 @ 开头，去掉它

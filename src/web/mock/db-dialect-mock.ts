@@ -1,9 +1,14 @@
 import { WaSqliteWorkerDialect } from 'kysely-wasqlite-worker'
+import { z } from 'zod'
 import { 项目标识 } from '../../app/meta-info'
 
-let 运行时数据库文件名: string | undefined
+let 数据库文件名模式 = z.string().min(1).max(63)
+let 当前URL = new URL(globalThis.location.href)
+let 数据库文件名查询参数 = 当前URL.searchParams.get('databaseFileName')
+let 运行时数据库文件名 = 数据库文件名查询参数 === null ? undefined : 数据库文件名模式.parse(数据库文件名查询参数)
 
 export function 设置浏览器运行时数据库文件名(文件名: string): void {
+  数据库文件名模式.parse(文件名)
   if (运行时数据库文件名 !== undefined && 运行时数据库文件名 !== 文件名)
     throw new Error(`浏览器运行时数据库已绑定为 ${运行时数据库文件名}，不能切换到 ${文件名}`)
   运行时数据库文件名 = 文件名

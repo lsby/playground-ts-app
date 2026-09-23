@@ -23,14 +23,16 @@ import {
 } from './tools/tools'
 
 let 本地根目录 = path.resolve(import.meta.dirname, '../', '../')
-let 服务器配置模式 = z.object({
-  name: z.string().min(1),
-  host: z.string().min(1),
-  username: z.string().min(1),
-  password: z.string().min(1),
-  useMirror: z.boolean(),
-  deployRootDir: z.string().min(1).nullable(),
-})
+let 服务器配置模式 = z
+  .object({
+    name: z.string().min(1),
+    host: z.string().min(1),
+    username: z.string().min(1),
+    password: z.string().min(1),
+    useMirror: z.boolean(),
+    deployRootDir: z.string().min(1).nullable(),
+  })
+  .strict()
 
 let 服务器配置路径 = path.resolve(本地根目录, process.env['DEPLOY_SERVERS_FILE'] ?? 'deploy/servers.local.json')
 if (fs.existsSync(服务器配置路径) === false) {
@@ -43,7 +45,7 @@ let 服务器配置组 = z
 let 服务器列表 = 服务器配置组.map((配置) => ({ name: 配置.name, value: 配置 }))
 
 // 读取项目名称
-let 包信息模式 = z.object({ name: z.string() })
+let 包信息模式 = z.object({ name: z.string() }).passthrough()
 
 let { name: 原始项目名称 } = 包信息模式.parse(
   JSON.parse(fs.readFileSync(path.join(path.resolve(import.meta.dirname, '../', '../'), 'package.json'), 'utf8')),

@@ -2,6 +2,7 @@ import { web请求 } from '@lsby/ts-http-extend'
 import { z } from 'zod'
 import { 项目标识 } from '../../../app/meta-info'
 import { 环境变量 } from '../../../global/env'
+import { JSON对象模式 } from '../../../model/json-value'
 import { 三方合并数据库, 同步快照, 同步快照模式, 数据库快照 } from '../../../model/local-first/sync-model'
 import { 已审阅的any } from '../../../tools/types'
 import { InterfaceType } from '../../../types/interface-type'
@@ -402,7 +403,7 @@ export class API管理器类 {
         ...(ws输出回调 !== undefined
           ? {
               ws信息回调: async (e: MessageEvent): Promise<void> => {
-                await ws输出回调(JSON.parse(e.data))
+                await ws输出回调(JSON对象模式.parse(JSON.parse(e.data)))
               },
             }
           : {}),

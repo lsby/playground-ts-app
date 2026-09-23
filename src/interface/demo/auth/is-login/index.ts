@@ -14,7 +14,7 @@ import { jwt插件, kysely插件 } from '../../../../global/plugin'
 let 接口路径 = '/api/demo/auth/is-login' as const
 let 接口方法 = 'post' as const
 let 接口逻辑实现 = 接口逻辑.空逻辑().绑定(
-  接口逻辑.构造([new JSON参数解析插件(z.object({}), {}), jwt插件.解析器, kysely插件], async (参数) => {
+  接口逻辑.构造([new JSON参数解析插件(z.object({}).strict(), {}), jwt插件.解析器, kysely插件], async (参数) => {
     if (参数.userId === undefined) return new Right({ isLogin: false })
     let 用户 = await 参数.kysely
       .获得句柄()
@@ -34,6 +34,6 @@ export default new 接口(
   接口路径,
   接口方法,
   接口逻辑实现,
-  new 常用接口返回器(z.never(), z.object({ isLogin: z.boolean() })),
+  new 常用接口返回器(z.never(), z.object({ isLogin: z.boolean() }).strip()),
   { 浏览器支持: '纯前端' },
 )

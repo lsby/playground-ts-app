@@ -12,6 +12,7 @@ import { CompiledQuery } from 'kysely'
 import { z } from 'zod'
 import { kysely插件 } from '../../../global/plugin'
 import { 检查管理员登录 } from '../../../interface-logic/check/check-login-jwt-admin'
+import { JSON对象模式 } from '../../../model/json-value'
 
 let 接口路径 = '/api/admin-sqlite/execute-query' as const
 let 接口方法 = 'post' as const
@@ -23,7 +24,12 @@ let 接口逻辑实现 = 接口逻辑
     接口逻辑.构造(
       [
         new JSON参数解析插件(
-          z.object({ sql: z.string(), parameters: z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])) }),
+          z
+            .object({
+              sql: z.string(),
+              parameters: z.array(z.union([z.string(), z.number().finite(), z.boolean(), z.null()])),
+            })
+            .strict(),
           {},
         ),
         kysely插件,
@@ -34,11 +40,11 @@ let 接口逻辑实现 = 接口逻辑
         let kysely = 参数.kysely.获得句柄()
 
         try {
-          let 结果 = await kysely.executeQuery<{ rows: Record<any, any> }>(
+          let 结果 = await kysely.executeQuery<Record<string, unknown>>(
             CompiledQuery.raw(参数.json.sql, 参数.json.parameters),
           )
           return new Right({
-            rows: 结果.rows,
+            rows: z.array(JSON对象模式).parse(结果.rows),
             numAffectedRows: 结果.numAffectedRows === undefined ? 结果.numAffectedRows : Number(结果.numAffectedRows),
             insertId: 结果.insertId === undefined ? 结果.insertId : Number(结果.insertId),
           })
@@ -54,10 +60,8 @@ type _接口逻辑错误返回 = 计算接口逻辑错误结果<typeof 接口逻
 type _接口逻辑正确返回 = 计算接口逻辑正确结果<typeof 接口逻辑实现>
 
 let 接口错误类型描述 = z.string()
-let 接口正确类型描述 = z.object({
-  rows: z.array(z.record(z.any())),
-  numAffectedRows: z.number().optional(),
-  insertId: z.number().optional(),
-})
+let 接口正确类型描述 = z
+  .object({ rows: z.array(JSON对象模式), numAffectedRows: z.number().optional(), insertId: z.number().optional() })
+  .strip()
 
 export default new 接口(接口路径, 接口方法, 接口逻辑实现, new 常用接口返回器(接口错误类型描述, 接口正确类型描述))

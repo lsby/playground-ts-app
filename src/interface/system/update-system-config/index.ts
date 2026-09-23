@@ -7,7 +7,7 @@ import {
   计算接口逻辑正确结果,
   计算接口逻辑错误结果,
 } from '@lsby/net-core'
-import { Right } from '@lsby/ts-fp-data'
+import { Left, Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
 import { 系统配置ID } from '../../../global/const'
 import { kysely插件 } from '../../../global/plugin'
@@ -23,13 +23,19 @@ let 接口逻辑实现 = 接口逻辑
     接口逻辑.构造(
       [
         new JSON参数解析插件(
-          z.object({ enable_register: z.boolean().optional(), enable_get_interface_type: z.boolean().optional() }),
+          z
+            .object({ enable_register: z.boolean().optional(), enable_get_interface_type: z.boolean().optional() })
+            .strict(),
           {},
         ),
         kysely插件,
       ],
       async (参数, 逻辑附加参数, 请求附加参数) => {
         let _log = 请求附加参数.log.extend(接口路径)
+
+        if (参数.json.enable_register === undefined && 参数.json.enable_get_interface_type === undefined) {
+          return new Left('输入参数错误' as const)
+        }
 
         let 更新数据: { enable_register?: number; enable_get_interface_type?: number } = {}
         if (参数.json.enable_register !== undefined) {
@@ -56,7 +62,7 @@ type _接口逻辑错误返回 = 计算接口逻辑错误结果<typeof 接口逻
 type _接口逻辑正确返回 = 计算接口逻辑正确结果<typeof 接口逻辑实现>
 
 let 接口错误类型描述 = z.enum(['未登录', '非管理员', '输入参数错误'])
-let 接口正确类型描述 = z.object({})
+let 接口正确类型描述 = z.object({}).strip()
 
 export default new 接口(接口路径, 接口方法, 接口逻辑实现, new 常用接口返回器(接口错误类型描述, 接口正确类型描述), {
   浏览器支持: '纯前端',

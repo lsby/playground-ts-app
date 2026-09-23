@@ -8,7 +8,7 @@ let 项目根目录 = path.resolve(import.meta.dirname, '../..')
 let 环境文件相对路径 = '.env/.env.production.electron'
 let 环境文件路径 = path.resolve(项目根目录, 环境文件相对路径)
 let Secret名称 = 'ELECTRON_ENV_FILE'
-let 仓库信息模式 = z.object({ nameWithOwner: z.string().min(1), url: z.string().url() })
+let 仓库信息模式 = z.object({ nameWithOwner: z.string().min(1), url: z.string().url() }).passthrough()
 type 仓库信息 = z.infer<typeof 仓库信息模式>
 
 function 执行gh并读取输出(参数组: string[]): string {

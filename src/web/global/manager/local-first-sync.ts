@@ -93,14 +93,23 @@ function 获得下一数据库槽位(
   throw new Error('本地优先数据库文件名不符合 A/B 槽位约定')
 }
 
+async function 创建本地优先文件名前缀(用户id: string): Promise<string> {
+  let 摘要 = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${项目标识}\0${用户id}`))
+  let 用户标识 = [...new Uint8Array(摘要).slice(0, 12)].map((字节) => 字节.toString(16).padStart(2, '0')).join('')
+  let 代次标识 = [...crypto.getRandomValues(new Uint8Array(4))]
+    .map((字节) => 字节.toString(16).padStart(2, '0'))
+    .join('')
+  return `lf-${用户标识}-${代次标识}`
+}
+
 export async function 采用本地优先权威快照(快照: 同步快照, 使用全新文件 = false): Promise<void> {
   if (快照.schemaFingerprint !== 本地数据库Schema指纹)
     throw new Error('服务器 Schema 与当前前端版本不一致，请先更新应用资源')
   let 已有状态 = 读取本地优先状态(快照.userId)
-  let 默认文件名前缀 = `${项目标识}-local-first-${快照.userId}`
+  let 默认文件名前缀 = await 创建本地优先文件名前缀(快照.userId)
   let 下一文件 =
     使用全新文件 === true
-      ? { 文件名前缀: `${默认文件名前缀}-recovery-${crypto.randomUUID()}`, 槽位: 'a' as const }
+      ? { 文件名前缀: 默认文件名前缀, 槽位: 'a' as const }
       : 获得下一数据库槽位(已有状态, 默认文件名前缀)
   let 状态: 本地优先状态 = {
     currentFileName: `${下一文件.文件名前缀}-current-${下一文件.槽位}.db`,

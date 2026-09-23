@@ -23,7 +23,10 @@ let 接口逻辑实现 = 接口逻辑
   .绑定(
     接口逻辑.构造(
       [
-        new JSON参数解析插件(z.object({ name: z.string(), pwd: z.string(), isAdmin: z.boolean().default(false) }), {}),
+        new JSON参数解析插件(
+          z.object({ name: z.string(), pwd: z.string(), isAdmin: z.boolean().default(false) }).strict(),
+          {},
+        ),
         kysely插件,
       ],
       async (参数, _逻辑附加参数, 请求附加参数) => {
@@ -54,7 +57,7 @@ type _接口逻辑错误返回 = 计算接口逻辑错误结果<typeof 接口逻
 type _接口逻辑正确返回 = 计算接口逻辑正确结果<typeof 接口逻辑实现>
 
 let 接口错误类型描述 = z.enum(['未登录', '非管理员'])
-let 接口正确类型描述 = z.object({})
+let 接口正确类型描述 = z.object({}).strip()
 
 export default new 接口(接口路径, 接口方法, 接口逻辑实现, new 常用接口返回器(接口错误类型描述, 接口正确类型描述), {
   浏览器支持: '纯前端',
