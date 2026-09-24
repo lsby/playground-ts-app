@@ -300,8 +300,8 @@
   - 默认无需额外参数即自动生成 Playwright HTML 测试报告至 `test-outputs/playwright-report/index.html`
 - **需求测试**:
   - 需求测试以业务需求和验收点为中心, 不限制具体测试技术, 模型与使用说明见 `src/model/test-requirement/README.md`
-  - 项目需求定义和可运行流程放在 `test/requirement/`, 每个业务需求拥有一个独立的子目录, 内部包含对应的 `xxx-model.ts` 和 `xxx.spec.ts`, 参考 `test/requirement/demo/demo-model.ts` 和 `test/requirement/demo/demo.spec.ts`
-  - `scripts/test/check-requirement-coverage.ts` 会递归扫描 `test/requirement/` 下的所有 `*-model.ts` 文件并统计覆盖率, 新增需求模型后无需手动注册
+  - 项目需求定义和可运行流程放在 `test/requirement/`, 每个业务需求拥有一个独立的子目录, 需求模型统一命名为 `model.ts`, 可执行入口统一命名为 `index.spec.ts`, 参考 `test/requirement/demo/model.ts` 和 `test/requirement/demo/index.spec.ts`
+  - `scripts/test/check-requirement-coverage.ts` 会递归扫描 `test/requirement/` 下所有名为 `model.ts` 的文件并统计覆盖率, 新增需求模型后无需手动注册
   - 相关目录, 文件, 任务和配置统一使用 `requirement` 命名, 不建立平行测试体系
   - 初始化可以直接准备数据, 业务行为和观察必须通过真实业务入口完成, 并返回符合项目证据策略的证据
   - 演示模式只控制展示和速度, 不得改变流程, 断言, 证据或测试数据

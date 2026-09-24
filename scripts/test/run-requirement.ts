@@ -31,7 +31,7 @@ function 是测试模型(值: unknown): 值 is 测试模型<已审阅的any, 已
 
 async function 加载所有模型(目录: string): Promise<测试模型<已审阅的any, 已审阅的any>[]> {
   let 文件列表 = await fs.readdir(目录, { recursive: true })
-  let 模型文件列表 = 文件列表.filter((文件) => 文件.endsWith('-model.ts'))
+  let 模型文件列表 = 文件列表.filter((文件) => path.basename(文件) === 'model.ts')
   let 结果列表: 测试模型<已审阅的any, 已审阅的any>[] = []
 
   for (let 文件 of 模型文件列表) {

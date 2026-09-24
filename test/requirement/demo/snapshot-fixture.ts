@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 import { 演示_点击, 演示_输入 } from '../../../src/model/test-interactive'
 import type { 快照配置 } from '../../../src/model/test-requirement'
-import type { 演示需求流程上下文 } from './demo-model'
+import type { 演示需求流程上下文 } from './model'
 
 let 快照数据文件名 = 'checkpoint-data.json'
 

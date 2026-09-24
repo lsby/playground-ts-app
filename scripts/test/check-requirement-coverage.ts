@@ -7,7 +7,7 @@ import type { 已审阅的any } from '../../src/tools/types'
 let __dirname = path.dirname(fileURLToPath(import.meta.url))
 let requirementDir = path.resolve(__dirname, '../../test/requirement')
 let files = await fs.readdir(requirementDir, { recursive: true })
-let modelFiles = files.filter((f) => f.endsWith('-model.ts'))
+let modelFiles = files.filter((文件) => path.basename(文件) === 'model.ts')
 
 let 所有模型: 测试模型<已审阅的any, 已审阅的any>[] = []
 for (let file of modelFiles) {
