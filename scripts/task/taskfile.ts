@@ -449,7 +449,13 @@ export let 任务表 = 定义任务({
   // capacitor
   'capacitor:init': { 说明: '初始化 Capacitor', 运行: 命令('cap', 'init'), 传递参数: true },
   'capacitor:add:android': { 说明: '添加 Android 平台', 运行: 命令('cap', 'add', 'android'), 传递参数: true },
-  'capacitor:sync:android': { 说明: '同步 Android 平台', 运行: 命令('cap', 'sync', 'android'), 传递参数: true },
+  'capacitor:sync:android': {
+    说明: '构建并同步 Android 平台',
+    依赖: ['build:web'],
+    需要环境文件: true,
+    运行: [命令('tsx', 'scripts/web/check-android-web-assets.ts'), 命令('cap', 'sync', 'android')],
+    传递参数: true,
+  },
   'capacitor:open:android': { 说明: '打开 Android 工程', 运行: 命令('cap', 'open', 'android'), 传递参数: true },
 
   // 发行
