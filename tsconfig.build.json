@@ -1,1 +1,1 @@
-{ "extends": "./tsconfig.json", "exclude": ["node_modules", "dist", "db", "src/web"] }
+{ "extends": "./tsconfig.json", "exclude": ["node_modules", "dist", "db", "src/web", "test"] }

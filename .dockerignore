@@ -46,3 +46,36 @@ test-outputs
 # 忽略sqlite相关文件
 **/*.db
 **/*.db-journal
+
+# 忽略文档与设计资产
+doc
+/doc
+/doc/**/*
+
+# 忽略测试代码与用例
+test
+/test
+/test/**/*
+playwright.config.ts
+playwright.requirement.config.ts
+
+# 忽略 AI 规则及 CI 配置
+.agents
+/.agents
+/.agents/**/*
+.github
+/.github
+/.github/**/*
+
+# 忽略手机端/移动端原生工程与配置
+android
+/android
+/android/**/*
+ios
+/ios
+/ios/**/*
+native
+/native
+/native/**/*
+capacitor.config.ts
+capacitor.config.json

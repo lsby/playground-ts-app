@@ -36,7 +36,36 @@ export function 获取Git忽略名单(项目根目录: string): string[] {
 }
 
 export function 获取完整忽略名单(项目根目录: string): string[] {
-  return [...获取Git忽略名单(项目根目录), '.git/**']
+  let 默认排除名单 = [
+    '.git',
+    '.git/**',
+    'test',
+    'test/**',
+    'doc',
+    'doc/**',
+    '.agents',
+    '.agents/**',
+    '.github',
+    '.github/**',
+    '.vscode',
+    '.vscode/**',
+    '.idea',
+    '.idea/**',
+    'test-outputs',
+    'test-outputs/**',
+    'playwright.config.ts',
+    'playwright.requirement.config.ts',
+    // 手机端/移动端工程及配置
+    'android',
+    'android/**',
+    'ios',
+    'ios/**',
+    'native',
+    'native/**',
+    'capacitor.config.ts',
+    'capacitor.config.json',
+  ]
+  return Array.from(new Set([...获取Git忽略名单(项目根目录), ...默认排除名单]))
 }
 
 export type 压缩项目参数 = {
