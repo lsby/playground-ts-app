@@ -1,11 +1,5 @@
 datasource db {
-  // sqlite
   provider = "sqlite"
-
-  // pg/mysql
-  // provider          = "postgresql"
-  // provider          = "mysql"
-  // shadowDatabaseUrl = env("SHADOW_DB_URL")
 }
 
 generator kysely {

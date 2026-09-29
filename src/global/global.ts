@@ -25,27 +25,6 @@ export let kysely管理器 = Kysely管理器.从适配器创建<DB>(
   创建sqlite数据库适配器(环境变量.DB_PATH),
   环境变量.NODE_ENV === 'development' ? ['query', 'error'] : [],
 )
-// export let kysely管理器 = Kysely管理器.从适配器创建<DB>(
-//   创建pg数据库适配器({
-//     host: 环境变量.DB_HOST,
-//     port: 环境变量.DB_PORT,
-//     user: 环境变量.DB_USER,
-//     password: 环境变量.DB_PWD,
-//     database: 环境变量.DB_NAME,
-//   }),
-//   环境变量.NODE_ENV === 'development' ? ['query', 'error'] : [],
-// )
-// export let kysely管理器 = Kysely管理器.从适配器创建<DB>(
-//   创建mysql数据库适配器({
-//     host: 环境变量.DB_HOST,
-//     port: 环境变量.DB_PORT,
-//     user: 环境变量.DB_USER,
-//     password: 环境变量.DB_PWD,
-//     database: 环境变量.DB_NAME,
-//   }),
-//   环境变量.NODE_ENV === 'development' ? ['query', 'error'] : [],
-// )
-
 export async function 检查数据库是否可用(): Promise<void> {
   try {
     await kysely管理器.获得句柄().selectFrom('system_config').select('id').limit(1).execute()
@@ -59,7 +38,7 @@ export async function 检查数据库是否可用(): Promise<void> {
     let 友好错误 = new Error(
       `数据库未就绪或未完成初始化！\n` +
         `这通常是因为您还没有运行数据库同步/推送命令（例如："npm run task -- db:push:dev:web"）。\n` +
-        `请先确保您的数据库已启动（如果使用 pg/mysql），然后执行相应的推送命令来新建数据库和表结构。\n` +
+        `请先执行相应的推送命令来新建数据库和表结构。\n` +
         `底层错误详情: ${错误消息}`,
     )
     throw 友好错误
