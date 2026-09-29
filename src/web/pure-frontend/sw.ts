@@ -101,23 +101,23 @@ ServiceWorker全局.addEventListener('fetch', (event: FetchEvent) => {
   if (event.request.method !== 'GET' || new URL(event.request.url).origin !== ServiceWorker全局.location.origin) return
   event.respondWith(
     (async (): Promise<Response> => {
-      if (event.request.mode === 'navigate') {
-        try {
-          await 刷新离线资源()
-        } catch (错误) {
-          if (当前缓存名 === undefined) throw 错误
-          console.error('刷新离线资源失败，继续使用已有缓存')
+      try {
+        if (event.request.mode === 'navigate') await 刷新离线资源()
+        else if (当前缓存名 === undefined) await 确保离线资源已准备()
+        let 规范请求URL = new URL(event.request.url)
+        规范请求URL.search = ''
+        规范请求URL.hash = ''
+        if (规范请求URL.pathname.endsWith('/')) 规范请求URL.pathname += 'index.html'
+        if (当前缓存名 !== undefined && 当前资源URL集.has(规范请求URL.href) === true) {
+          let 缓存 = await caches.open(当前缓存名)
+          let 已缓存响应 = await 缓存.match(规范请求URL)
+          if (已缓存响应 === undefined) throw new Error(`离线资源缺失: ${event.request.url}`)
+          return 已缓存响应
         }
-      } else if (当前缓存名 === undefined) await 确保离线资源已准备()
-      let 规范请求URL = new URL(event.request.url)
-      规范请求URL.search = ''
-      规范请求URL.hash = ''
-      if (规范请求URL.pathname.endsWith('/')) 规范请求URL.pathname += 'index.html'
-      if (当前缓存名 === undefined || 当前资源URL集.has(规范请求URL.href) === false) return await fetch(event.request)
-      let 缓存 = await caches.open(当前缓存名)
-      let 已缓存响应 = await 缓存.match(规范请求URL)
-      if (已缓存响应 === undefined) throw new Error(`离线资源缺失: ${event.request.url}`)
-      return 已缓存响应
+      } catch (错误) {
+        console.error('离线资源处理失败，尝试原始网络请求', 错误)
+      }
+      return await fetch(event.request)
     })(),
   )
 })
