@@ -13,13 +13,13 @@ import { 脱敏请求头, 获得请求体摘要, 获得错误摘要 } from './ap
 import { 是标准接口响应, 解析接口响应 } from './api-response'
 import {
   停用本地优先状态,
-  删除本地优先状态,
   本地优先同步失败处理器,
   本地优先同步问题解决器,
   获得接口浏览器支持,
   读取本地优先状态,
 } from './local-first-state'
 import {
+  强制重建本地优先数据,
   解决本地优先数据问题,
   读取本地优先同步数据库对,
   采用本地优先权威快照,
@@ -94,7 +94,7 @@ if (离线资源准备任务 !== undefined) {
 export class API管理器类 {
   private 本地存储名称 = `${项目标识}-api-token`
   private token: string | null = null
-  private 本地优先同步任务: Promise<void> | undefined
+  private 本地优先同步任务: Promise<void | string> | undefined
 
   public constructor() {
     let storedToken = localStorage.getItem(this.本地存储名称)
@@ -138,6 +138,18 @@ export class API管理器类 {
     }
   }
 
+  public async 强制从远程重建本地优先数据(): Promise<string> {
+    if (环境变量.BUILD_TARGET === 'pure-frontend') throw new Error('纯前端模式没有远程数据库可用于重建')
+    if (this.token === null) throw new Error('请先登录再从远程重建本地数据')
+    let 重建任务 = 强制重建本地优先数据(async (): Promise<同步快照> => await this.拉取本地优先快照())
+    this.本地优先同步任务 = 重建任务
+    try {
+      return await 重建任务
+    } finally {
+      if (this.本地优先同步任务 === 重建任务) this.本地优先同步任务 = undefined
+    }
+  }
+
   private async 执行本地优先同步(问题解决器: 本地优先同步问题解决器): Promise<void> {
     if (this.token === null) throw new Error('本地优先同步需要先登录')
     正在执行本地优先同步 = true
@@ -166,12 +178,13 @@ export class API管理器类 {
             })
             switch (解决方案.action) {
               case 'discard-and-reinitialize':
-                删除本地优先状态(远程快照.userId)
                 终止纯前端Worker()
                 await 采用本地优先权威快照(远程快照, true)
                 return
               case 'abort':
-                throw new Error('本地数据库迁移失败，已取消同步')
+                throw new Error(
+                  `本地数据库迁移失败：${数据库对.failures.map((失败) => `${失败.database} (${失败.fileName}): ${失败.message}`).join('；')}`,
+                )
               case 'use-database':
                 throw new Error('迁移失败时不允许修复或提交本地数据库')
             }

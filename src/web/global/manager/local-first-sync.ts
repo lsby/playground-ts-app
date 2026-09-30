@@ -11,7 +11,27 @@ import {
   本地优先迁移失败项,
   读取本地优先状态,
 } from './local-first-state'
-import { 终止纯前端Worker, 请求纯前端Worker } from './pure-frontend-client'
+import { 清理旧本地优先数据库 } from './local-first-storage-cleanup'
+import { 使用纯前端数据库锁, 终止纯前端Worker, 请求纯前端Worker } from './pure-frontend-client'
+
+export async function 强制重建本地优先数据(拉取快照: () => Promise<同步快照>): Promise<string> {
+  return await 使用纯前端数据库锁(async (): Promise<string> => {
+    let 快照 = await 拉取快照()
+    if (快照.schemaFingerprint !== 本地数据库Schema指纹)
+      throw new Error('服务器 Schema 与当前前端版本不一致，请先更新应用资源')
+    let 旧状态: 本地优先状态 | undefined
+    try {
+      旧状态 = 读取本地优先状态(快照.userId)
+    } catch {
+      旧状态 = undefined
+    }
+    await 采用本地优先权威快照(快照, true)
+    let 状态 = 读取本地优先状态(快照.userId)
+    if (状态 === undefined) throw new Error('远程重建完成后未找到本地优先状态')
+    await 清理旧本地优先数据库(快照.userId, [状态.currentFileName, 状态.baselineFileName], 旧状态)
+    return 快照.userId
+  })
+}
 
 export type 读取同步数据库对结果 =
   | { 状态: '成功'; 当前Schema指纹: string; 基线Schema指纹: string; 当前数据库: 数据库快照; 基线数据库: 数据库快照 }
@@ -105,7 +125,7 @@ async function 创建本地优先文件名前缀(用户id: string): Promise<stri
 export async function 采用本地优先权威快照(快照: 同步快照, 使用全新文件 = false): Promise<void> {
   if (快照.schemaFingerprint !== 本地数据库Schema指纹)
     throw new Error('服务器 Schema 与当前前端版本不一致，请先更新应用资源')
-  let 已有状态 = 读取本地优先状态(快照.userId)
+  let 已有状态 = 使用全新文件 === true ? undefined : 读取本地优先状态(快照.userId)
   let 默认文件名前缀 = await 创建本地优先文件名前缀(快照.userId)
   let 下一文件 =
     使用全新文件 === true
@@ -126,6 +146,6 @@ export async function 采用本地优先权威快照(快照: 同步快照, 使�
   })
   if (是标准接口响应(结果) === false || 结果.status !== 'success')
     throw new Error(`替换本地优先数据库失败: ${JSON.stringify(结果)}`)
-  写入本地优先状态(状态)
+  写入本地优先状态(状态, 使用全新文件)
   终止纯前端Worker()
 }

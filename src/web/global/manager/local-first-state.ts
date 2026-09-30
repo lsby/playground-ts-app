@@ -55,9 +55,16 @@ export function 读取本地优先状态(用户id?: string): 本地优先状态 
   return 读取本地优先状态表()[目标用户id]
 }
 
-export function 写入本地优先状态(状态: 本地优先状态): void {
+export function 写入本地优先状态(状态: 本地优先状态, 允许重建损坏状态表 = false): void {
   let 已校验状态 = 本地优先状态模式.parse(状态)
-  let 状态表 = 读取本地优先状态表()
+  let 状态表: Record<string, 本地优先状态>
+  if (允许重建损坏状态表 === true) {
+    try {
+      状态表 = 读取本地优先状态表()
+    } catch {
+      状态表 = {}
+    }
+  } else 状态表 = 读取本地优先状态表()
   状态表[已校验状态.userId] = 已校验状态
   localStorage.setItem(本地优先状态键, JSON.stringify(状态表))
   sessionStorage.setItem(当前标签页用户键, 已校验状态.userId)
