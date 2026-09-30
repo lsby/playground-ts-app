@@ -50,6 +50,8 @@ export let 环境变量 = getRawEnv(
       APP_PORT: 端口,
       WEB_PORT: 端口,
       WEB_HMR_PORT: 端口,
+      // 后端地址
+      BACKEND_URL: z.string(),
       // 系统用户
       DEFAULT_SYSTEM_USER: 非空字符串,
       DEFAULT_SYSTEM_PWD: z.string(),

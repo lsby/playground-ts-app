@@ -22,10 +22,6 @@ class 定时任务实现 extends 定时任务抽象类 {
     await log.info('数据库备份定时任务开始执行')
 
     // 只有当DB_TYPE为sqlite时才执行备份
-    if (环境变量.DB_TYPE !== 'sqlite') {
-      await log.info(`当前数据库类型为${环境变量.DB_TYPE}，跳过备份`)
-      return
-    }
 
     try {
       await log.info('开始执行数据库备份')

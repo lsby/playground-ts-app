@@ -23,6 +23,7 @@ export function getRawEnv<T extends z.ZodRawShape>(schema: z.ZodObject<T>): z.in
     DEFAULT_JWT_SECRET: '',
     JWT_EXPIRES_IN: process.env['JWT_EXPIRES_IN'],
     BCRYPT_ROUNDS: process.env['BCRYPT_ROUNDS'],
+    BACKEND_URL: process.env['BACKEND_URL'],
   }
   return schema.parse(假环境变量)
 }

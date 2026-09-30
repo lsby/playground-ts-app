@@ -83,7 +83,7 @@ type 所有GET文本路径 = InterfaceType extends readonly (infer Item)[]
 type GET查询参数组<接口路径 extends 所有GET文本路径> = [取QUERY输入<取接口<接口路径>>] extends [never]
   ? []
   : [参数: 取QUERY输入<取接口<接口路径>>]
-let API前缀 = ''
+let API前缀 = 环境变量.BACKEND_URL.replace(/\/+$/, '')
 let 离线资源准备任务 = 注册离线资源缓存()
 if (离线资源准备任务 !== undefined) {
   void 离线资源准备任务.catch((错误: unknown) => {
