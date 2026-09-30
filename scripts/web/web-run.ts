@@ -3,7 +3,7 @@ import crossSpawn from 'cross-spawn'
 import { config } from 'dotenv'
 import { readdirSync, writeFileSync } from 'fs'
 import path from 'path'
-import { ParcelWorker入口, ParcelWorker选项 } from '../task/task-common'
+import { ParcelWorker入口, ParcelWorker选项 } from '../task/model/task-common'
 
 function getHtmlEntries(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

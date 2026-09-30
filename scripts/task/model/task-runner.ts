@@ -24,7 +24,7 @@ export type 执行选项 = { 环境文件?: string; 传递参数?: string[]; 仅
 type 执行上下文 = { 环境变量: NodeJS.ProcessEnv; 标识: string }
 type 执行记录 = { 上下文标识: string; 执行Promise: Promise<void> }
 
-let 项目根目录 = path.resolve(import.meta.dirname, '../..')
+let 项目根目录 = path.resolve(import.meta.dirname, '../../..')
 let 活动进程组 = new Set<ChildProcess>()
 let 活动进程清空回调组 = new Set<() => void>()
 

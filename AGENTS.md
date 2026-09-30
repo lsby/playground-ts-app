@@ -242,7 +242,7 @@
 ### 任务与生成文件
 
 - **任务系统**:
-  - 整个任务图表集中在 `scripts/task/taskfile.ts` 中定义, 任务执行器的逻辑则放在 `scripts/task/` 目录
+  - 任务图表按领域模块化拆分在 `scripts/task/taskfile/` 目录中定义, 并在 `scripts/task/index.ts` 中集中聚合, 任务执行器与公共工具逻辑则放在 `scripts/task/model/` 目录
   - 你可以使用 `npm run task -- --list` 查看公开任务, 使用 `npm run task -- --list-all` 查看包含内部叶子任务在内的全部任务, 或者用 `npm run task -- <任务名> --dry-run` 预览具体的执行计划
   - 为了维持一个唯一的事实来源, `package.json` 的 scripts 里只保留最常用任务的快捷别名, 复杂的任务组合一律在 Taskfile 中通过 `依赖` 和 `依赖方式` 声明
   - 基础的叶子任务不应该反向调用包含它的组合任务, 以避免递归调用

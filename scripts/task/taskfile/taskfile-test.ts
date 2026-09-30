@@ -1,5 +1,5 @@
-import { 测试环境文件, 测试调试环境 } from './task-common'
-import { 命令, 定义任务 } from './task-runner'
+import { 测试环境文件, 测试调试环境 } from '../model/task-common'
+import { 命令, 定义任务 } from '../model/task-runner'
 
 export let 测试任务表 = 定义任务({
   // 单元测试

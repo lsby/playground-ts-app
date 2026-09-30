@@ -3,7 +3,7 @@ import * as path from 'node:path'
 
 export type 候选任务项 = { name: string; value: string; description: string; 说明?: string }
 
-let 状态相对路径 = '../../node_modules/.cache/task-state.json'
+let 状态相对路径 = '../../../node_modules/.cache/task-state.json'
 
 function 获得状态文件路径(): string {
   return path.resolve(import.meta.dirname, 状态相对路径)

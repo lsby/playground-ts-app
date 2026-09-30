@@ -1,15 +1,33 @@
 import inquirer from 'inquirer'
 import {
   优雅终止全部任务进程,
+  定义任务,
   强制终止全部任务进程,
   打印任务列表,
   执行任务,
   type 任务表类型,
   type 任务配置,
-} from './task-runner'
-import { 任务表 } from './taskfile'
+} from './model/task-runner'
+import { 保存上次任务, 模糊过滤并排序任务, 读取上次任务, type 候选任务项 } from './model/task-search'
+import { 构建任务表 } from './taskfile/taskfile-build'
+import { 数据库任务表 } from './taskfile/taskfile-db'
+import { 开发任务表 } from './taskfile/taskfile-dev'
+import { 生成任务表 } from './taskfile/taskfile-generate'
+import { 质量任务表 } from './taskfile/taskfile-quality'
+import { 发布任务表 } from './taskfile/taskfile-release'
+import { 初始化任务表 } from './taskfile/taskfile-setup'
+import { 测试任务表 } from './taskfile/taskfile-test'
 
-import { 保存上次任务, 模糊过滤并排序任务, 读取上次任务, type 候选任务项 } from './task-search'
+let 任务表 = 定义任务({
+  ...生成任务表,
+  ...质量任务表,
+  ...构建任务表,
+  ...初始化任务表,
+  ...数据库任务表,
+  ...开发任务表,
+  ...测试任务表,
+  ...发布任务表,
+})
 
 type 任务选项 = 候选任务项
 
