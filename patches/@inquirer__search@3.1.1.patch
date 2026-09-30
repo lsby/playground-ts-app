@@ -1,0 +1,24 @@
+diff --git a/dist/commonjs/index.js b/dist/commonjs/index.js
+index 544f27ffb8bc2aeba8d8c00fd77e9db18c3328c4..6b45c6e8df560a529e5833869e890be93d7c4d32 100644
+--- a/dist/commonjs/index.js
++++ b/dist/commonjs/index.js
+@@ -121,6 +121,7 @@ exports.default = (0, core_1.createPrompt)((config, done) => {
+         }
+         else if (status !== 'loading' && ((0, core_1.isUpKey)(key) || (0, core_1.isDownKey)(key))) {
+             rl.clearLine(0);
++            rl.write(searchTerm);
+             if (((0, core_1.isUpKey)(key) && active !== bounds.first) ||
+                 ((0, core_1.isDownKey)(key) && active !== bounds.last)) {
+                 const offset = (0, core_1.isUpKey)(key) ? -1 : 1;
+diff --git a/dist/esm/index.js b/dist/esm/index.js
+index 571ca784bbe7305ff7c45a04a64668bb06470283..8e44d294b2902d727d02a4940d741f29527e5276 100644
+--- a/dist/esm/index.js
++++ b/dist/esm/index.js
+@@ -115,6 +115,7 @@ export default createPrompt((config, done) => {
+         }
+         else if (status !== 'loading' && (isUpKey(key) || isDownKey(key))) {
+             rl.clearLine(0);
++            rl.write(searchTerm);
+             if ((isUpKey(key) && active !== bounds.first) ||
+                 (isDownKey(key) && active !== bounds.last)) {
+                 const offset = isUpKey(key) ? -1 : 1;

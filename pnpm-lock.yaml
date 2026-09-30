@@ -5,6 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
+  '@inquirer/search@3.1.1':
+    hash: fhm2yfa552jey4h56bdlykd6p4
+    path: patches/@inquirer__search@3.1.1.patch
   '@sqlite.org/sqlite-wasm@3.53.0-build1':
     hash: sl5fk57htewvrggrqbuwflu67u
     path: patches/@sqlite.org__sqlite-wasm@3.53.0-build1.patch
@@ -6475,7 +6478,7 @@ snapshots:
       '@inquirer/number': 3.0.18(@types/node@25.0.6)
       '@inquirer/password': 4.0.18(@types/node@25.0.6)
       '@inquirer/rawlist': 4.1.6(@types/node@25.0.6)
-      '@inquirer/search': 3.1.1(@types/node@25.0.6)
+      '@inquirer/search': 3.1.1(patch_hash=fhm2yfa552jey4h56bdlykd6p4)(@types/node@25.0.6)
       '@inquirer/select': 4.3.2(@types/node@25.0.6)
     optionalDependencies:
       '@types/node': 25.0.6
@@ -6488,7 +6491,7 @@ snapshots:
     optionalDependencies:
       '@types/node': 25.0.6
 
-  '@inquirer/search@3.1.1(@types/node@25.0.6)':
+  '@inquirer/search@3.1.1(patch_hash=fhm2yfa552jey4h56bdlykd6p4)(@types/node@25.0.6)':
     dependencies:
       '@inquirer/core': 10.2.0(@types/node@25.0.6)
       '@inquirer/figures': 1.0.13

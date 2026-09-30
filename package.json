@@ -122,6 +122,7 @@
   "packageManager": "pnpm@9.5.0",
   "pnpm": {
     "patchedDependencies": {
+      "@inquirer/search@3.1.1": "patches/@inquirer__search@3.1.1.patch",
       "@sqlite.org/sqlite-wasm@3.53.0-build1": "patches/@sqlite.org__sqlite-wasm@3.53.0-build1.patch",
       "kysely-generic-sqlite@1.2.1": "patches/kysely-generic-sqlite@1.2.1.patch"
     }
