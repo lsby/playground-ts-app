@@ -328,3 +328,170 @@ export function 获得相对环境文件路径(某个环境: string): string {
   }
   return `../../${环境文件}`
 }
+
+export async function 检查Compose服务是否运行中(
+  ssh: NodeSSH,
+  工作目录: string,
+  项目名称: string,
+  环境: string,
+  compose命令: string,
+  环境文件路径: string,
+): Promise<boolean> {
+  if ((await 远程路径是否存在(ssh, 工作目录)) === false) {
+    return false
+  }
+  let 命令 = `${compose命令} --env-file ${转义PosixShell参数(环境文件路径)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} ps -a -q app`
+  let 结果 = await 执行远程命令(ssh, 命令, { 工作目录, 打印输出: false })
+  if (结果.code !== 0) {
+    throw new Error(`无法确定 Compose 服务状态，退出码: ${String(结果.code)}`)
+  }
+  let 容器ID列表 = 结果.stdout
+    .split(/\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+  if (容器ID列表.length === 0) {
+    return false
+  }
+  for (let 容器ID of 容器ID列表) {
+    let inspect结果 = await 执行远程命令(ssh, `docker inspect -f '{{.State.Running}}' ${转义PosixShell参数(容器ID)}`, {
+      打印输出: false,
+    })
+    if (inspect结果.code !== 0) {
+      throw new Error(`无法读取容器运行状态: ${容器ID}`)
+    }
+    let 运行状态 = inspect结果.stdout.trim()
+    if (运行状态 !== 'true' && 运行状态 !== 'false') {
+      throw new Error(`容器返回了未知运行状态: ${容器ID} -> ${运行状态}`)
+    }
+    if (运行状态 === 'true') {
+      return true
+    }
+  }
+  return false
+}
+
+export type Compose服务镜像快照 = { 镜像ID: string; 镜像名称: string }
+
+export async function 获取Compose服务镜像快照(
+  ssh: NodeSSH,
+  工作目录: string,
+  项目名称: string,
+  环境: string,
+  compose命令: string,
+  环境文件路径: string,
+): Promise<Compose服务镜像快照 | null> {
+  if ((await 远程路径是否存在(ssh, 工作目录)) === false) {
+    return null
+  }
+  let 基础命令 = `${compose命令} --env-file ${转义PosixShell参数(环境文件路径)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)}`
+  let 容器结果 = await 执行远程命令(ssh, `${基础命令} ps -a -q app`, { 工作目录, 打印输出: false })
+  let 容器ID列表 = 容器结果.stdout
+    .split(/\s+/)
+    .map((值) => 值.trim())
+    .filter((值) => 值.length > 0)
+  if (容器ID列表.length === 0) {
+    return null
+  }
+  if (容器ID列表.length !== 1) {
+    throw new Error(`期望 app 服务恰好对应一个容器，实际为 ${String(容器ID列表.length)} 个`)
+  }
+  let 容器ID = 容器ID列表[0]
+  if (容器ID === undefined) {
+    throw new Error('Compose 返回了空的 app 容器 ID')
+  }
+  let 镜像结果 = await 执行远程命令(
+    ssh,
+    `docker inspect -f '{{.Image}}|{{.Config.Image}}' ${转义PosixShell参数(容器ID)}`,
+    { 打印输出: false },
+  )
+  let [镜像ID, 镜像名称, 多余内容] = 镜像结果.stdout.trim().split('|')
+  if (镜像ID === undefined || 镜像ID === '' || 镜像名称 === undefined || 镜像名称 === '' || 多余内容 !== undefined) {
+    throw new Error(`无法解析 app 容器镜像信息: ${镜像结果.stdout.trim()}`)
+  }
+  return { 镜像ID, 镜像名称 }
+}
+
+let 等待 = async (毫秒数: number): Promise<void> => {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 毫秒数)
+  })
+}
+
+export async function 等待Compose应用就绪(
+  ssh: NodeSSH,
+  工作目录: string,
+  项目名称: string,
+  环境: string,
+  compose命令: string,
+  环境文件路径: string,
+): Promise<void> {
+  let 基础命令 = `${compose命令} --env-file ${转义PosixShell参数(环境文件路径)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)}`
+  let 健康检查脚本 = [
+    "let 端口 = process.env['APP_PORT']",
+    "if (端口 === undefined || 端口 === '') process.exit(2)",
+    'fetch(`http://127.0.0.1:${端口}/`).then((响应) => process.exit(响应.ok ? 0 : 1)).catch(() => process.exit(1))',
+  ].join('; ')
+  let 连续成功次数 = 0
+  let 最后状态 = '尚未获得容器状态'
+
+  for (let 尝试次数 = 1; 尝试次数 <= 30; 尝试次数 += 1) {
+    let 容器结果 = await 执行远程命令(ssh, `${基础命令} ps -a -q app`, { 工作目录, 打印输出: false, 抛出错误: false })
+    let 容器ID列表 = 容器结果.stdout
+      .split(/\s+/)
+      .map((值) => 值.trim())
+      .filter((值) => 值.length > 0)
+    let 容器ID = 容器ID列表.length === 1 ? 容器ID列表[0] : undefined
+    if (容器结果.code !== 0) {
+      最后状态 = `Compose 状态查询失败，退出码: ${String(容器结果.code)}`
+    } else if (容器ID === undefined) {
+      最后状态 = `app 容器数量不是 1，实际为 ${String(容器ID列表.length)}`
+    } else {
+      let 状态结果 = await 执行远程命令(
+        ssh,
+        `docker inspect -f '{{.State.Running}}|{{.State.Status}}|{{.RestartCount}}' ${转义PosixShell参数(容器ID)}`,
+        { 打印输出: false, 抛出错误: false },
+      )
+      let [是否运行, 状态, 重启次数] = 状态结果.stdout.trim().split('|')
+      最后状态 = `running=${是否运行 ?? '未知'}, status=${状态 ?? '未知'}, restartCount=${重启次数 ?? '未知'}`
+      if (状态结果.code === 0 && 是否运行 === 'true') {
+        let 探测结果 = await 执行远程命令(ssh, `${基础命令} exec -T app node -e ${转义PosixShell参数(健康检查脚本)}`, {
+          工作目录,
+          打印输出: false,
+          抛出错误: false,
+        })
+        if (探测结果.code === 0) {
+          连续成功次数 += 1
+          if (连续成功次数 >= 3) {
+            return
+          }
+        } else {
+          连续成功次数 = 0
+        }
+      } else {
+        连续成功次数 = 0
+      }
+    }
+    await 等待(2000)
+  }
+
+  await 执行远程命令(ssh, `${基础命令} logs --tail 100 app`, { 工作目录, 打印输出: true, 抛出错误: false })
+  throw new Error(`新服务在 60 秒内未通过连续健康检查，最后状态: ${最后状态}`)
+}
+
+export async function 恢复Compose服务镜像(
+  ssh: NodeSSH,
+  快照: Compose服务镜像快照,
+  工作目录: string,
+  项目名称: string,
+  环境: string,
+  compose命令: string,
+  环境文件路径: string,
+): Promise<void> {
+  await 执行远程命令(
+    ssh,
+    `docker image inspect ${转义PosixShell参数(快照.镜像ID)} >/dev/null && docker tag ${转义PosixShell参数(快照.镜像ID)} ${转义PosixShell参数(快照.镜像名称)}`,
+  )
+  let 基础命令 = `${compose命令} --env-file ${转义PosixShell参数(环境文件路径)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)}`
+  await 执行远程命令(ssh, `${基础命令} up -d --remove-orphans --force-recreate`, { 工作目录 })
+  await 等待Compose应用就绪(ssh, 工作目录, 项目名称, 环境, compose命令, 环境文件路径)
+}

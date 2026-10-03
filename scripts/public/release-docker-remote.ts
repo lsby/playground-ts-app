@@ -5,15 +5,18 @@ import { NodeSSH } from 'node-ssh'
 import * as path from 'path'
 import { z } from 'zod'
 import { 发现环境文件 } from '../setup/env-files-core.mjs'
+import { 执行数据库预演与准备, 执行新服务失败回滚 } from './tools/database-preflight'
+import { 执行数据库同步 } from './tools/database-sync'
 import { 日志类 } from './tools/model'
 import {
   上传文件,
-  下载文件,
   压缩项目,
   执行远程命令,
   检查远程删除目标,
   清理旧镜像,
+  等待Compose应用就绪,
   获取Compose命令,
+  获取Compose服务镜像快照,
   获取Compose镜像列表,
   获取完整忽略名单,
   获得安全远程项目根目录,
@@ -357,6 +360,14 @@ async function 主函数(): Promise<void> {
         compose命令,
         相对环境文件,
       )
+      let 旧服务镜像快照 = await 获取Compose服务镜像快照(
+        sshClient,
+        docker文件目录,
+        项目名称,
+        环境,
+        compose命令,
+        相对环境文件,
+      )
       日志.打印(`📊 当前项目使用的镜像 ID 列表: [${旧镜像列表.join(', ') === '' ? '无' : 旧镜像列表.join(', ')}]`)
 
       日志.打印(`📦 解压到运行目录...`)
@@ -372,12 +383,46 @@ async function 主函数(): Promise<void> {
       }
       await 执行远程命令(sshClient, 构建命令, { 工作目录: docker文件目录 })
 
-      日志.打印(`🚀 正在启动新服务 (实现极短停机更新)...`)
-      await 执行远程命令(
+      // 数据库安全预演与停机备份
+      let 数据库准备结果 = await 执行数据库预演与准备({
         sshClient,
-        `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} up -d --remove-orphans`,
-        { 工作目录: docker文件目录 },
-      )
+        日志,
+        环境,
+        远程运行目录,
+        docker文件目录,
+        项目名称,
+        compose命令,
+        相对环境文件,
+      })
+
+      try {
+        日志.打印(`🚀 正在启动新服务...`)
+        await 执行远程命令(
+          sshClient,
+          `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} up -d --remove-orphans`,
+          { 工作目录: docker文件目录 },
+        )
+        日志.打印(`🩺 正在验证新服务是否稳定就绪...`)
+        await 等待Compose应用就绪(sshClient, docker文件目录, 项目名称, 环境, compose命令, 相对环境文件)
+        日志.打印(`✅ 新服务已连续通过健康检查。`)
+      } catch (启动错误) {
+        try {
+          await 执行新服务失败回滚({
+            sshClient,
+            日志,
+            数据库准备结果,
+            旧服务镜像快照,
+            docker文件目录,
+            项目名称,
+            环境,
+            compose命令,
+            相对环境文件,
+          })
+        } catch (回滚错误) {
+          throw new AggregateError([启动错误, 回滚错误], '新服务启动失败，且自动回滚失败')
+        }
+        throw 启动错误
+      }
 
       日志.打印(`✅ 确认部署后的新镜像状态...`)
       let 新镜像列表 = await 获取Compose镜像列表(
@@ -500,64 +545,7 @@ async function 主函数(): Promise<void> {
     // 模式: 数据同步
     // ====================
     if (模式 === 'sync-to-local' || 模式 === 'sync-to-server') {
-      let 数据库文件名 = 环境 === 'production' ? 'prod-web.db' : 'dev-web.db'
-      let 本地数据库路径 = path.join(本地根目录, 'db', 数据库文件名)
-      let 远程数据库路径 = path.posix.join(远程运行目录, 'db', 数据库文件名)
-
-      if (模式 === 'sync-to-local') {
-        日志.打印(`🔄 模式: 同步服务器数据到本地 [${数据库文件名}]`)
-
-        // 1. 检查远程文件是否存在
-        let 结果 = await 执行远程命令(sshClient, `[ -f ${转义PosixShell参数(远程数据库路径)} ]`, {
-          打印输出: false,
-          抛出错误: false,
-        })
-        if (结果.code !== 0) {
-          throw new Error(`远程数据库文件不存在: ${远程数据库路径}`)
-        }
-
-        // 2. 备份本地文件
-        if (fs.existsSync(本地数据库路径) === true) {
-          let 时间戳 = new Date().toISOString().replace(/[:.]/g, '-')
-          let 备份路径 = 本地数据库路径.replace(/\.db$/, `.${时间戳}.bak.db`)
-          日志.打印(`📦 正在备份本地数据库到: ${备份路径}`)
-          fs.copyFileSync(本地数据库路径, 备份路径)
-        }
-
-        // 3. 下载文件
-        日志.打印(`⬇️ 正在从服务器下载数据库...`)
-        await 下载文件(sshClient, 远程数据库路径, 本地数据库路径)
-        日志.打印(`✨ 同步完成: 服务器 -> 本地`)
-      }
-
-      if (模式 === 'sync-to-server') {
-        日志.打印(`🔄 模式: 同步本地数据到服务器 [${数据库文件名}]`)
-
-        // 1. 检查本地文件是否存在
-        if (fs.existsSync(本地数据库路径) === false) {
-          throw new Error(`本地数据库文件不存在: ${本地数据库路径}`)
-        }
-
-        // 2. 备份远程文件
-        let 远程是否存在 = await 执行远程命令(sshClient, `[ -f ${转义PosixShell参数(远程数据库路径)} ]`, {
-          打印输出: false,
-          抛出错误: false,
-        })
-        if (远程是否存在.code === 0) {
-          let 时间戳 = new Date().toISOString().replace(/[:.]/g, '-')
-          let 备份路径 = 远程数据库路径.replace(/\.db$/, `.${时间戳}.bak.db`)
-          日志.打印(`📦 正在备份服务器数据库到: ${备份路径}`)
-          await 执行远程命令(sshClient, `cp -- ${转义PosixShell参数(远程数据库路径)} ${转义PosixShell参数(备份路径)}`)
-        } else {
-          // 确保远程目录存在
-          await 执行远程命令(sshClient, `mkdir -p -- ${转义PosixShell参数(path.posix.dirname(远程数据库路径))}`)
-        }
-
-        // 3. 上传文件
-        日志.打印(`⬆️ 正在上传数据库到服务器...`)
-        await 上传文件(sshClient, 本地数据库路径, 远程数据库路径)
-        日志.打印(`✨ 同步完成: 本地 -> 服务器`)
-      }
+      await 执行数据库同步({ sshClient, 日志, 模式, 环境, 本地根目录, 远程运行目录 })
     }
 
     // ====================
