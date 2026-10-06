@@ -2,6 +2,7 @@ import fs from 'fs'
 import open from 'open'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { 写入发布信息, 创建当前发布信息 } from './release-info'
 
 let __当前文件名 = fileURLToPath(import.meta.url)
 let __当前目录名 = path.dirname(__当前文件名)
@@ -70,6 +71,8 @@ async function 执行构建(): Promise<void> {
       '3. 当前数据库后端不使用 OPFS 或 SharedArrayBuffer，无需配置 COOP/COEP 响应头。',
     ].join('\r\n')
     fs.writeFileSync(path.join(发布目录, '部署说明.md'), 说明内容)
+    let 发布信息路径 = 写入发布信息(发布目录, 创建当前发布信息(项目根目录))
+    console.log(`✅ 已写入发布信息: ${发布信息路径}`)
 
     console.log('✅ 纯前端产物整理成功！')
     console.log(`成果物位置: ${发布目录}`)

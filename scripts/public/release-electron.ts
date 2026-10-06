@@ -6,6 +6,7 @@ import readline from 'readline/promises'
 import { fileURLToPath } from 'url'
 import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
 import { 写入AppPackageJson, 生成Electron便携资源, 获得Prisma迁移名称组 } from './electron-update-release'
+import { 写入发布信息, 创建当前发布信息 } from './release-info'
 
 let __当前文件名 = fileURLToPath(import.meta.url)
 let __当前目录名 = path.dirname(__当前文件名)
@@ -283,6 +284,9 @@ async function 执行构建(): Promise<void> {
         console.log(`✅ 已生成 ${runExe路径}`)
       }
     }
+
+    let 发布信息路径 = 写入发布信息(生成目录, 创建当前发布信息(项目根目录))
+    console.log(`✅ 已写入发布信息: ${发布信息路径}`)
 
     if (是否生成Zip === true) {
       console.log('正在生成 Electron 完整便携压缩包...')

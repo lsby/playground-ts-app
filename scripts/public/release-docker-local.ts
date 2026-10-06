@@ -6,6 +6,7 @@ import path from 'path'
 import { exit } from 'process'
 import { z } from 'zod'
 import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
+import { 写入发布信息, 创建发布信息, 删除发布信息 } from './release-info'
 
 // ============= 配置区 =============
 let 推送目标列表 = [
@@ -110,6 +111,8 @@ async function 执行打包(): Promise<void> {
   console.log('执行命令: %O %O', 'docker', 构建参数)
 
   try {
+    let 发布信息路径 = 写入发布信息(项目根目录, 创建发布信息(项目根目录, 环境文件路径))
+    console.log(`✅ 已生成 Docker 构建发布信息: ${发布信息路径}`)
     let 环境内容 = 读取环境文件明文(项目根目录, 环境文件路径)
     let 退出码 = await 执行命令行('docker', 构建参数, 项目根目录, { ...process.env, APP_ENV_CONTENT: 环境内容 })
     console.log(`docker build 进程退出，退出码: ${退出码}`)
@@ -137,7 +140,9 @@ async function 执行打包(): Promise<void> {
     }
   } catch (错误) {
     console.error('构建出错: ', 错误)
-    exit(1)
+    throw 错误
+  } finally {
+    删除发布信息(项目根目录)
   }
 }
 

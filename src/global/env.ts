@@ -39,6 +39,8 @@ export let 环境变量 = getRawEnv(
       LOCAL_MODE: z.enum(['true', 'false']).transform((值): boolean => 值 === 'true'),
       // 样例模式, 仅由显式选择的接口模拟数据
       SAMPLE_MODE: z.enum(['true', 'false']).transform((值): boolean => 值 === 'true'),
+      // 部署时是否允许工作区或暂存区包含未提交修改
+      DEPLOY_ALLOW_DIRTY_GIT: z.enum(['true', 'false']).transform((值): boolean => 值 === 'true'),
       // ========= 数据库部分 开始 =========
       DB_TYPE: z.enum(['sqlite']),
       DB_PATH: 非空字符串,

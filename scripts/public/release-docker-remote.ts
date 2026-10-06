@@ -6,6 +6,7 @@ import * as path from 'path'
 import { z } from 'zod'
 import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
 import { 读取部署服务器配置 } from './deploy-env'
+import { 写入发布信息, 创建发布信息, 删除发布信息, 发布信息文件名 } from './release-info'
 import { 执行数据库预演与准备, 执行新服务失败回滚 } from './tools/database-preflight'
 import { 执行数据库同步 } from './tools/database-sync'
 import { 日志类 } from './tools/model'
@@ -258,6 +259,8 @@ async function 主函数(): Promise<void> {
         日志.打印(`📦 正在本地生成、检查并预构建项目 (使用 ${envFile}，避免服务器内存溢出假死)...`)
         await 执行本地命令(`npm run task -- build:all --env ${envFile}`, { 工作目录: 本地根目录 })
       }
+      let 发布信息路径 = 写入发布信息(本地根目录, 创建发布信息(本地根目录, envFile))
+      日志.打印(`✅ 已生成 Docker 构建发布信息: ${发布信息路径}`)
 
       日志.打印(`🧹 清理旧的本地压缩包`)
       if (fs.existsSync(本地压缩包路径) === true) {
@@ -266,7 +269,7 @@ async function 主函数(): Promise<void> {
 
       日志.打印(`📦 正在打包项目 (根目录: ${本地根目录})...`)
       let 忽略名单 = 获取完整忽略名单(本地根目录)
-      let 强制包含文件组: string[] = []
+      let 强制包含文件组: string[] = [发布信息文件名]
       let 覆盖文本文件组: Array<{ 相对路径: string; 内容: string }> = [
         { 相对路径: 打包环境文件, 内容: 读取环境文件明文(本地根目录, envFile) },
       ]
@@ -546,6 +549,7 @@ async function 主函数(): Promise<void> {
     }
   } finally {
     sshClient.dispose()
+    删除发布信息(本地根目录)
     if (fs.existsSync(本地压缩包路径) === true) {
       日志.打印(`🧹 运行结束清理本地文件...`)
       fs.unlinkSync(本地压缩包路径)

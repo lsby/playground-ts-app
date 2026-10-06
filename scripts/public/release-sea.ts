@@ -4,6 +4,7 @@ import open from 'open'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
+import { 写入发布信息, 创建当前发布信息 } from './release-info'
 
 let __当前文件名 = fileURLToPath(import.meta.url)
 let __当前目录名 = path.dirname(__当前文件名)
@@ -226,6 +227,9 @@ async function 执行构建(): Promise<void> {
       fs.writeFileSync(sh路径, 启动脚本内容, { encoding: 'utf8', mode: 0o755 })
       console.log(`✅ 已生成 ${sh路径}`)
     }
+
+    let 发布信息路径 = 写入发布信息(发布目录, 创建当前发布信息(项目根目录))
+    console.log(`✅ 已写入发布信息: ${发布信息路径}`)
 
     // 清理中间文件
     let 中间文件 = ['server.bundle.cjs', 'sea-prep.blob', 'sea-config.json']

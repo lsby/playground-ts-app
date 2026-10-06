@@ -230,6 +230,7 @@
 - **环境变量机制**:
   - 环境变量的模型被定义在 `src/global/env.ts` 中, 而加载它的机制位于 `src/global/env-provider.ts`
   - 工程任务直接指定入库的正式环境文件. `CONFIG_ENCRYPTION` 控制明文或逐项加密模式, 加密模式的项目密钥位于根目录 `.project-config.key` 并严禁入库. `NODE_ENV` 与 `BUILD_TARGET` 在加载时校验运行环境, `LOCAL_MODE` 控制本地免登录, `SAMPLE_MODE` 控制选中业务接口的样例分支
+  - `DEPLOY_ALLOW_DIRTY_GIT` 控制部署脚本是否允许工作区、暂存区或未跟踪文件不干净. 它只放宽 dirty 检查, 发布信息中的提交哈希必须始终由发布脚本直接从当前 Git 仓库计算
   - 人工修改加密配置时先运行 `env:decode` 生成 `.decode`, 修改后运行 `env:encode` 写回正式文件并清理全部 `.decode`; 程序运行、构建和发布过程只在内存中解密
   - 环境加密相关任务为 `env:decode`, `env:encode`, `env:enable-encryption`, `env:disable-encryption` 和 `env:status`; 均通过 `npm run task -- <任务名>` 执行
   - 远程服务器配置统一维护在 `.env/.env.deploy`; GitHub Actions 使用名为 `PROJECT_CONFIG_KEY_FILE` 的 Secret 保存 `.project-config.key` 完整原始内容, 可运行 `npm run task -- setup:github-config-key` 配置
@@ -266,6 +267,13 @@
     - 数据库与接口层面的 `src/types/db.ts`, `src/interface/interface-list.ts` 以及 `src/types/interface-type.ts`
     - 前端相关与本地数据库层面的 `src/web/page/entry/**/*.ts`, `src/web/pure-frontend/local-api-list.ts`, `src/web/pure-frontend/local-api-policy.ts`, `src/web/pure-frontend/local-schema.ts` 和 `src/types/local-first-database-meta.ts`
     - 此外还包括注入到应用里的元信息文件 `src/app/meta-info.ts`, 其中项目标识由 `package.json` 的包名派生, 浏览器持久化键名和数据库文件名应复用该标识
+
+### 发布产物源码追溯
+
+- **机制说明**: 用于将发布产物与特定代码版本强绑定。在执行各类发布任务时，系统会自动提取当前 Git 仓库的提交哈希 (`gitCommit`) 与工作区状态 (`gitDirty`)，生成独立的 `release-info.json` 附带在发布产物中，以便生产审计与排查追溯源码来源。
+- **使用与行为**:
+  - **自动随发布生成**: 执行任何 `public:*` 发布任务（如 Docker、桌面端、纯前端、NPM 等）时全自动嵌入，不需要也不允许手动指定 Git 状态。
+  - **脏工作区拦截**: 通过环境变量 `DEPLOY_ALLOW_DIRTY_GIT` 控制是否允许在包含未提交修改（Dirty）时发布。开发环境默认允许以方便调试，生产与测试环境严禁 Dirty 发布，确保所有发布产物代码均有据可查。
 
 ### Docker 远程部署
 

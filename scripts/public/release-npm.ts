@@ -3,6 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { z } from 'zod'
+import { 写入发布信息, 创建当前发布信息 } from './release-info'
 
 let __当前文件名 = fileURLToPath(import.meta.url)
 let __当前目录名 = path.dirname(__当前文件名)
@@ -33,6 +34,8 @@ async function 执行发布(): Promise<void> {
 
   try {
     console.log('🚀 开始 NPM 发布流程...')
+    let 发布信息路径 = 写入发布信息(path.join(项目根目录, 'dist'), 创建当前发布信息(项目根目录))
+    console.log(`✅ 已写入发布信息: ${发布信息路径}`)
 
     let 解析结果 = 包信息模式.parse(JSON.parse(原始文本))
     if (解析结果.scripts !== undefined) {
