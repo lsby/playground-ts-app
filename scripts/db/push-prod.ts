@@ -4,6 +4,7 @@ import dotenv from 'dotenv'
 import fs from 'fs'
 import sqlite3 from 'node-sqlite3-wasm'
 import path from 'path'
+import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
 
 type 迁移 = { 名称: string; SQL内容: string; 校验和: string }
 type 已完成迁移记录 = { 名称: string; 校验和: string }
@@ -33,6 +34,13 @@ let 获得错误消息 = (错误: unknown): string => (错误 instanceof Error ?
 
 let 获得项目路径 = (目标路径: string): string => path.resolve(项目根目录, 目标路径)
 
+let 加载环境文件 = (环境文件: string): void => {
+  let 文件变量 = dotenv.parse(读取环境文件明文(项目根目录, 获得项目路径(环境文件)))
+  for (let [名称, 值] of Object.entries(文件变量)) {
+    if (process.env[名称] === undefined) process.env[名称] = 值
+  }
+}
+
 let 获得环境文件参数 = (): string | null => {
   let 环境文件参数 = process.argv[2]
   if (环境文件参数 === undefined || 环境文件参数 === '' || 环境文件参数.startsWith('--') === true) {
@@ -61,11 +69,11 @@ let 读取可空迁移时间 = (值: unknown, 字段名: string): string | numbe
 let 获得数据库路径 = (): string => {
   let 环境文件参数 = 获得环境文件参数()
   if (环境文件参数 !== null) {
-    dotenv.config({ path: 获得项目路径(环境文件参数) })
+    加载环境文件(环境文件参数)
   } else {
     let 环境文件路径 = process.env['ENV_FILE_PATH']
     if (环境文件路径 !== undefined && 环境文件路径 !== '') {
-      dotenv.config({ path: 获得项目路径(环境文件路径) })
+      加载环境文件(环境文件路径)
     }
   }
 

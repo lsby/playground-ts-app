@@ -4,6 +4,7 @@ import { createHash } from 'crypto'
 import dotenv from 'dotenv'
 import fs from 'fs'
 import path from 'path'
+import { 读取环境文件明文 } from '../../setup/env-crypto-core.mjs'
 
 export type 命令配置 = { 程序: string; 参数: string[] }
 export type 任务配置 = {
@@ -44,7 +45,7 @@ function 获得环境标识(环境变量: NodeJS.ProcessEnv): string {
 function 加载环境文件(上下文: 执行上下文, 环境文件: string): 执行上下文 {
   let 绝对路径 = path.resolve(项目根目录, 环境文件)
   if (fs.existsSync(绝对路径) === false) throw new Error(`找不到环境文件: ${环境文件}`)
-  let 文件变量 = dotenv.parse(fs.readFileSync(绝对路径))
+  let 文件变量 = dotenv.parse(读取环境文件明文(项目根目录, 绝对路径))
   let 已解析变量 = new Map<string, string>()
   let 解析变量 = (名称: string, 路径: string[]): string => {
     let 已解析值 = 已解析变量.get(名称)
@@ -67,6 +68,7 @@ function 加载环境文件(上下文: 执行上下文, 环境文件: string): �
   let 环境变量: NodeJS.ProcessEnv = { ...上下文.环境变量 }
   for (let 名称 of Object.keys(文件变量)) 环境变量[名称] = 解析变量(名称, [])
   环境变量['ENV_FILE_PATH'] = 环境文件
+  环境变量['PROJECT_ROOT_DIR'] = 项目根目录
   return { 环境变量, 标识: 获得环境标识(环境变量) }
 }
 

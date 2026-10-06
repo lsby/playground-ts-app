@@ -2,17 +2,16 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline/promises'
+import { 加密环境文本, 发现正式环境文件, 生成项目密钥, 读取环境文件明文 } from './env-crypto-core.mjs'
 import { 发现环境文件 } from './env-files-core.mjs'
 import { 执行开发数据库初始化 } from './init-dev-database.mjs'
-import { 应用端口表, 推断已有端口表, 生成随机端口表, 读取初始化状态文件 } from './init-ports-core.mjs'
+import { 应用端口表, 生成随机端口表, 读取初始化状态文件 } from './init-ports-core.mjs'
 import { 执行项目重命名, 解析当前包名 } from './rename-project-core.mjs'
 import { 打印初始化帮助, 解析初始化参数 } from './setup-options.mjs'
 
 let 项目根目录 = path.resolve(import.meta.dirname, '../..')
 let 运行目标标识们 = ['web', 'pure-frontend', 'electron', 'sea', 'android', 'cli']
-let 环境示例文件组 = 发现环境文件(项目根目录)
-let 所有环境文件组 = 环境示例文件组.map((环境文件) => 环境文件.本地文件)
-let Electron生产环境文件 = '.env/.env.production.electron'
+let 所有环境文件组 = 发现环境文件(项目根目录).map((环境文件) => 环境文件.本地文件)
 let 初始化状态相对路径 = '.setup-state.json'
 
 function 读取初始化状态() {
@@ -24,6 +23,7 @@ function 读取初始化状态() {
   return {
     目标组: 原始状态.targets,
     是否配置GitHubSecret: 原始状态.configureGitHubSecret,
+    是否启用环境加密: 原始状态.encryptConfig,
     是否使用随机端口: 原始状态.useRandomPorts,
     端口表: 原始状态.ports,
     是否重命名项目: 原始状态.renameProject,
@@ -38,6 +38,7 @@ function 写入初始化状态(状态, 状态名称) {
     status: 状态名称,
     targets: 状态.目标组,
     configureGitHubSecret: 状态.是否配置GitHubSecret,
+    encryptConfig: 状态.是否启用环境加密,
     useRandomPorts: 状态.是否使用随机端口,
     ports: 状态.端口表,
     renameProject: 状态.是否重命名项目,
@@ -45,13 +46,6 @@ function 写入初始化状态(状态, 状态名称) {
     devDatabaseInitializationPending: 状态.是否等待初始化开发数据库,
   }
   fs.writeFileSync(path.resolve(项目根目录, 初始化状态相对路径), `${JSON.stringify(可保存状态, null, 2)}\n`)
-}
-
-function 是否已有本地配置() {
-  return (
-    所有环境文件组.some((环境文件) => fs.existsSync(path.resolve(项目根目录, 环境文件)) === true) ||
-    fs.existsSync(path.resolve(项目根目录, 'deploy/servers.local.json')) === true
-  )
 }
 
 function 读取确认输入(内容, 默认值) {
@@ -89,6 +83,14 @@ async function 获得文本值(询问器, 参数值, 参数名, 消息, 默认�
 }
 
 function 获得GitHub仓库() {
+  let 根目录结果 = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+    cwd: 项目根目录,
+    encoding: 'utf8',
+    windowsHide: true,
+  })
+  if (根目录结果.error instanceof Error || 根目录结果.status !== 0) return null
+  let Git根目录 = 根目录结果.stdout.trim()
+  if (Git根目录 === '' || path.relative(项目根目录, path.resolve(Git根目录)) !== '') return null
   let 结果 = spawnSync('git', ['remote', 'get-url', 'origin'], { cwd: 项目根目录, encoding: 'utf8', windowsHide: true })
   if (结果.error instanceof Error || 结果.status !== 0) return null
   let 远程地址 = 结果.stdout.trim()
@@ -118,45 +120,26 @@ function 同步包仓库字段(GitHub仓库) {
   console.log(`[完成] 已写入 package.json repository：${GitHub仓库.远程地址}`)
 }
 
-function 从示例创建文件(示例相对路径, 本地相对路径) {
-  let 示例路径 = path.resolve(项目根目录, 示例相对路径)
-  let 本地路径 = path.resolve(项目根目录, 本地相对路径)
-  if (fs.existsSync(本地路径) === true) {
-    console.log(`[跳过] 已存在：${本地相对路径}`)
-    return
-  }
-  if (fs.existsSync(示例路径) === false) throw new Error(`缺少配置示例：${示例相对路径}`)
-  fs.mkdirSync(path.dirname(本地路径), { recursive: true })
-  fs.copyFileSync(示例路径, 本地路径)
-  console.log(`[完成] 已创建：${本地相对路径}`)
-}
-
 function 初始化全部配置() {
-  for (let 环境示例文件 of 环境示例文件组) {
-    let 本地文件 = 环境示例文件.本地文件
-    从示例创建文件(环境示例文件.示例文件, 本地文件)
-  }
-  let 本地服务器配置 = path.resolve(项目根目录, 'deploy/servers.local.json')
-  if (fs.existsSync(本地服务器配置) === true) console.log('[跳过] 已存在：deploy/servers.local.json')
-  else {
-    fs.copyFileSync(path.resolve(项目根目录, 'deploy/servers.example.json'), 本地服务器配置)
-    console.log('[完成] 已创建：deploy/servers.local.json')
-  }
+  let 缺失文件组 = [...所有环境文件组, '.env/.env.deploy'].filter(
+    (文件) => fs.existsSync(path.resolve(项目根目录, 文件)) === false,
+  )
+  if (缺失文件组.length !== 0) throw new Error(`缺少必需环境文件: ${缺失文件组.join(', ')}`)
 }
 
 function 打印Secret手动说明(GitHub仓库) {
-  console.log('\n可以稍后手动配置 Electron GitHub Actions Secret：')
-  console.log(`  名称：ELECTRON_ENV_FILE`)
-  console.log(`  内容：${Electron生产环境文件} 的完整原始内容`)
+  console.log('\n可以稍后手动配置 GitHub Actions 项目密钥 Secret：')
+  console.log(`  名称：PROJECT_CONFIG_KEY_FILE`)
+  console.log(`  内容：.project-config.key 的完整原始内容`)
   console.log(`  页面：${GitHub仓库.页面地址}/settings/secrets/actions/new`)
   console.log(
-    `  PowerShell：Get-Content -Raw ${Electron生产环境文件} | gh secret set ELECTRON_ENV_FILE --repo ${GitHub仓库.仓库名称}`,
+    `  PowerShell：Get-Content -Raw .project-config.key | gh secret set PROJECT_CONFIG_KEY_FILE --repo ${GitHub仓库.仓库名称}`,
   )
 }
 
-function 配置ElectronSecret(GitHub仓库) {
-  let 环境文件路径 = path.resolve(项目根目录, Electron生产环境文件)
-  let 结果 = spawnSync('gh', ['secret', 'set', 'ELECTRON_ENV_FILE', '--repo', GitHub仓库.仓库名称], {
+function 配置项目密钥Secret(GitHub仓库) {
+  let 环境文件路径 = path.resolve(项目根目录, '.project-config.key')
+  let 结果 = spawnSync('gh', ['secret', 'set', 'PROJECT_CONFIG_KEY_FILE', '--repo', GitHub仓库.仓库名称], {
     cwd: 项目根目录,
     encoding: 'utf8',
     input: fs.readFileSync(环境文件路径, 'utf8'),
@@ -169,7 +152,29 @@ function 配置ElectronSecret(GitHub仓库) {
     打印Secret手动说明(GitHub仓库)
     return
   }
-  console.log(`[完成] 已配置 ${GitHub仓库.仓库名称} 的 Actions Secret：ELECTRON_ENV_FILE`)
+  console.log(`[完成] 已配置 ${GitHub仓库.仓库名称} 的 Actions Secret：PROJECT_CONFIG_KEY_FILE`)
+}
+
+function 启用环境加密() {
+  生成项目密钥(项目根目录)
+  for (let 相对路径 of 发现正式环境文件(项目根目录)) {
+    let 文件路径 = path.resolve(项目根目录, 相对路径)
+    let 原始内容 = fs.readFileSync(文件路径, 'utf8')
+    if (/^CONFIG_ENCRYPTION\s*=\s*true\s*$/mu.test(原始内容) === true) continue
+    let 明文内容 = 读取环境文件明文(项目根目录, 文件路径)
+    fs.writeFileSync(文件路径, 加密环境文本({ 项目根目录, 文件路径, 明文内容 }))
+    console.log(`[完成] 已加密：${相对路径}`)
+  }
+}
+
+function 停用环境加密() {
+  for (let 相对路径 of 发现正式环境文件(项目根目录)) {
+    let 文件路径 = path.resolve(项目根目录, 相对路径)
+    let 原始内容 = fs.readFileSync(文件路径, 'utf8')
+    if (/^CONFIG_ENCRYPTION\s*=\s*false\s*$/mu.test(原始内容) === true) continue
+    fs.writeFileSync(文件路径, 读取环境文件明文(项目根目录, 文件路径))
+    console.log(`[完成] 已恢复明文：${相对路径}`)
+  }
 }
 
 async function 运行初始化向导() {
@@ -183,23 +188,6 @@ async function 运行初始化向导() {
   if (可交互 === false && 是否显式运行 === false && 参数.执行初始化 !== false) return
   let 上次状态 = 读取初始化状态()
   if (是否显式运行 === false && 上次状态 !== null) return
-  if (是否显式运行 === false && 是否已有本地配置() === true) {
-    初始化全部配置()
-    let 已有端口表 = 推断已有端口表(项目根目录, 所有环境文件组)
-    写入初始化状态(
-      {
-        目标组: ['web'],
-        是否配置GitHubSecret: false,
-        是否使用随机端口: 已有端口表 !== null,
-        端口表: 已有端口表,
-        是否重命名项目: false,
-        是否初始化开发数据库: true,
-        是否等待初始化开发数据库: false,
-      },
-      'migrated',
-    )
-    return
-  }
   let 询问器 = 可交互 ? readline.createInterface({ input: process.stdin, output: process.stdout }) : null
   try {
     console.log(是否显式运行 ? '\n项目初始化向导' : '\n项目依赖安装前初始化')
@@ -214,6 +202,7 @@ async function 运行初始化向导() {
         上次状态 ?? {
           目标组: ['web'],
           是否配置GitHubSecret: false,
+          是否启用环境加密: false,
           是否使用随机端口: true,
           端口表: null,
           是否重命名项目: false,
@@ -234,18 +223,6 @@ async function 运行初始化向导() {
     else 同步包仓库字段(GitHub仓库)
 
     初始化全部配置()
-    let 是否配置GitHubSecret = false
-    if (GitHub仓库 !== null) {
-      是否配置GitHubSecret = await 获得确认值(
-        询问器,
-        参数.配置GitHubSecret,
-        '是否将 Electron 生产环境配置写入 GitHub Actions Secret？',
-        上次状态?.是否配置GitHubSecret ?? false,
-      )
-    } else if (参数.配置GitHubSecret === true) {
-      throw new Error('已指定 --github-secret，但未检测到 GitHub origin')
-    }
-
     let 是否使用随机端口 = await 获得确认值(
       询问器,
       参数.使用随机端口,
@@ -265,6 +242,31 @@ async function 运行初始化向导() {
       应用端口表(项目根目录, 所有环境文件组, 端口表)
     } else if (参数.重新生成端口 === true) {
       throw new Error('--regenerate-ports 与 --no-random-ports 不能同时使用')
+    }
+
+    let 是否启用环境加密 = await 获得确认值(
+      询问器,
+      参数.启用环境加密,
+      '是否启用项目环境文件加密？',
+      上次状态?.是否启用环境加密 ?? true,
+    )
+    if (是否启用环境加密 === true) 启用环境加密()
+    else 停用环境加密()
+
+    let 是否配置GitHubSecret = false
+    if (GitHub仓库 !== null && 是否启用环境加密 === true) {
+      是否配置GitHubSecret = await 获得确认值(
+        询问器,
+        参数.配置GitHubSecret,
+        '是否将项目配置密钥写入 GitHub Actions Secret？',
+        上次状态?.是否配置GitHubSecret ?? false,
+      )
+    } else if (参数.配置GitHubSecret === true) {
+      throw new Error(
+        GitHub仓库 === null
+          ? '已指定 --github-secret，但未检测到 GitHub origin'
+          : '未启用环境加密时不能配置项目密钥 Secret',
+      )
     }
 
     let 是否初始化开发数据库 = await 获得确认值(
@@ -300,10 +302,11 @@ async function 运行初始化向导() {
         执行项目重命名({ 项目根目录, 新作者名, 新项目名 })
       }
     }
-    if (GitHub仓库 !== null && 是否配置GitHubSecret === true) 配置ElectronSecret(GitHub仓库)
+    if (GitHub仓库 !== null && 是否配置GitHubSecret === true) 配置项目密钥Secret(GitHub仓库)
     let 新状态 = {
       目标组,
       是否配置GitHubSecret,
+      是否启用环境加密,
       是否使用随机端口,
       端口表,
       是否重命名项目,

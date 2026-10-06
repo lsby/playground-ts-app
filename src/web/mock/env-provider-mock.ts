@@ -3,6 +3,7 @@ import { z } from 'zod'
 export function getRawEnv<T extends z.ZodRawShape>(schema: z.ZodObject<T>): z.infer<z.ZodObject<T>> {
   let 是否纯前端构建 = process.env['BUILD_TARGET'] === 'pure-frontend'
   let 假环境变量 = {
+    CONFIG_ENCRYPTION: process.env['CONFIG_ENCRYPTION'],
     NODE_ENV: process.env['NODE_ENV'],
     BUILD_TARGET: process.env['BUILD_TARGET'],
     DEBUG_NAME: process.env['DEBUG_NAME'],

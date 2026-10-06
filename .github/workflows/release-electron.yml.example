@@ -32,6 +32,26 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: 写入项目配置密钥 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          PROJECT_CONFIG_KEY_FILE: ${{ secrets.PROJECT_CONFIG_KEY_FILE }}
+        run: |
+          $encrypted = Select-String -Path .env/.env.production.electron -Pattern '^CONFIG_ENCRYPTION\s*=\s*true\s*$' -Quiet
+          if ($encrypted -and -not $env:PROJECT_CONFIG_KEY_FILE) { throw "加密环境文件缺少仓库 Secret PROJECT_CONFIG_KEY_FILE" }
+          if ($env:PROJECT_CONFIG_KEY_FILE) { Set-Content -Path .project-config.key -Value $env:PROJECT_CONFIG_KEY_FILE }
+
+      - name: 写入项目配置密钥 (macOS)
+        if: runner.os != 'Windows'
+        env:
+          PROJECT_CONFIG_KEY_FILE: ${{ secrets.PROJECT_CONFIG_KEY_FILE }}
+        run: |
+          if grep -Eq '^CONFIG_ENCRYPTION[[:space:]]*=[[:space:]]*true[[:space:]]*$' .env/.env.production.electron && [ -z "$PROJECT_CONFIG_KEY_FILE" ]; then
+            echo "加密环境文件缺少仓库 Secret PROJECT_CONFIG_KEY_FILE" && exit 1
+          fi
+          if [ -n "$PROJECT_CONFIG_KEY_FILE" ]; then printf '%s\n' "$PROJECT_CONFIG_KEY_FILE" > .project-config.key; fi
+
       # Windows 下使用 hoisted 布局，避免 Electron/Parcel 的深层 pnpm 路径问题。
       - name: 配置依赖布局 (Windows)
         if: runner.os == 'Windows'
@@ -40,25 +60,6 @@ jobs:
 
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
-
-      - name: 创建 Electron 生产环境配置 (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          ELECTRON_ENV_FILE: ${{ secrets.ELECTRON_ENV_FILE }}
-        run: |
-          if (-not $env:ELECTRON_ENV_FILE) { throw "缺少仓库 Secret ELECTRON_ENV_FILE" }
-          New-Item -ItemType Directory -Force -Path .env | Out-Null
-          Set-Content -Path .env/.env.production.electron -Value $env:ELECTRON_ENV_FILE
-
-      - name: 创建 Electron 生产环境配置 (macOS)
-        if: runner.os != 'Windows'
-        env:
-          ELECTRON_ENV_FILE: ${{ secrets.ELECTRON_ENV_FILE }}
-        run: |
-          if [ -z "$ELECTRON_ENV_FILE" ]; then echo "缺少仓库 Secret ELECTRON_ENV_FILE" && exit 1; fi
-          mkdir -p .env
-          printf '%s\n' "$ELECTRON_ENV_FILE" > .env/.env.production.electron
 
       - name: 准备 Electron 数据库 (Windows)
         if: runner.os == 'Windows'

@@ -229,7 +229,10 @@
 
 - **环境变量机制**:
   - 环境变量的模型被定义在 `src/global/env.ts` 中, 而加载它的机制位于 `src/global/env-provider.ts`
-  - 工程任务直接指定环境文件路径, 初始化流程按 `.example` 文件名创建对应本地文件. `NODE_ENV` 与 `BUILD_TARGET` 在加载时校验运行环境, `LOCAL_MODE` 控制本地免登录, `SAMPLE_MODE` 控制选中业务接口的样例分支
+  - 工程任务直接指定入库的正式环境文件. `CONFIG_ENCRYPTION` 控制明文或逐项加密模式, 加密模式的项目密钥位于根目录 `.project-config.key` 并严禁入库. `NODE_ENV` 与 `BUILD_TARGET` 在加载时校验运行环境, `LOCAL_MODE` 控制本地免登录, `SAMPLE_MODE` 控制选中业务接口的样例分支
+  - 人工修改加密配置时先运行 `env:decode` 生成 `.decode`, 修改后运行 `env:encode` 写回正式文件并清理全部 `.decode`; 程序运行、构建和发布过程只在内存中解密
+  - 环境加密相关任务为 `env:decode`, `env:encode`, `env:enable-encryption`, `env:disable-encryption` 和 `env:status`; 均通过 `npm run task -- <任务名>` 执行
+  - 远程服务器配置统一维护在 `.env/.env.deploy`; GitHub Actions 使用名为 `PROJECT_CONFIG_KEY_FILE` 的 Secret 保存 `.project-config.key` 完整原始内容, 可运行 `npm run task -- setup:github-config-key` 配置
   - 环境变量应当通过 Zod 进行严格校验, 并且不提供业务兜底值, 以便让缺失的配置在启动或构建阶段就能尽早报错
   - 业务代码应统一使用解析好的 `环境变量` 对象, 而不要直接去读取 `process.env`. 这既能保留类型检查, 也能完美兼容前端环境的变量注入
   - 针对前端编译时的环境变量注入, 相关实现在 `src/web/mock/env-provider-mock.ts` 中
@@ -239,7 +242,7 @@
   - 项目源码和工程脚本都禁止使用 `process.cwd()` 或向上搜索 `package.json` 的方式推断项目根目录, 因为不同执行入口和环境产物下的当前工作目录与文件层级并不稳定
   - 各入口应依据自身运行环境和产物结构显式计算路径, 不要假设所有目标共享同一种目录层级
 - **安全与密钥**:
-  - 像 `.env/*.example` 和 `deploy/servers.example.json` 这些文件只应用于存放脱敏的公开示例, 切勿让真实的密钥数据跟随模板进入代码仓库
+  - 模板仓库默认提供脱敏的明文正式环境文件. 写入真实密钥前应启用配置加密; `.decode` 只用于人工编辑且严禁入库
 
 ### 任务与生成文件
 
@@ -251,7 +254,7 @@
   - 只有当输出结果互不覆盖时才可以安排任务并行执行, 以避免竞争冒险
 - **初始化与监听**:
   - 仓库的初始化由 `scripts/setup/preinstall.mjs` 和 `scripts/setup/postinstall.mjs` 提供向导支持 (也可通过 `npm run setup:all` 手动重新触发)
-  - 在初始化过程中, 会顺次配置环境文件 (`init-env.ts`), 分配本地端口 (`init-ports.ts`) 并协助执行项目重命名 (`rename-project.ts`)
+  - 在初始化过程中, 会顺次分配本地端口 (`init-ports.ts`), 选择环境文件加密模式并协助执行项目重命名 (`rename-project.ts`)
   - `preinstall` 脚本执行时各种第三方包还没下载完毕, 因此只能使用 Node.js 的内置模块
   - 整个初始化流程必须保证幂等
   - 初始化流程中不能向控制台泄漏敏感 Secret
@@ -266,8 +269,13 @@
 
 ### Docker 远程部署
 
-- 修改或执行远程 Docker 发布流程前, 完整阅读 `scripts/public/README.md` 中的远程部署说明
 - 通用实现位于 `scripts/public/release-docker-remote.ts`, 对应任务为 `npm run task -- public:docker:remote`. 现有流程能够满足需求时, 不要建立项目专用的平行部署体系
+- 服务器配置统一位于 `.env/.env.deploy`, 不同环境的 Compose 配置位于 `deploy/development/` 和 `deploy/production/`; 不同运行目标语义不同时应使用独立环境文件, 不要在 Compose 中暗改其他目标的 `BUILD_TARGET`
+- 修改 Dockerfile 或 Compose 文件时保留现有模板结构, 只增补实际需要的依赖, 端口或数据卷; Docker 构建通过 BuildKit Secret 读取实际环境文件, 不要把包含密钥的配置复制到镜像层
+- **远程目录与生命周期**:
+  - `deployRootDir` 是统一部署根目录而不是 SSH 用户家目录; 未配置时才使用远程用户的 `$HOME`. 项目目录固定为 `<部署根目录>/<规范化项目名>`, 其中 `upload/` 接收临时文件, `build/<环境>/` 用于构建, `run/<环境>/` 用于运行
+  - Docker Compose 在 `run/<环境>/deploy/<环境>/` 中执行, 相对数据卷以该目录为基准. 只有需要脱离项目生命周期长期保留的大体积数据才使用宿主机绝对路径, 并必须明确备份, 迁移和删除策略
+  - `run` 会覆盖运行目录中的同名文件但不预先清空目录; `redeploy` 会删除整个 `run/<环境>/`; `delete` 会删除整个远程项目目录. 执行后两者前必须确认相对卷数据是否需要备份或迁移
 - **标准部署与数据库迁移机制**:
   - **常规升级 (自动化安全部署)**:
     直接选择 `运行项目 (run)` 即可。脚本已内置全套自动化安全防护机制：

@@ -4,7 +4,8 @@ import inquirer from 'inquirer'
 import { NodeSSH } from 'node-ssh'
 import * as path from 'path'
 import { z } from 'zod'
-import { 发现环境文件 } from '../setup/env-files-core.mjs'
+import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
+import { 读取部署服务器配置 } from './deploy-env'
 import { 执行数据库预演与准备, 执行新服务失败回滚 } from './tools/database-preflight'
 import { 执行数据库同步 } from './tools/database-sync'
 import { 日志类 } from './tools/model'
@@ -26,25 +27,7 @@ import {
 } from './tools/tools'
 
 let 本地根目录 = path.resolve(import.meta.dirname, '../', '../')
-let 服务器配置模式 = z
-  .object({
-    name: z.string().min(1),
-    host: z.string().min(1),
-    username: z.string().min(1),
-    password: z.string().min(1),
-    useMirror: z.boolean(),
-    deployRootDir: z.string().min(1).nullable(),
-  })
-  .strict()
-
-let 服务器配置路径 = path.resolve(本地根目录, process.env['DEPLOY_SERVERS_FILE'] ?? 'deploy/servers.local.json')
-if (fs.existsSync(服务器配置路径) === false) {
-  throw new Error('缺少 deploy/servers.local.json，请先运行 npm run task -- setup:env')
-}
-let 服务器配置组 = z
-  .array(服务器配置模式)
-  .min(1)
-  .parse(JSON.parse(fs.readFileSync(服务器配置路径, 'utf8')))
+let 服务器配置组 = 读取部署服务器配置(本地根目录)
 let 服务器列表 = 服务器配置组.map((配置) => ({ name: 配置.name, value: 配置 }))
 
 // 读取项目名称
@@ -268,7 +251,7 @@ async function 主函数(): Promise<void> {
       let 环境文件名表 = { development: '.env/.env.development.web', production: '.env/.env.production.web' }
       let envFile = 环境文件名表[Docker环境]
       if (fs.existsSync(path.join(本地根目录, envFile)) === false) {
-        throw new Error(`找不到对应的环境变量文件: ${envFile}，请先运行 npm run task -- setup:env`)
+        throw new Error(`找不到对应的环境变量文件: ${envFile}`)
       }
       let 打包环境文件 = envFile
       if (复用本地构建 === true) {
@@ -283,9 +266,9 @@ async function 主函数(): Promise<void> {
 
       日志.打印(`📦 正在打包项目 (根目录: ${本地根目录})...`)
       let 忽略名单 = 获取完整忽略名单(本地根目录)
-      let 强制包含文件组 = 发现环境文件(本地根目录).map((环境文件) => 环境文件.示例文件)
+      let 强制包含文件组: string[] = []
       let 覆盖文本文件组: Array<{ 相对路径: string; 内容: string }> = [
-        { 相对路径: 打包环境文件, 内容: fs.readFileSync(path.resolve(本地根目录, envFile), 'utf8') },
+        { 相对路径: 打包环境文件, 内容: 读取环境文件明文(本地根目录, envFile) },
       ]
       let Docker忽略文件相对路径 = '.dockerignore'
       let Docker忽略内容 = fs

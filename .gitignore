@@ -3,9 +3,8 @@
 # =========================
 /node_modules
 /OCR-portable-python*
-/.env/.env.*
-!/.env/*.example
-/deploy/servers.local.json
+/.env/*.decode
+/.project-config.key
 /test/unit/unit-test.test.ts
 
 # =========================

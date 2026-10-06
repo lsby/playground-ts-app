@@ -50,7 +50,6 @@
     "@lsby/net-core": "^0.14.22",
     "@lsby/net-core-jwt": "^0.5.4",
     "@lsby/net-core-kysely": "^0.6.0",
-    "@lsby/ts-env": "^0.0.14",
     "@lsby/ts-fp-data": "^0.2.7",
     "@lsby/ts-http-extend": "^0.3.4",
     "@lsby/ts-kysely": "^0.2.10",

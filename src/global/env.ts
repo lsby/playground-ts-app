@@ -7,6 +7,7 @@ let 端口 = z.coerce.number().int().min(1).max(65535)
 export let 环境变量 = getRawEnv(
   z
     .object({
+      CONFIG_ENCRYPTION: z.enum(['true', 'false']).transform((值): boolean => 值 === 'true'),
       // 环境名称
       NODE_ENV: z.enum(['development', 'production', 'test']),
       /**

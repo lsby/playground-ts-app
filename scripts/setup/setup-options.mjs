@@ -1,6 +1,7 @@
 let 布尔参数定义们 = [
   ['--initialize', '--no-initialize', '执行初始化'],
   ['--github-secret', '--no-github-secret', '配置GitHubSecret'],
+  ['--encryption', '--no-encryption', '启用环境加密'],
   ['--random-ports', '--no-random-ports', '使用随机端口'],
   ['--regenerate-ports', '--no-regenerate-ports', '重新生成端口'],
   ['--dev-database', '--no-dev-database', '初始化开发数据库'],
@@ -70,6 +71,7 @@ export function 打印初始化帮助() {
   --force                                      强制重新运行向导（setup:all 自动提供）
   --initialize / --no-initialize
   --github-secret / --no-github-secret
+  --encryption / --no-encryption
   --random-ports / --no-random-ports
   --regenerate-ports / --no-regenerate-ports
   --dev-database / --no-dev-database

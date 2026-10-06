@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
+import { 加密环境文本, 读取环境文件明文 } from './env-crypto-core.mjs'
 import { 读取Node环境 } from './env-files-core.mjs'
 
 export let 端口键组 = ['APP_PORT', 'WEB_PORT', 'WEB_HMR_PORT', 'TEST_APP_PORT', 'TEST_WEB_PORT', 'TEST_WEB_HMR_PORT']
@@ -22,9 +23,13 @@ export function 读取初始化状态文件(项目根目录) {
   } catch (错误) {
     throw new Error('.setup-state.json 读取或解析失败', { cause: 错误 })
   }
+  if (typeof 状态 === 'object' && 状态 !== null && Object.hasOwn(状态, 'encryptConfig') === false) {
+    状态.encryptConfig = false
+  }
   let 状态名称组 = ['configured', 'migrated', 'skipped', 'completed']
   let 布尔字段组 = [
     'configureGitHubSecret',
+    'encryptConfig',
     'useRandomPorts',
     'renameProject',
     'initializeDevDatabase',
@@ -56,7 +61,7 @@ export function 读取端口状态(项目根目录) {
 function 从环境文件读取端口(项目根目录, 文件相对路径, 变量名) {
   let 文件路径 = path.resolve(项目根目录, 文件相对路径)
   if (fs.existsSync(文件路径) === false) return null
-  let 匹配结果 = new RegExp(`^${变量名}\\s*=\\s*(\\d+)`, 'mu').exec(fs.readFileSync(文件路径, 'utf8'))
+  let 匹配结果 = new RegExp(`^${变量名}\\s*=\\s*(\\d+)`, 'mu').exec(读取环境文件明文(项目根目录, 文件路径))
   let 端口 = Number(匹配结果?.[1])
   return Number.isInteger(端口) ? 端口 : null
 }
@@ -113,11 +118,15 @@ export async function 生成随机端口表() {
 function 替换环境文件端口(项目根目录, 文件相对路径, 端口表) {
   let 文件路径 = path.resolve(项目根目录, 文件相对路径)
   if (fs.existsSync(文件路径) === false) return
-  let 内容 = fs.readFileSync(文件路径, 'utf8')
+  let 原始内容 = fs.readFileSync(文件路径, 'utf8')
+  let 内容 = 读取环境文件明文(项目根目录, 文件路径)
   for (let [变量名, 端口] of Object.entries(端口表)) {
     内容 = 内容.replace(new RegExp(`^(${变量名}\\s*=\\s*)\\d+`, 'mu'), `$1${端口}`)
   }
-  fs.writeFileSync(文件路径, 内容)
+  let 是否加密 = /^CONFIG_ENCRYPTION\s*=\s*true\s*$/mu.test(原始内容)
+  let 输出内容 =
+    是否加密 === true ? 加密环境文本({ 项目根目录, 文件路径, 明文内容: 内容, 现有加密内容: 原始内容 }) : 内容
+  fs.writeFileSync(文件路径, 输出内容)
   console.log(`[完成] 已更新端口：${文件相对路径}`)
 }
 
@@ -143,6 +152,7 @@ export function 写入端口状态(项目根目录, 端口表) {
     status: 'configured',
     targets: ['web'],
     configureGitHubSecret: false,
+    encryptConfig: false,
     useRandomPorts: true,
     ports: null,
     renameProject: false,

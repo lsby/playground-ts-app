@@ -37,9 +37,6 @@ importers:
       '@lsby/net-core-kysely':
         specifier: ^0.6.0
         version: 0.6.0(@lsby/net-core@0.14.22(@lsby/ts-fp-data@0.2.7)(@lsby/ts-log@0.3.1(@types/node@25.0.6)(lightningcss@1.33.0))(@types/express@5.0.6)(express@5.2.1)(typescript@5.9.3)(zod@3.24.2))(@lsby/ts-fp-data@0.2.7)(@lsby/ts-kysely@0.2.10)(@types/node@25.0.6)(kysely@0.29.4)(lightningcss@1.33.0)(zod@3.24.2)
-      '@lsby/ts-env':
-        specifier: ^0.0.14
-        version: 0.0.14(@types/node@25.0.6)(lightningcss@1.33.0)
       '@lsby/ts-fp-data':
         specifier: ^0.2.7
         version: 0.2.7
@@ -1192,9 +1189,6 @@ packages:
       typescript: ^5.9.3
       zod: 3.24.2
 
-  '@lsby/ts-env@0.0.14':
-    resolution: {integrity: sha512-9Kd4fMinoBaWGiv8eBI3fQ3Hygs1ya6euK7DiNnNLgP07FB8Nag/C+uMaYgoqbay56WohZb2fWdMMo++jpAdGQ==}
-
   '@lsby/ts-fp-data@0.2.7':
     resolution: {integrity: sha512-Gex/3dX7/HgUicBtFaLlUeA8NoN4Y5m9ckFsayMkZUh/9De4/SlzCrMCXHrIYoUX8QeovApbpyWruBMEBai35Q==}
 
@@ -1206,10 +1200,6 @@ packages:
 
   '@lsby/ts-kysely@0.2.10':
     resolution: {integrity: sha512-pHXcCmp0JhD8t00LvouFX+5WRSGDm7YSajSmibXqup1eAKhcebeR4XuahKQpPBuEP/SS0az2eaW/CHCGeNkTyw==}
-
-  '@lsby/ts-log@0.0.3':
-    resolution: {integrity: sha512-ztstLQ2lXOW2QwREmknoM0wHM/G+xyKcbOwEk6vYn099R2RlXvb4ykvwPecgZC4eHp8g93HCtt2GS/Cp94mWaQ==}
-    hasBin: true
 
   '@lsby/ts-log@0.1.2':
     resolution: {integrity: sha512-uaw/L56XqE95gA0MElZHcLlQ9vQ0OpmZ71O4ARb4NljMRbsEHlouv8ZT4qpdZysPNaenV3ivFPog/qXXAsSzDA==}
@@ -6729,29 +6719,6 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@lsby/ts-env@0.0.14(@types/node@25.0.6)(lightningcss@1.33.0)':
-    dependencies:
-      '@lsby/ts-log': 0.0.3(@types/node@25.0.6)(lightningcss@1.33.0)
-      dotenv: 16.6.1
-      vitest: 2.1.9(@types/node@25.0.6)(lightningcss@1.33.0)
-      zod: 3.24.2
-    transitivePeerDependencies:
-      - '@edge-runtime/vm'
-      - '@types/node'
-      - '@vitest/browser'
-      - '@vitest/ui'
-      - happy-dom
-      - jsdom
-      - less
-      - lightningcss
-      - msw
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - supports-color
-      - terser
-
   '@lsby/ts-fp-data@0.2.7': {}
 
   '@lsby/ts-http-extend@0.3.4(@types/node@25.0.6)(lightningcss@1.33.0)':
@@ -6806,28 +6773,6 @@ snapshots:
     dependencies:
       '@lsby/ts-fp-data': 0.2.7
       kysely: 0.29.4
-
-  '@lsby/ts-log@0.0.3(@types/node@25.0.6)(lightningcss@1.33.0)':
-    dependencies:
-      debug: 4.4.3
-      vitest: 2.1.9(@types/node@25.0.6)(lightningcss@1.33.0)
-      zod: 3.24.2
-    transitivePeerDependencies:
-      - '@edge-runtime/vm'
-      - '@types/node'
-      - '@vitest/browser'
-      - '@vitest/ui'
-      - happy-dom
-      - jsdom
-      - less
-      - lightningcss
-      - msw
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - supports-color
-      - terser
 
   '@lsby/ts-log@0.1.2(@types/node@25.0.6)(lightningcss@1.33.0)':
     dependencies:

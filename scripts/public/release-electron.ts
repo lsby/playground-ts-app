@@ -4,6 +4,7 @@ import open from 'open'
 import path from 'path'
 import readline from 'readline/promises'
 import { fileURLToPath } from 'url'
+import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
 import { 写入AppPackageJson, 生成Electron便携资源, 获得Prisma迁移名称组 } from './electron-update-release'
 
 let __当前文件名 = fileURLToPath(import.meta.url)
@@ -153,8 +154,7 @@ async function 执行构建(): Promise<void> {
     if (fs.existsSync(path.dirname(appResourcesEnv)) === true) {
       环境目标路径组.push(appResourcesEnv)
     }
-    let 环境内容 = fs
-      .readFileSync(环境源文件, 'utf8')
+    let 环境内容 = 读取环境文件明文(项目根目录, 环境源文件)
       .replace(/^DB_PATH\s*=.*$/m, 'DB_PATH = "./data/db/prod-electron.db"')
       .replace(/^DB_BACKUP_PATH\s*=.*$/m, 'DB_BACKUP_PATH = "./data/backups"')
     for (let 目标目录 of 环境目标路径组) {

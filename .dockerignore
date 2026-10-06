@@ -27,8 +27,8 @@ docker-compose.yml
 *.swp
 *.swo
 .env/.env.*
-!.env/*.example
-deploy/servers.local.json
+.env/*.decode
+.project-config.key
 .setup-state.json
 
 # 忽略操作系统生成的临时文件

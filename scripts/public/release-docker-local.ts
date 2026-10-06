@@ -5,6 +5,7 @@ import inquirer from 'inquirer'
 import path from 'path'
 import { exit } from 'process'
 import { z } from 'zod'
+import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
 
 // ============= 配置区 =============
 let 推送目标列表 = [
@@ -24,9 +25,9 @@ let 项目名称 = 包信息.name.startsWith('@') === true ? 包信息.name.slic
 console.log('项目名称: %O, 项目版本: %O', 项目名称, 包信息.version)
 
 // 命令行执行函数
-function 执行命令行(命令: string, 参数: string[], 工作目录?: string): Promise<number> {
+function 执行命令行(命令: string, 参数: string[], 工作目录?: string, 环境变量?: NodeJS.ProcessEnv): Promise<number> {
   return new Promise<number>((解决, 拒绝) => {
-    let 进程 = spawn(命令, 参数, { cwd: 工作目录, stdio: 'inherit' })
+    let 进程 = spawn(命令, 参数, { cwd: 工作目录, stdio: 'inherit', env: 环境变量 ?? process.env })
 
     进程.on('close', (退出码) => {
       if (退出码 === null) {
@@ -99,7 +100,7 @@ async function 执行打包(): Promise<void> {
   let 构建参数 = [
     'build',
     '--secret',
-    `id=app_env,src=${环境文件路径}`,
+    'type=env,id=app_env,env=APP_ENV_CONTENT',
     '-t',
     `${回答.用户输入镜像名}:${包信息.version}`,
     '-f',
@@ -109,7 +110,8 @@ async function 执行打包(): Promise<void> {
   console.log('执行命令: %O %O', 'docker', 构建参数)
 
   try {
-    let 退出码 = await 执行命令行('docker', 构建参数, 项目根目录)
+    let 环境内容 = 读取环境文件明文(项目根目录, 环境文件路径)
+    let 退出码 = await 执行命令行('docker', 构建参数, 项目根目录, { ...process.env, APP_ENV_CONTENT: 环境内容 })
     console.log(`docker build 进程退出，退出码: ${退出码}`)
 
     if (退出码 === 0 && 回答.是否推送 === true && 回答.目标仓库 !== undefined) {

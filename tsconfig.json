@@ -3,6 +3,7 @@
     "src/**/*.ts",
     "test/**/*.ts",
     "scripts/**/*.ts",
+    "scripts/setup/env-crypto-core.mjs",
     "eslint.config.mjs",
     "vitest.config.ts",
     "vite.config/**/*.js"
@@ -53,7 +54,7 @@
     // "noResolve": true,                                /* Disallow 'import's, 'require's or '<reference>'s from expanding the number of files TypeScript should add to a project. */
 
     /* JavaScript Support */
-    // "allowJs": true,                                  /* Allow JavaScript files to be a part of your program. Use the 'checkJS' option to get errors from these files. */
+    "allowJs": true /* Emit the shared preinstall/runtime encryption core. */,
     // "checkJs": true,                                  /* Enable error reporting in type-checked JavaScript files. */
     // "maxNodeModuleJsDepth": 1,                        /* Specify the maximum folder depth used for checking JavaScript files from 'node_modules'. Only applicable with 'allowJs'. */
 

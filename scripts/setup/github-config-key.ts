@@ -5,9 +5,9 @@ import path from 'path'
 import { z } from 'zod'
 
 let 项目根目录 = path.resolve(import.meta.dirname, '../..')
-let 环境文件相对路径 = '.env/.env.production.electron'
-let 环境文件路径 = path.resolve(项目根目录, 环境文件相对路径)
-let Secret名称 = 'ELECTRON_ENV_FILE'
+let 密钥文件相对路径 = '.project-config.key'
+let 密钥文件路径 = path.resolve(项目根目录, 密钥文件相对路径)
+let Secret名称 = 'PROJECT_CONFIG_KEY_FILE'
 let 仓库信息模式 = z.object({ nameWithOwner: z.string().min(1), url: z.string().url() }).passthrough()
 type 仓库信息 = z.infer<typeof 仓库信息模式>
 
@@ -27,26 +27,26 @@ function 打印手动配置说明(仓库: 仓库信息 | null): void {
   console.error('\n自动配置失败，请手动添加 GitHub Actions Secret：')
   console.error(`- 仓库: ${仓库名称}`)
   console.error(`- Secret 名称: ${Secret名称}`)
-  console.error(`- Secret 内容来源: ${环境文件相对路径} 的完整原始内容`)
+  console.error(`- Secret 内容来源: ${密钥文件相对路径} 的完整原始内容`)
   console.error(`- 页面: ${设置地址}`)
   console.error('\nPowerShell:')
-  console.error(`Get-Content -Raw ${环境文件相对路径} | gh secret set ${Secret名称} --repo ${仓库名称}`)
+  console.error(`Get-Content -Raw ${密钥文件相对路径} | gh secret set ${Secret名称} --repo ${仓库名称}`)
   console.error('\nBash:')
-  console.error(`gh secret set ${Secret名称} --repo ${仓库名称} < ${环境文件相对路径}`)
+  console.error(`gh secret set ${Secret名称} --repo ${仓库名称} < ${密钥文件相对路径}`)
 }
 
 async function 主函数(): Promise<void> {
   let 仓库: 仓库信息 | null = null
   try {
-    if (fs.existsSync(环境文件路径) === false || fs.statSync(环境文件路径).isFile() === false) {
-      throw new Error(`找不到环境文件: ${环境文件相对路径}`)
+    if (fs.existsSync(密钥文件路径) === false || fs.statSync(密钥文件路径).isFile() === false) {
+      throw new Error(`找不到项目配置密钥: ${密钥文件相对路径}`)
     }
     执行gh并读取输出(['--version'])
     执行gh并读取输出(['auth', 'status'])
     仓库 = 仓库信息模式.parse(JSON.parse(执行gh并读取输出(['repo', 'view', '--json', 'nameWithOwner,url'])))
     console.log(`目标仓库: ${仓库.nameWithOwner}`)
     console.log(`Secret 名称: ${Secret名称}`)
-    console.log(`内容来源: ${环境文件相对路径}`)
+    console.log(`内容来源: ${密钥文件相对路径}`)
 
     if (process.argv.slice(2).includes('--yes') === false) {
       if (process.stdin.isTTY !== true) {
@@ -58,7 +58,7 @@ async function 主函数(): Promise<void> {
         {
           type: 'confirm',
           name: '确认',
-          message: '是否将该环境文件完整写入目标仓库的 Actions Secret?',
+          message: '是否将项目配置密钥完整写入目标仓库的 Actions Secret?',
           default: false,
         },
       ])
@@ -71,7 +71,7 @@ async function 主函数(): Promise<void> {
     let 写入结果 = crossSpawn.sync('gh', ['secret', 'set', Secret名称, '--repo', 仓库.nameWithOwner], {
       cwd: 项目根目录,
       encoding: 'utf8',
-      input: fs.readFileSync(环境文件路径, 'utf8'),
+      input: fs.readFileSync(密钥文件路径, 'utf8'),
       stdio: ['pipe', 'inherit', 'inherit'],
     })
     if (写入结果.error instanceof Error) throw 写入结果.error

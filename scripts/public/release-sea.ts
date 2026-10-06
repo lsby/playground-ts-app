@@ -3,6 +3,7 @@ import fs from 'fs'
 import open from 'open'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
 
 let __当前文件名 = fileURLToPath(import.meta.url)
 let __当前目录名 = path.dirname(__当前文件名)
@@ -154,7 +155,7 @@ async function 执行构建(): Promise<void> {
     // 复制环境变量并修改为 sea 模式
     let 环境目标目录 = path.join(发布目录, '.env')
     确保目录存在(环境目标目录)
-    let 环境变量内容 = fs.readFileSync(环境源文件, 'utf-8')
+    let 环境变量内容 = 读取环境文件明文(项目根目录, 环境源文件)
     fs.writeFileSync(path.join(环境目标目录, 打包环境文件名), 环境变量内容)
 
     console.log('[9/9] 正在生成启动脚本...')

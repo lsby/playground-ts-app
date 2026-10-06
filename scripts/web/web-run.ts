@@ -1,8 +1,9 @@
 import type { ChildProcess } from 'child_process'
 import crossSpawn from 'cross-spawn'
-import { config } from 'dotenv'
+import dotenv from 'dotenv'
 import { readdirSync, writeFileSync } from 'fs'
 import path from 'path'
+import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
 import { ParcelWorker入口, ParcelWorker选项 } from '../task/model/task-common'
 
 function getHtmlEntries(directory: string): string[] {
@@ -19,7 +20,11 @@ if (envFile === undefined) {
   console.error('未提供 ENV_FILE_PATH 环境变量！为了避免前端打包到错误的配置，必须指定配置文件。')
   process.exit(1)
 }
-config({ path: envFile })
+let 项目根目录 = path.resolve(import.meta.dirname, '../..')
+let 已解密变量 = dotenv.parse(读取环境文件明文(项目根目录, envFile))
+for (let [名称, 值] of Object.entries(已解密变量)) {
+  if (process.env[名称] === undefined) process.env[名称] = 值
+}
 
 // 根据 APP_PORT 动态写入 .proxyrc.json 供 Parcel 代理使用
 let appPort = process.env['APP_PORT'] ?? '3000'
