@@ -133,17 +133,17 @@
 
 ### 纯前端
 
-- **核心规范与架构设计**: 纯前端 (Pure Frontend) 的核心组件（API Worker, SQLite Worker, IndexedDB 持久化）、生成与配置、以及并发锁机制等详细设计规范，请参见 [doc/framework/pure-frontend.md](file:///d:/Code/playground-ts-app/doc/framework/pure-frontend.md)。
+- **核心规范与架构设计**: 纯前端 (Pure Frontend) 的核心组件（API Worker, SQLite Worker, IndexedDB 持久化）、生成与配置、以及并发锁机制等详细设计规范，请参见 [doc/framework/pure-frontend.md](doc/framework/pure-frontend.md)。
 - **注意**: 纯前端标注的接口会在本地浏览器运行，开发时必须运行完整的 `npm run task -- dev:pure-frontend` 以监听派生文件的更新。
 
 ### 本地优先
 
-- **核心规范与架构设计**: 本地优先 (Local-First) 的核心概念（基线与当前双库、字段级三方合并）、同步协议、生命周期以及离线保证等详细设计规范，请参见 [doc/framework/local-first.md](file:///d:/Code/playground-ts-app/doc/framework/local-first.md)。
+- **核心规范与架构设计**: 本地优先 (Local-First) 的核心概念（基线与当前双库、字段级三方合并）、同步协议、生命周期以及离线保证等详细设计规范，请参见 [doc/framework/local-first.md](doc/framework/local-first.md)。
 - **注意**: 进行本地优先的业务开发或维护时，**必须**完整阅读并遵循上述文档中的同步边界与并发排他保护机制。
 
 ### 样例模式
 
-- **规范与最佳实践**: 样例模式的设计哲学、编写原则（坚持硬编码、杜绝过度设计、容忍联动断裂）以及运行机制，请参见 [doc/framework/sample-mode.md](file:///d:/Code/playground-ts-app/doc/framework/sample-mode.md)。
+- **规范与最佳实践**: 样例模式的设计哲学、编写原则（坚持硬编码、杜绝过度设计、容忍联动断裂）以及运行机制，请参见 [doc/framework/sample-mode.md](doc/framework/sample-mode.md)。
 
 ### 任务系统
 
@@ -222,7 +222,7 @@
 ### 部署与发布追溯
 
 - **发布产物源码追溯与 Docker 远程部署**: 
-  - 关于发布任务中 Git 状态拦截、Docker 自动化安全部署机制、以及手动运维流程（如数据库迁移冲突处理），请参见 [doc/framework/deploy-and-release.md](file:///d:/Code/playground-ts-app/doc/framework/deploy-and-release.md)。
+  - 关于发布任务中 Git 状态拦截、Docker 自动化安全部署机制、以及手动运维流程（如数据库迁移冲突处理），请参见 [doc/framework/deploy-and-release.md](doc/framework/deploy-and-release.md)。
   - 若需执行部署或遇到远程发布问题，**必须**优先参考上述部署指南。
 
 ## 测试与质量保证
@@ -232,7 +232,7 @@
 - **策略与理念**:
   - 除非用户在交互中明确要求, 否则禁止擅自去补齐或新增测试代码, 并不是所有修改都有写测试的价值, 可以询问用户, 但应该让用户决定
   - 所有测试默认均会生成格式化测试报告, 统一输出在 `test-outputs/` 目录下, 并在运行结束时在控制台输出可直接点击的报告链接
-- **各级测试规范**: 关于单元测试、集成测试、端到端测试及需求测试的目录约定、运行命令和详细规范，请统一参阅 [doc/framework/testing.md](file:///d:/Code/playground-ts-app/doc/framework/testing.md)。
+- **各级测试规范**: 关于单元测试、集成测试、端到端测试及需求测试的目录约定、运行命令和详细规范，请统一参阅 [doc/framework/testing.md](doc/framework/testing.md)。
 
 ### 修改完成后的验证
 
