@@ -2,6 +2,7 @@ import { 浮层管理器, type 浮层句柄 } from '../../../global/manager/over
 import { 是中止错误 } from '../../../global/tools/abort'
 import { 创建元素, 应用宿主样式, 应用样式 } from '../../../global/tools/create-element'
 import { 增强样式类型 } from '../../../global/types/style'
+import { 创建图标 } from '../base/icon'
 import { 获得表单控件基础样式 } from './control-style'
 import { 表单组件基类 } from './form'
 import { 同步表单控件校验状态 } from './form-accessibility'
@@ -33,6 +34,7 @@ export class 组合框 extends 表单组件基类<组合框事件, {}, string> {
   private 全部选项: 组合框选项[]
   private 当前选项: 组合框选项[] = []
   private 输入元素?: HTMLInputElement
+  private 箭头元素?: SVGSVGElement
   private 面板元素?: HTMLDivElement
   private 选项元素列表: HTMLDivElement[] = []
   private 活动索引 = -1
@@ -55,12 +57,13 @@ export class 组合框 extends 表单组件基类<组合框事件, {}, string> {
       placeholder: this.配置.占位符 ?? '请输入关键字',
       disabled: this.配置.禁用 ?? false,
       autocomplete: 'off',
-      style: { ...this.获得输入样式(), ...this.配置.元素样式 },
+      style: { ...this.获得输入样式(), paddingRight: '36px', ...this.配置.元素样式 },
     })
     输入.setAttribute('role', 'combobox')
     输入.setAttribute('aria-autocomplete', 'list')
     输入.setAttribute('aria-expanded', 'false')
     输入.setAttribute('aria-controls', this.面板标识)
+    输入.setAttribute('aria-haspopup', 'listbox')
     if (this.配置.可访问名称 !== undefined) 输入.setAttribute('aria-label', this.配置.可访问名称)
 
     let 面板 = 创建元素('div', {
@@ -83,9 +86,18 @@ export class 组合框 extends 表单组件基类<组合框事件, {}, string> {
     })
     面板.setAttribute('popover', 'manual')
     面板.setAttribute('aria-label', `${this.配置.可访问名称 ?? '可搜索选择'}选项`)
+    let 箭头 = 创建图标('chevron-down', 14)
+    箭头.style.position = 'absolute'
+    箭头.style.right = '12px'
+    箭头.style.top = '50%'
+    箭头.style.transform = 'translateY(-50%)'
+    箭头.style.transition = 'transform var(--动画-正常)'
+    箭头.style.pointerEvents = 'none'
+    箭头.style.color = 'var(--次要文字颜色)'
     let 容器 = 创建元素('div', { style: { position: 'relative' } })
-    容器.append(输入, 面板)
+    容器.append(输入, 箭头, 面板)
     this.输入元素 = 输入
+    this.箭头元素 = 箭头
     this.面板元素 = 面板
     this.shadow.append(容器)
     this.同步显示文本()
@@ -143,7 +155,14 @@ export class 组合框 extends 表单组件基类<组合框事件, {}, string> {
   private 绑定事件(输入: HTMLInputElement): void {
     输入.onfocus = (): void => {
       this.派发事件('焦点', undefined)
-      this.安全执行(async (): Promise<void> => await this.执行查询(输入.value, false))
+      window.setTimeout((): void => 输入.select())
+      this.安全执行(async (): Promise<void> => await this.执行查询('', false))
+    }
+    输入.onclick = (): void => {
+      if (this.浮层句柄 !== null) return
+      let 选中项 = [...this.全部选项, ...this.当前选项].find((选项): boolean => 选项.值 === this.获得值())
+      if (选中项?.文本 === 输入.value) 输入.select()
+      this.安全执行(async (): Promise<void> => await this.执行查询('', false))
     }
     输入.oninput = (): void => {
       this.派发事件('搜索', 输入.value)
@@ -210,7 +229,14 @@ export class 组合框 extends 表单组件基类<组合框事件, {}, string> {
       })
       元素.setAttribute('aria-selected', 选项.值 === this.获得值() ? 'true' : 'false')
       元素.setAttribute('aria-disabled', 选项.禁用 === true ? 'true' : 'false')
+      元素.style.backgroundColor = 选项.值 === this.获得值() ? 'var(--主色调-极淡)' : 'transparent'
       元素.onpointerdown = (event: PointerEvent): void => event.preventDefault()
+      元素.onpointerenter = (): void => {
+        if (选项.禁用 !== true) 元素.style.backgroundColor = 'var(--选中背景颜色)'
+      }
+      元素.onpointerleave = (): void => {
+        元素.style.backgroundColor = 选项.值 === this.获得值() ? 'var(--主色调-极淡)' : 'transparent'
+      }
       元素.onclick = (): void => {
         if (选项.禁用 !== true) this.选择项(选项)
       }
@@ -243,7 +269,7 @@ export class 组合框 extends 表单组件基类<组合框事件, {}, string> {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       if (this.浮层句柄 === null) {
-        this.安全执行(async (): Promise<void> => await this.执行查询(this.输入元素?.value ?? '', false))
+        this.安全执行(async (): Promise<void> => await this.执行查询('', false))
         return
       }
       this.移动活动选项(event.key === 'ArrowDown' ? 1 : -1)
@@ -265,7 +291,9 @@ export class 组合框 extends 表单组件基类<组合框事件, {}, string> {
     }
     this.活动索引 = 索引
     this.选项元素列表.forEach((元素, 当前索引): void => {
-      元素.style.backgroundColor = 当前索引 === 索引 ? 'var(--选中背景颜色)' : 'transparent'
+      let 选项 = this.当前选项[当前索引]
+      元素.style.backgroundColor =
+        当前索引 === 索引 ? 'var(--选中背景颜色)' : 选项?.值 === this.获得值() ? 'var(--主色调-极淡)' : 'transparent'
     })
     let 活动元素 = this.选项元素列表[索引]
     if (活动元素 !== undefined) {
@@ -291,16 +319,20 @@ export class 组合框 extends 表单组件基类<组合框事件, {}, string> {
       附加内部元素: [this.输入元素],
       外部关闭: '任意外部',
       允许Escape关闭: true,
+      初始焦点: this.输入元素,
+      关闭后恢复焦点: false,
       位置更新: (): void => this.更新面板位置(),
       请求关闭: async (): Promise<void> => await this.关闭面板(),
     })
     this.输入元素.setAttribute('aria-expanded', 'true')
+    if (this.箭头元素 !== undefined) this.箭头元素.style.transform = 'translateY(-50%) rotate(180deg)'
     this.更新面板位置()
   }
 
   private async 关闭面板(): Promise<void> {
     this.输入元素?.setAttribute('aria-expanded', 'false')
     this.输入元素?.removeAttribute('aria-activedescendant')
+    if (this.箭头元素 !== undefined) this.箭头元素.style.transform = 'translateY(-50%)'
     let 句柄 = this.浮层句柄
     this.浮层句柄 = null
     await 句柄?.关闭()

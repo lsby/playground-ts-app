@@ -10,6 +10,7 @@ export type 浮层选项 = {
   允许Escape关闭?: boolean
   外部关闭?: 外部关闭策略
   初始焦点?: HTMLElement
+  关闭后恢复焦点?: boolean
   请求关闭?: () => void | Promise<void>
   挂载方式?: 浮层挂载方式
   附加内部元素?: readonly HTMLElement[]
@@ -85,7 +86,7 @@ class 浮层管理器类 {
     } else 记录.根元素.remove()
     this.同步页面滚动()
     this.同步背景可交互性()
-    if (是顶层 === true && 记录.原焦点?.isConnected === true) 记录.原焦点.focus()
+    if (是顶层 === true && 记录.关闭后恢复焦点 !== false && 记录.原焦点?.isConnected === true) 记录.原焦点.focus()
   }
 
   public async 请求关闭(id: number): Promise<void> {

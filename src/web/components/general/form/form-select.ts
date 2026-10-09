@@ -46,13 +46,24 @@ abstract class 下拉框基类 extends 表单组件基类<下拉框事件, 监�
     if (this.配置.可访问名称 !== undefined) 下拉框元素.setAttribute('aria-label', this.配置.可访问名称)
 
     if (this.配置.占位符 !== undefined) {
-      let 占位符选项 = 创建元素('option', { value: '', textContent: this.配置.占位符, disabled: true, selected: true })
+      let 占位符选项 = 创建元素('option', {
+        value: '',
+        textContent: this.配置.占位符,
+        disabled: true,
+        selected: true,
+        style: { backgroundColor: 'var(--输入框背景)', color: 'var(--次要文字颜色)' },
+      })
       下拉框元素.appendChild(占位符选项)
     }
 
     if (this.配置.选项列表 !== undefined) {
       for (let 选项 of this.配置.选项列表) {
-        let 选项元素 = 创建元素('option', { value: 选项.值, textContent: 选项.文本, disabled: 选项.禁用 ?? false })
+        let 选项元素 = 创建元素('option', {
+          value: 选项.值,
+          textContent: 选项.文本,
+          disabled: 选项.禁用 ?? false,
+          style: { backgroundColor: 'var(--输入框背景)', color: 'var(--文字颜色)' },
+        })
         下拉框元素.appendChild(选项元素)
       }
     }
@@ -138,11 +149,17 @@ abstract class 下拉框基类 extends 表单组件基类<下拉框事件, 监�
           textContent: this.配置.占位符,
           disabled: true,
           selected: true,
+          style: { backgroundColor: 'var(--输入框背景)', color: 'var(--次要文字颜色)' },
         })
         this.下拉框元素.appendChild(占位符选项)
       }
       for (let 选项 of 选项列表) {
-        let 选项元素 = 创建元素('option', { value: 选项.值, textContent: 选项.文本, disabled: 选项.禁用 ?? false })
+        let 选项元素 = 创建元素('option', {
+          value: 选项.值,
+          textContent: 选项.文本,
+          disabled: 选项.禁用 ?? false,
+          style: { backgroundColor: 'var(--输入框背景)', color: 'var(--文字颜色)' },
+        })
         this.下拉框元素.appendChild(选项元素)
       }
       let 保留原值 = 原值 !== '' && 选项列表.some((选项): boolean => 选项.值 === 原值 && 选项.禁用 !== true)
