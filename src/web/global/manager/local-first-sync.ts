@@ -25,6 +25,7 @@ export async function 强制重建本地优先数据(拉取快照: () => Promise
     } catch {
       旧状态 = undefined
     }
+    终止纯前端Worker()
     await 采用本地优先权威快照(快照, true)
     let 状态 = 读取本地优先状态(快照.userId)
     if (状态 === undefined) throw new Error('远程重建完成后未找到本地优先状态')

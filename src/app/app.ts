@@ -87,7 +87,7 @@ class App {
 
             return new Right({ filePath: 文件路径 })
           }),
-          new 静态文件返回器({}),
+          new 静态文件返回器({ MIME类型映射: { '.wasm': 'application/wasm' } }),
         ),
         new 接口(
           new RegExp('/.*'),
@@ -111,7 +111,7 @@ class App {
 
             return new Right({ filePath: 文件路径 })
           }),
-          new 静态文件返回器({}),
+          new 静态文件返回器({ MIME类型映射: { '.wasm': 'application/wasm' } }),
         ),
       ],
       端口: 环境变量.APP_PORT,

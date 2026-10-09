@@ -12,6 +12,8 @@ import { 是中止错误, 等待可取消任务 } from '../tools/abort'
 import { 脱敏请求头, 获得请求体摘要, 获得错误摘要 } from './api-log'
 import { 是标准接口响应, 解析接口响应 } from './api-response'
 import { 本地优先初始化恢复器 } from './local-first-auto-recovery'
+import { 本地优先远程不可用错误, 本地优先远程同步错误 } from './local-first-error'
+import { 恢复远程只读同步数据 } from './local-first-snapshot'
 import {
   停用本地优先状态,
   本地优先同步失败处理器,
@@ -107,12 +109,14 @@ export class API管理器类 {
   }
 
   public 设置token(token: string): Promise<void> {
+    终止纯前端Worker()
     this.token = token
     localStorage.setItem(this.本地存储名称, token)
     if (环境变量.BUILD_TARGET !== 'pure-frontend') 停用本地优先状态()
     return Promise.resolve()
   }
   public 清除token(): Promise<void> {
+    终止纯前端Worker()
     this.token = null
     localStorage.removeItem(this.本地存储名称)
     停用本地优先状态()
@@ -226,6 +230,7 @@ export class API管理器类 {
             await 验证本地优先数据库(最终数据库)
           }
 
+          最终数据库 = 恢复远程只读同步数据(远程快照.database, 最终数据库)
           let 提交结果 = await this.提交本地优先快照(远程快照, 最终数据库)
           if (提交结果 === 'REMOTE_DATA_CHANGED') continue
           await 采用本地优先权威快照(提交结果)
@@ -357,13 +362,28 @@ export class API管理器类 {
   private async 请求远程同步接口(路径: string, 参数: object): Promise<{ status: string; data: unknown }> {
     let 头: Record<string, string> = { 'Content-Type': 'application/json' }
     if (this.token !== null) 头['authorization'] = `Bearer ${this.token}`
-    let 请求结果 = await web请求({ url: API前缀 + 路径, body: JSON.stringify(参数), headers: 头, method: 'POST' })
+    let 请求结果: string
+    try {
+      请求结果 = await web请求({ url: API前缀 + 路径, body: JSON.stringify(参数), headers: 头, method: 'POST' })
+    } catch (错误) {
+      throw new 本地优先远程不可用错误('无法连接本地优先同步服务', { cause: 错误 })
+    }
     return 解析接口响应(JSON.parse(请求结果))
   }
 
   private async 拉取本地优先快照(): Promise<同步快照> {
     let 结果 = await this.请求远程同步接口('/api/system/local-first/pull', {})
-    if (结果.status !== 'success') throw new Error(`后到前同步失败: ${JSON.stringify(结果.data)}`)
+    if (结果.status !== 'success') {
+      let 错误 = z
+        .object({
+          code: z.enum(['NOT_LOGGED_IN', 'SCHEMA_MISMATCH', 'REMOTE_DATA_CHANGED', 'INVALID_SYNC_DATABASE']),
+          message: z.string(),
+        })
+        .strict()
+        .safeParse(结果.data)
+      if (错误.success === true) throw new 本地优先远程同步错误(错误.data.code, 错误.data.message)
+      throw new Error(`后到前同步失败: ${JSON.stringify(结果.data)}`)
+    }
     return 同步快照模式.parse(结果.data)
   }
 
@@ -374,8 +394,17 @@ export class API管理器类 {
       database: 数据库,
     })
     if (结果.status === 'success') return 同步快照模式.parse(结果.data)
-    let 错误代码 = z.object({ code: z.string(), message: z.string() }).strict().safeParse(结果.data)
-    if (错误代码.success === true && 错误代码.data.code === 'REMOTE_DATA_CHANGED') return 'REMOTE_DATA_CHANGED'
+    let 错误代码 = z
+      .object({
+        code: z.enum(['NOT_LOGGED_IN', 'SCHEMA_MISMATCH', 'REMOTE_DATA_CHANGED', 'INVALID_SYNC_DATABASE']),
+        message: z.string(),
+      })
+      .strict()
+      .safeParse(结果.data)
+    if (错误代码.success === true) {
+      if (错误代码.data.code === 'REMOTE_DATA_CHANGED') return 'REMOTE_DATA_CHANGED'
+      throw new 本地优先远程同步错误(错误代码.data.code, 错误代码.data.message)
+    }
     throw new Error(`前到后同步失败: ${JSON.stringify(结果.data)}`)
   }
 
