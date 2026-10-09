@@ -65,6 +65,7 @@ export async function 执行数据库预演与准备(参数: 执行数据库预�
   let 时间戳 = new Date().toISOString().replace(/[:.]/g, '-')
   let 备份路径 = 远程数据库路径.replace(/\.db$/, `.${时间戳}.bak.db`)
   let 已发起停机 = false
+  let 备份已完成 = false
   try {
     // 2. 优雅停止旧服务，防止预演与正式迁移期间产生并发写入
     if (旧服务运行中 === true) {
@@ -81,16 +82,17 @@ export async function 执行数据库预演与准备(参数: 执行数据库预�
     日志.打印(`📦 正在自动创建数据库基线备份: ${path.posix.basename(备份路径)}`)
     let 备份命令 = [
       `cp -- ${转义PosixShell参数(远程数据库路径)} ${转义PosixShell参数(备份路径)}`,
-      `[ ! -f ${转义PosixShell参数(`${远程数据库路径}-wal`)} ] || cp -- ${转义PosixShell参数(`${远程数据库路径}-wal`)} ${转义PosixShell参数(`${备份路径}-wal`)}`,
-      `[ ! -f ${转义PosixShell参数(`${远程数据库路径}-shm`)} ] || cp -- ${转义PosixShell参数(`${远程数据库路径}-shm`)} ${转义PosixShell参数(`${备份路径}-shm`)}`,
+      `if [ -f ${转义PosixShell参数(`${远程数据库路径}-wal`)} ]; then cp -- ${转义PosixShell参数(`${远程数据库路径}-wal`)} ${转义PosixShell参数(`${备份路径}-wal`)}; fi`,
+      `if [ -f ${转义PosixShell参数(`${远程数据库路径}-shm`)} ]; then cp -- ${转义PosixShell参数(`${远程数据库路径}-shm`)} ${转义PosixShell参数(`${备份路径}-shm`)}; fi`,
     ].join(' && ')
     await 执行远程命令(sshClient, 备份命令)
+    备份已完成 = true
 
     // 4. 创建沙箱预演临时副本
     let 预演副本命令 = [
       `cp -- ${转义PosixShell参数(远程数据库路径)} ${转义PosixShell参数(预演数据库路径)}`,
-      `[ ! -f ${转义PosixShell参数(`${远程数据库路径}-wal`)} ] || cp -- ${转义PosixShell参数(`${远程数据库路径}-wal`)} ${转义PosixShell参数(`${预演数据库路径}-wal`)}`,
-      `[ ! -f ${转义PosixShell参数(`${远程数据库路径}-shm`)} ] || cp -- ${转义PosixShell参数(`${远程数据库路径}-shm`)} ${转义PosixShell参数(`${预演数据库路径}-shm`)}`,
+      `if [ -f ${转义PosixShell参数(`${远程数据库路径}-wal`)} ]; then cp -- ${转义PosixShell参数(`${远程数据库路径}-wal`)} ${转义PosixShell参数(`${预演数据库路径}-wal`)}; fi`,
+      `if [ -f ${转义PosixShell参数(`${远程数据库路径}-shm`)} ]; then cp -- ${转义PosixShell参数(`${远程数据库路径}-shm`)} ${转义PosixShell参数(`${预演数据库路径}-shm`)}; fi`,
     ].join(' && ')
     await 执行远程命令(sshClient, 预演副本命令)
 
@@ -110,6 +112,13 @@ export async function 执行数据库预演与准备(参数: 执行数据库预�
     return { 数据库备份: { 备份路径, 数据库路径: 远程数据库路径 }, 旧服务运行中 }
   } catch (预演错误) {
     日志.打印(`💥 数据库安全预演或准备失败，发布已终止。`)
+    if (备份已完成 === false) {
+      await 执行远程命令(
+        sshClient,
+        `rm -f -- ${转义PosixShell参数(备份路径)} ${转义PosixShell参数(`${备份路径}-wal`)} ${转义PosixShell参数(`${备份路径}-shm`)}`,
+        { 打印输出: false, 抛出错误: false },
+      )
+    }
     if (旧服务运行中 === true && 已发起停机 === true) {
       try {
         日志.打印(`🔄 正在恢复并验证旧服务...`)
@@ -144,8 +153,8 @@ export async function 恢复数据库基线备份(
     `cp -- ${转义PosixShell参数(备份路径)} ${转义PosixShell参数(临时恢复路径)}`,
     `rm -f -- ${转义PosixShell参数(`${数据库路径}-wal`)} ${转义PosixShell参数(`${数据库路径}-shm`)}`,
     `mv -f -- ${转义PosixShell参数(临时恢复路径)} ${转义PosixShell参数(数据库路径)}`,
-    `[ ! -f ${转义PosixShell参数(`${备份路径}-wal`)} ] || cp -- ${转义PosixShell参数(`${备份路径}-wal`)} ${转义PosixShell参数(`${数据库路径}-wal`)}`,
-    `[ ! -f ${转义PosixShell参数(`${备份路径}-shm`)} ] || cp -- ${转义PosixShell参数(`${备份路径}-shm`)} ${转义PosixShell参数(`${数据库路径}-shm`)}`,
+    `if [ -f ${转义PosixShell参数(`${备份路径}-wal`)} ]; then cp -- ${转义PosixShell参数(`${备份路径}-wal`)} ${转义PosixShell参数(`${数据库路径}-wal`)}; fi`,
+    `if [ -f ${转义PosixShell参数(`${备份路径}-shm`)} ]; then cp -- ${转义PosixShell参数(`${备份路径}-shm`)} ${转义PosixShell参数(`${数据库路径}-shm`)}; fi`,
   ].join(' && ')
   await 执行远程命令(sshClient, 恢复命令)
 }

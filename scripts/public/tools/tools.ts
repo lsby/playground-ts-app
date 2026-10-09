@@ -212,6 +212,30 @@ export async function 清理旧镜像(
   }
 }
 
+export async function 准备Docker构建空间(ssh: NodeSSH, 检查路径: string, 日志: 日志类): Promise<void> {
+  let 构建缓存保留字节数 = 10 * 1024 * 1024 * 1024
+  let 最小可用千字节数 = 5 * 1024 * 1024
+  日志.打印(`🧹 正在清理超出 10 GiB 的未使用 Docker 构建缓存...`)
+  await 执行远程命令(ssh, `docker builder prune -af --keep-storage ${String(构建缓存保留字节数)}`, { 打印输出: false })
+
+  let 空间结果 = await 执行远程命令(ssh, `df -Pk -- ${转义PosixShell参数(检查路径)} | awk 'NR == 2 { print $4 }'`, {
+    打印输出: false,
+  })
+  let 可用千字节文本 = 空间结果.stdout.trim()
+  if (/^\d+$/u.test(可用千字节文本) === false) {
+    throw new Error(`无法解析远程磁盘可用空间: ${可用千字节文本}`)
+  }
+  let 可用千字节数 = Number.parseInt(可用千字节文本, 10)
+  if (Number.isSafeInteger(可用千字节数) === false) {
+    throw new Error(`远程磁盘可用空间超出安全整数范围: ${可用千字节文本}`)
+  }
+  let 可用GiB = 可用千字节数 / 1024 / 1024
+  if (可用千字节数 < 最小可用千字节数) {
+    throw new Error(`远程磁盘空间不足，构建前至少需要 5 GiB，当前仅剩 ${可用GiB.toFixed(2)} GiB`)
+  }
+  日志.打印(`✅ 远程磁盘空间检查通过，当前可用 ${可用GiB.toFixed(2)} GiB。`)
+}
+
 export async function 执行远程命令(
   ssh: NodeSSH,
   命令: string,

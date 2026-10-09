@@ -12,6 +12,7 @@ import { 执行数据库同步 } from './tools/database-sync'
 import { 日志类 } from './tools/model'
 import {
   上传文件,
+  准备Docker构建空间,
   压缩项目,
   执行远程命令,
   检查远程删除目标,
@@ -207,6 +208,10 @@ async function 主函数(): Promise<void> {
         ? path.posix.resolve(远程项目根目录, 'run', 环境)
         : path.posix.resolve(远程项目根目录, 'run')
     let 远程运行部署目录: string = path.posix.resolve(远程运行目录, 'deploy')
+
+    if (['build', 'run', 'redeploy'].includes(模式)) {
+      await 准备Docker构建空间(sshClient, 远程部署根目录, 日志)
+    }
 
     日志.打印(`📂 远程路径初始化完成:`)
     日志.打印(`- 远程部署根目录: ${远程部署根目录}`)
