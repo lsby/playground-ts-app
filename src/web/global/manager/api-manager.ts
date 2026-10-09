@@ -11,6 +11,7 @@ import { 错误提示 } from '../manager/toast-manager'
 import { 是中止错误, 等待可取消任务 } from '../tools/abort'
 import { 脱敏请求头, 获得请求体摘要, 获得错误摘要 } from './api-log'
 import { 是标准接口响应, 解析接口响应 } from './api-response'
+import { 本地优先初始化恢复器 } from './local-first-auto-recovery'
 import {
   停用本地优先状态,
   本地优先同步失败处理器,
@@ -95,6 +96,10 @@ export class API管理器类 {
   private 本地存储名称 = `${项目标识}-api-token`
   private token: string | null = null
   private 本地优先同步任务: Promise<void | string> | undefined
+  private 初始化恢复器 = new 本地优先初始化恢复器(
+    (): Promise<void | string> | undefined => this.本地优先同步任务,
+    async (): Promise<同步快照> => await this.拉取本地优先快照(),
+  )
 
   public constructor() {
     let storedToken = localStorage.getItem(this.本地存储名称)
@@ -250,7 +255,7 @@ export class API管理器类 {
     try {
       let 浏览器支持 = 获得接口浏览器支持(完整路径, 'GET')
       if (环境变量.BUILD_TARGET === 'pure-frontend' || (浏览器支持 === '本地优先' && this.token !== null)) {
-        await this.确保本地优先已初始化()
+        await this.初始化恢复器.确保已初始化()
         if (正在执行本地优先同步 === true) throw new Error('同步期间不能调用本地优先接口')
         let 响应 = await 使用纯前端数据库锁(() =>
           请求纯前端Worker响应(添加本地优先上下文({ path: 完整路径, headers: 头, method: 'GET', body: '' })),
@@ -349,14 +354,6 @@ export class API管理器类 {
     )) as 已审阅的any
   }
 
-  private async 确保本地优先已初始化(): Promise<void> {
-    if (环境变量.BUILD_TARGET === 'pure-frontend') return
-    let 同步任务 = this.本地优先同步任务
-    if (同步任务 !== undefined) await 同步任务
-    if (读取本地优先状态() === undefined)
-      throw new Error('本地优先数据库尚未初始化，请先显式调用 API管理器.本地优先同步')
-  }
-
   private async 请求远程同步接口(路径: string, 参数: object): Promise<{ status: string; data: unknown }> {
     let 头: Record<string, string> = { 'Content-Type': 'application/json' }
     if (this.token !== null) 头['authorization'] = `Bearer ${this.token}`
@@ -447,7 +444,7 @@ export class API管理器类 {
       // console.log('请求:\n路径: %o\n头: %o\n方法: %o\nbody: %o\n结果: %o', 接口路径, 头, 方法, body, 请求结果)
       let 浏览器支持 = 获得接口浏览器支持(接口路径, 方法)
       if (环境变量.BUILD_TARGET === 'pure-frontend' || (浏览器支持 === '本地优先' && this.token !== null)) {
-        await this.确保本地优先已初始化()
+        await this.初始化恢复器.确保已初始化()
         if (正在执行本地优先同步 === true) throw new Error('同步期间不能调用本地优先接口')
         return await 等待可取消任务(请求纯前端接口(接口路径, 头, 方法, body), 请求选项?.信号)
       }

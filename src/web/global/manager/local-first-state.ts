@@ -70,6 +70,15 @@ export function 写入本地优先状态(状态: 本地优先状态, 允许重�
   sessionStorage.setItem(当前标签页用户键, 已校验状态.userId)
 }
 
+export function 激活本地优先状态(用户id: string): boolean {
+  if (读取本地优先状态表()[用户id] === undefined) {
+    sessionStorage.removeItem(当前标签页用户键)
+    return false
+  }
+  sessionStorage.setItem(当前标签页用户键, 用户id)
+  return true
+}
+
 export function 删除本地优先状态(用户id: string): void {
   let 状态表 = 读取本地优先状态表()
   delete 状态表[用户id]

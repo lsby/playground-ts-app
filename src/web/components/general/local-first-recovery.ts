@@ -6,7 +6,7 @@ type 恢复入口配置 = {
   错误: unknown
   重试: () => Promise<void>
   恢复成功: () => void | Promise<void>
-  放弃本地数据后?: (用户id: string) => void | Promise<void>
+  重建本地数据后?: (用户id: string) => void | Promise<void>
 }
 
 function 获得错误详情(错误: unknown): string {
@@ -18,7 +18,7 @@ export function 创建本地优先恢复入口(配置: 恢复入口配置): HTML
   let 原因 = 创建元素('pre', {
     textContent: 获得错误详情(配置.错误),
     style: {
-      maxHeight: '30vh',
+      maxHeight: '22vh',
       overflow: 'auto',
       padding: 'var(--间距-3)',
       border: '1px solid var(--边框颜色)',
@@ -29,66 +29,79 @@ export function 创建本地优先恢复入口(配置: 恢复入口配置): HTML
       overflowWrap: 'anywhere',
     },
   })
-  let 状态 = 创建元素('p', { role: 'status', style: { color: 'var(--错误前景)', whiteSpace: 'pre-wrap' } })
+  let 状态 = 创建元素('p', {
+    role: 'status',
+    style: { color: 'var(--次要文字颜色)', margin: '0', minHeight: '1.5em', textAlign: 'center' },
+  })
   let 正在操作 = false
-  let 执行 = async (操作: () => Promise<void>): Promise<void> => {
+  let 确认区 = 创建元素('div', {
+    style: {
+      display: 'none',
+      gap: 'var(--间距-3)',
+      padding: 'var(--间距-3)',
+      border: '1px solid var(--错误前景)',
+      borderRadius: 'var(--圆角-中)',
+    },
+  })
+  let 执行尝试修复 = async (): Promise<void> => {
     if (正在操作 === true) return
     正在操作 = true
-    状态.textContent = '正在恢复本地数据…'
+    状态.textContent = '正在修复，请稍候…'
     try {
-      await 操作()
+      await 配置.重试()
       await 配置.恢复成功()
     } catch (错误) {
-      状态.textContent = '恢复失败，请查看下方原因后重试。'
+      状态.textContent = '本机数据仍无法恢复。继续前请确认是否改用云端数据。'
       原因.textContent = 获得错误详情(错误)
+      确认区.style.display = 'grid'
     } finally {
       正在操作 = false
     }
   }
-  let 重试按钮 = new 主要按钮({ 文本: '重试同步', 点击处理函数: async (): Promise<void> => await 执行(配置.重试) })
-  let 确认区 = 创建元素('div', {
-    style: { display: 'none', gap: 'var(--间距-3)', padding: 'var(--间距-3)', border: '1px solid var(--错误前景)' },
-  })
-  let 重建按钮 = new 危险按钮({
-    文本: '放弃本地数据并从远程重建',
-    点击处理函数: (): void => {
+  let 执行重建 = async (): Promise<void> => {
+    if (正在操作 === true) return
+    正在操作 = true
+    确认区.style.display = 'none'
+    状态.textContent = '正在下载云端数据，请稍候…'
+    try {
+      let 用户id = await API管理器.强制从远程重建本地优先数据()
+      await 配置.重建本地数据后?.(用户id)
+      await 配置.恢复成功()
+    } catch (错误) {
+      状态.textContent = '暂时无法下载云端数据，请检查网络后重试。'
+      原因.textContent = 获得错误详情(错误)
       确认区.style.display = 'grid'
-    },
-  })
+    } finally {
+      正在操作 = false
+    }
+  }
+  let 修复按钮 = new 主要按钮({ 文本: '修复并继续', 点击处理函数: async (): Promise<void> => await 执行尝试修复() })
   确认区.append(
     创建元素('p', {
-      textContent:
-        配置.放弃本地数据后 === undefined
-          ? '确认删除当前账号的本地优先数据库吗？尚未同步到服务器的修改会永久丢失。'
-          : '确认删除当前账号的本地数据库和业务缓存吗？尚未同步的修改、草稿和待提交数据会永久丢失。',
+      textContent: '本机数据无法继续使用。改用云端数据后，尚未上传的本机修改会丢失。是否继续？',
+      style: { lineHeight: '1.7', margin: '0' },
     }),
     创建元素('div', {
-      style: { display: 'flex', flexWrap: 'wrap', gap: 'var(--间距-3)' },
+      style: { display: 'flex', flexWrap: 'wrap', gap: 'var(--间距-3)', justifyContent: 'flex-end' },
       children: [
         new 普通按钮({
-          文本: '取消',
+          文本: '暂不处理',
           点击处理函数: (): void => {
             确认区.style.display = 'none'
+            状态.textContent = '尚未改用云端数据，可以稍后重新尝试。'
           },
         }),
-        new 危险按钮({
-          文本: '确认放弃并重建',
-          点击处理函数: async (): Promise<void> =>
-            await 执行(async (): Promise<void> => {
-              let 用户id = await API管理器.强制从远程重建本地优先数据()
-              await 配置.放弃本地数据后?.(用户id)
-            }),
-        }),
+        new 危险按钮({ 文本: '使用云端数据继续', 点击处理函数: async (): Promise<void> => await 执行重建() }),
       ],
     }),
   )
-  let 按钮区 = 创建元素('div', {
-    style: { display: 'flex', flexWrap: 'wrap', gap: 'var(--间距-3)', justifyContent: 'center' },
-    children: [重试按钮, 重建按钮],
+  let 错误详情 = 创建元素('details', {
+    style: { color: 'var(--次要文字颜色)', fontSize: 'var(--字号-小)' },
+    children: [创建元素('summary', { textContent: '查看错误详情', style: { cursor: 'pointer' } }), 原因],
   })
   let 面板 = 创建元素('section', {
     role: 'alertdialog',
-    ariaLabel: '本地优先数据控制台',
+    ariaLabel: '修复本机数据',
     style: {
       width: 'min(520px, 100%)',
       maxHeight: 'calc(100dvh - 32px)',
@@ -103,14 +116,16 @@ export function 创建本地优先恢复入口(配置: 恢复入口配置): HTML
       boxShadow: 'var(--深阴影)',
     },
     children: [
-      创建元素('h1', { textContent: '本地优先数据控制台', style: { margin: '0', fontSize: 'var(--字号-标题)' } }),
+      创建元素('h1', { textContent: '本机数据需要修复', style: { margin: '0', fontSize: 'var(--字号-标题)' } }),
       创建元素('p', {
-        textContent: '以下是同步失败的实际原因。可以重试；也可以放弃当前账号的本地数据，从服务器重新建立。',
+        textContent:
+          '应用更新后，本机数据暂时无法正常读取。点击后会先尽力保留本机修改；如果仍无法恢复，应用会在重新下载云端数据前再次征求你的确认。',
+        style: { color: 'var(--次要文字颜色)', lineHeight: '1.7', margin: '0' },
       }),
-      原因,
+      创建元素('div', { style: { display: 'flex', justifyContent: 'center' }, children: [修复按钮] }),
       状态,
-      按钮区,
       确认区,
+      错误详情,
     ],
   })
   return 创建元素('div', {
