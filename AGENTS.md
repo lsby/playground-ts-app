@@ -221,7 +221,7 @@
 
 ### 部署与发布追溯
 
-- **发布产物源码追溯与 Docker 远程部署**: 
+- **发布产物源码追溯与 Docker 远程部署**:
   - 关于发布任务中 Git 状态拦截、Docker 自动化安全部署机制、以及手动运维流程（如数据库迁移冲突处理），请参见 [doc/framework/deploy-and-release.md](doc/framework/deploy-and-release.md)。
   - 若需执行部署或遇到远程发布问题，**必须**优先参考上述部署指南。
 
