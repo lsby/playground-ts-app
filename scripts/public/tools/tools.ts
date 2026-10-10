@@ -2,7 +2,10 @@ import archiver from 'archiver'
 import * as fs from 'fs'
 import { NodeSSH } from 'node-ssh'
 import * as path from 'path'
+import { 获得Compose回滚镜像名称, 获得待清理旧镜像列表 } from './docker-image'
 import { 日志类 } from './model'
+
+export { 获得Compose回滚镜像名称, 获得待清理旧镜像列表 } from './docker-image'
 
 export function 转义PosixShell参数(参数: string): string {
   return `'${参数.replaceAll("'", `'"'"'`)}'`
@@ -204,11 +207,9 @@ export async function 清理旧镜像(
   新镜像列表: string[],
   日志: 日志类,
 ): Promise<void> {
-  for (let 镜像ID of 旧镜像列表) {
-    if (新镜像列表.includes(镜像ID) === false) {
-      日志.打印(`检测到旧镜像 ID: ${镜像ID} 已不再用于本项目，尝试执行删除 (docker image rm)...`)
-      await 执行远程命令(ssh, `docker image rm ${转义PosixShell参数(镜像ID)} || true`)
-    }
+  for (let 镜像ID of 获得待清理旧镜像列表(旧镜像列表, 新镜像列表)) {
+    日志.打印(`检测到旧镜像 ID: ${镜像ID} 已不再用于本项目，尝试执行删除 (docker image rm)...`)
+    await 执行远程命令(ssh, `docker image rm ${转义PosixShell参数(镜像ID)} || true`)
   }
 }
 
@@ -395,6 +396,27 @@ export async function 检查Compose服务是否运行中(
 }
 
 export type Compose服务镜像快照 = { 镜像ID: string; 镜像名称: string }
+export type 已保留Compose服务镜像快照 = Compose服务镜像快照 & { 回滚镜像名称: string }
+
+export async function 保留Compose服务镜像(
+  ssh: NodeSSH,
+  快照: Compose服务镜像快照,
+  标识: string,
+): Promise<已保留Compose服务镜像快照> {
+  let 回滚镜像名称 = 获得Compose回滚镜像名称(快照.镜像名称, 标识)
+  await 执行远程命令(
+    ssh,
+    `docker image inspect ${转义PosixShell参数(快照.镜像ID)} >/dev/null && docker tag ${转义PosixShell参数(快照.镜像ID)} ${转义PosixShell参数(回滚镜像名称)}`,
+  )
+  return { ...快照, 回滚镜像名称 }
+}
+
+export async function 清理Compose服务回滚镜像(ssh: NodeSSH, 快照: 已保留Compose服务镜像快照): Promise<void> {
+  await 执行远程命令(ssh, `docker image rm ${转义PosixShell参数(快照.回滚镜像名称)}`, {
+    打印输出: false,
+    抛出错误: false,
+  })
+}
 
 export async function 获取Compose服务镜像快照(
   ssh: NodeSSH,
@@ -504,7 +526,7 @@ export async function 等待Compose应用就绪(
 
 export async function 恢复Compose服务镜像(
   ssh: NodeSSH,
-  快照: Compose服务镜像快照,
+  快照: 已保留Compose服务镜像快照,
   工作目录: string,
   项目名称: string,
   环境: string,
@@ -513,7 +535,7 @@ export async function 恢复Compose服务镜像(
 ): Promise<void> {
   await 执行远程命令(
     ssh,
-    `docker image inspect ${转义PosixShell参数(快照.镜像ID)} >/dev/null && docker tag ${转义PosixShell参数(快照.镜像ID)} ${转义PosixShell参数(快照.镜像名称)}`,
+    `docker image inspect ${转义PosixShell参数(快照.回滚镜像名称)} >/dev/null && docker tag ${转义PosixShell参数(快照.回滚镜像名称)} ${转义PosixShell参数(快照.镜像名称)}`,
   )
   let 基础命令 = `${compose命令} --env-file ${转义PosixShell参数(环境文件路径)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)}`
   await 执行远程命令(ssh, `${基础命令} up -d --remove-orphans --force-recreate`, { 工作目录 })

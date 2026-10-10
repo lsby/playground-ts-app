@@ -2,7 +2,7 @@ import { NodeSSH } from 'node-ssh'
 import * as path from 'path'
 import { 日志类 } from './model'
 import {
-  Compose服务镜像快照,
+  已保留Compose服务镜像快照,
   恢复Compose服务镜像,
   执行远程命令,
   检查Compose服务是否运行中,
@@ -163,7 +163,7 @@ export async function 执行新服务失败回滚(参数: {
   sshClient: NodeSSH
   日志: 日志类
   数据库准备结果: 数据库预演与准备结果
-  旧服务镜像快照: Compose服务镜像快照 | null
+  旧服务镜像快照: 已保留Compose服务镜像快照 | null
   docker文件目录: string
   项目名称: string
   环境: string

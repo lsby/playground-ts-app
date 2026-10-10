@@ -9,13 +9,16 @@ import { 读取部署服务器配置 } from './deploy-env'
 import { 写入发布信息, 创建发布信息, 删除发布信息, 发布信息文件名 } from './release-info'
 import { 执行数据库预演与准备, 执行新服务失败回滚 } from './tools/database-preflight'
 import { 执行数据库同步 } from './tools/database-sync'
+import { 获得非回滚旧镜像列表 } from './tools/docker-image'
 import { 日志类 } from './tools/model'
 import {
   上传文件,
+  保留Compose服务镜像,
   准备Docker构建空间,
   压缩项目,
   执行远程命令,
   检查远程删除目标,
+  清理Compose服务回滚镜像,
   清理旧镜像,
   等待Compose应用就绪,
   获取Compose命令,
@@ -351,7 +354,7 @@ async function 主函数(): Promise<void> {
         compose命令,
         相对环境文件,
       )
-      let 旧服务镜像快照 = await 获取Compose服务镜像快照(
+      let 原始旧服务镜像快照 = await 获取Compose服务镜像快照(
         sshClient,
         docker文件目录,
         项目名称,
@@ -359,74 +362,88 @@ async function 主函数(): Promise<void> {
         compose命令,
         相对环境文件,
       )
+      let 旧服务镜像快照 =
+        原始旧服务镜像快照 === null
+          ? null
+          : await 保留Compose服务镜像(sshClient, 原始旧服务镜像快照, `${环境}-${Date.now().toString()}`)
       日志.打印(`📊 当前项目使用的镜像 ID 列表: [${旧镜像列表.join(', ') === '' ? '无' : 旧镜像列表.join(', ')}]`)
-
-      日志.打印(`📦 解压到运行目录...`)
-      await 执行远程命令(
-        sshClient,
-        `tar -xzf ${转义PosixShell参数(远程压缩包路径)} -C ${转义PosixShell参数(远程运行目录)}`,
-      )
-
-      日志.打印(`🔨 正在构建项目镜像 (此时旧服务仍在运行)...`)
-      let 构建命令 = `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} build ${镜像参数}`
-      if (使用缓存 === false) {
-        构建命令 += ' --no-cache'
-      }
-      await 执行远程命令(sshClient, 构建命令, { 工作目录: docker文件目录 })
-
-      // 数据库安全预演与停机备份
-      let 数据库准备结果 = await 执行数据库预演与准备({
-        sshClient,
-        日志,
-        环境,
-        远程运行目录,
-        docker文件目录,
-        项目名称,
-        compose命令,
-        相对环境文件,
-      })
-
+      let 部署后镜像列表: string[] | null = null
       try {
-        日志.打印(`🚀 正在启动新服务...`)
+        日志.打印(`📦 解压到运行目录...`)
         await 执行远程命令(
           sshClient,
-          `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} up -d --remove-orphans`,
-          { 工作目录: docker文件目录 },
+          `tar -xzf ${转义PosixShell参数(远程压缩包路径)} -C ${转义PosixShell参数(远程运行目录)}`,
         )
-        日志.打印(`🩺 正在验证新服务是否稳定就绪...`)
-        await 等待Compose应用就绪(sshClient, docker文件目录, 项目名称, 环境, compose命令, 相对环境文件)
-        日志.打印(`✅ 新服务已连续通过健康检查。`)
-      } catch (启动错误) {
-        try {
-          await 执行新服务失败回滚({
-            sshClient,
-            日志,
-            数据库准备结果,
-            旧服务镜像快照,
-            docker文件目录,
-            项目名称,
-            环境,
-            compose命令,
-            相对环境文件,
-          })
-        } catch (回滚错误) {
-          throw new AggregateError([启动错误, 回滚错误], '新服务启动失败，且自动回滚失败')
+
+        日志.打印(`🔨 正在构建项目镜像 (此时旧服务仍在运行)...`)
+        let 构建命令 = `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} build ${镜像参数}`
+        if (使用缓存 === false) {
+          构建命令 += ' --no-cache'
         }
-        throw 启动错误
+        await 执行远程命令(sshClient, 构建命令, { 工作目录: docker文件目录 })
+
+        let 数据库准备结果 = await 执行数据库预演与准备({
+          sshClient,
+          日志,
+          环境,
+          远程运行目录,
+          docker文件目录,
+          项目名称,
+          compose命令,
+          相对环境文件,
+        })
+
+        try {
+          日志.打印(`🚀 正在启动新服务...`)
+          await 执行远程命令(
+            sshClient,
+            `${compose命令} --env-file ${转义PosixShell参数(相对环境文件)} -p ${转义PosixShell参数(`${项目名称}-${环境}`)} up -d --remove-orphans`,
+            { 工作目录: docker文件目录 },
+          )
+          日志.打印(`🩺 正在验证新服务是否稳定就绪...`)
+          await 等待Compose应用就绪(sshClient, docker文件目录, 项目名称, 环境, compose命令, 相对环境文件)
+          日志.打印(`✅ 新服务已连续通过健康检查。`)
+        } catch (启动错误) {
+          try {
+            await 执行新服务失败回滚({
+              sshClient,
+              日志,
+              数据库准备结果,
+              旧服务镜像快照,
+              docker文件目录,
+              项目名称,
+              环境,
+              compose命令,
+              相对环境文件,
+            })
+          } catch (回滚错误) {
+            throw new AggregateError([启动错误, 回滚错误], '新服务启动失败，且自动回滚失败')
+          }
+          throw 启动错误
+        }
+
+        日志.打印(`✅ 确认部署后的新镜像状态...`)
+        部署后镜像列表 = await 获取Compose镜像列表(
+          sshClient,
+          docker文件目录,
+          `${项目名称}-${环境}`,
+          compose命令,
+          相对环境文件,
+        )
+        日志.打印(
+          `📊 部署后项目使用的镜像 ID 列表: [${部署后镜像列表.join(', ') === '' ? '无' : 部署后镜像列表.join(', ')}]`,
+        )
+
+        日志.打印(`🧹 正在对比并清理不再使用的旧镜像...`)
+        let 待清理旧镜像 = 获得非回滚旧镜像列表(旧镜像列表, 重部署前镜像列表, 旧服务镜像快照?.镜像ID)
+        await 清理旧镜像(sshClient, 待清理旧镜像, 部署后镜像列表, 日志)
+      } finally {
+        if (旧服务镜像快照 !== null) await 清理Compose服务回滚镜像(sshClient, 旧服务镜像快照)
       }
-
-      日志.打印(`✅ 确认部署后的新镜像状态...`)
-      let 新镜像列表 = await 获取Compose镜像列表(
-        sshClient,
-        docker文件目录,
-        `${项目名称}-${环境}`,
-        compose命令,
-        相对环境文件,
-      )
-      日志.打印(`📊 部署后项目使用的镜像 ID 列表: [${新镜像列表.join(', ') === '' ? '无' : 新镜像列表.join(', ')}]`)
-
-      日志.打印(`🧹 正在对比并清理不再使用的旧镜像...`)
-      await 清理旧镜像(sshClient, Array.from(new Set([...旧镜像列表, ...重部署前镜像列表])), 新镜像列表, 日志)
+      if (旧服务镜像快照 !== null) {
+        日志.打印(`🧹 新服务已稳定就绪，清理部署前的旧服务镜像...`)
+        await 清理旧镜像(sshClient, [旧服务镜像快照.镜像ID], 部署后镜像列表, 日志)
+      }
 
       日志.打印(`✨ 所有操作均已完成`)
     }
