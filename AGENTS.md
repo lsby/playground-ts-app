@@ -185,6 +185,7 @@
   - 人工修改加密配置时先运行 `env:decode` 生成 `.decode`, 修改后运行 `env:encode` 写回正式文件并清理全部 `.decode`; 程序运行、构建和发布过程只在内存中解密
   - 环境加密相关任务为 `env:decode`, `env:encode`, `env:enable-encryption`, `env:disable-encryption` 和 `env:status`; 均通过 `npm run task -- <任务名>` 执行
   - 远程服务器配置统一维护在 `.env/.env.deploy`; GitHub Actions 使用名为 `PROJECT_CONFIG_KEY_FILE` 的 Secret 保存 `.project-config.key` 完整原始内容, 可运行 `npm run task -- setup:github-config-key` 配置
+  - Git 忽略但需要跨机器同步的证书、密钥与发布材料可通过 [外挂 LFS](doc/framework/external-lfs.md) 管理；Git 提交逐文件加密清单和加密的 `.env/.env.external-lfs`，阿里云 OSS 或腾讯云 COS 保存加密对象，唯一解密根密钥仍为 `.project-config.key`
   - 环境变量应当通过 Zod 进行严格校验, 并且不提供业务兜底值, 以便让缺失的配置在启动或构建阶段就能尽早报错
   - 业务代码应统一使用解析好的 `环境变量` 对象, 而不要直接去读取 `process.env`. 这既能保留类型检查, 也能完美兼容前端环境的变量注入
   - 针对前端编译时的环境变量注入, 相关实现在 `src/web/mock/env-provider-mock.ts` 中

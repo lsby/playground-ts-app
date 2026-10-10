@@ -12,6 +12,7 @@ import { 保存上次任务, 模糊过滤并排序任务, 读取上次任务, ty
 import { 构建任务表 } from './taskfile/taskfile-build'
 import { 数据库任务表 } from './taskfile/taskfile-db'
 import { 开发任务表 } from './taskfile/taskfile-dev'
+import { 外挂LFS任务表 } from './taskfile/taskfile-external-lfs'
 import { 生成任务表 } from './taskfile/taskfile-generate'
 import { 质量任务表 } from './taskfile/taskfile-quality'
 import { 发布任务表 } from './taskfile/taskfile-release'
@@ -25,6 +26,7 @@ let 任务表 = 定义任务({
   ...初始化任务表,
   ...数据库任务表,
   ...开发任务表,
+  ...外挂LFS任务表,
   ...测试任务表,
   ...发布任务表,
 })

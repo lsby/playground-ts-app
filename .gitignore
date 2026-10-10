@@ -5,6 +5,8 @@
 /OCR-portable-python*
 /.env/*.decode
 /.project-config.key
+/.external-lfs/recovery/
+/.external-lfs/operation.lock
 /test/unit/unit-test.test.ts
 
 # =========================

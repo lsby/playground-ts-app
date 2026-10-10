@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "provider": "tencent-cos",
+  "credentialsFile": ".env/.env.external-lfs",
+  "keyFile": ".project-config.key",
+  "manifestDirectory": ".external-lfs/manifests",
+  "remotePrefix": "replace-with-project-name/private-files/v1",
+  "managedPaths": [{ "path": "doc/private", "scope": "private" }],
+  "exclude": ["**/.DS_Store", "**/*.tmp", "**/.gitkeep"]
+}
