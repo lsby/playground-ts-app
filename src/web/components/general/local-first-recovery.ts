@@ -82,7 +82,7 @@ export function 创建本地优先恢复入口(配置: 恢复入口配置): HTML
       style: { lineHeight: '1.7', margin: '0' },
     }),
     创建元素('div', {
-      style: { display: 'flex', flexWrap: 'wrap', gap: 'var(--间距-3)', justifyContent: 'flex-end' },
+      style: { display: 'flex', flexWrap: 'wrap', gap: 'var(--间距-3)', justifyContent: 'center' },
       children: [
         new 普通按钮({
           文本: '暂不处理',
