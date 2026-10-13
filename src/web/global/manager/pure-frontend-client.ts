@@ -42,25 +42,31 @@ export function 添加本地优先上下文<
 }
 
 function 获得纯前端Worker(数据库文件名: string): Worker {
+  if (纯前端Worker !== undefined && 纯前端Worker数据库文件名 !== 数据库文件名) {
+    if (纯前端等待请求.size !== 0) throw new Error(`Worker 尚有未完成请求，不能切换到数据库 ${数据库文件名}`)
+    纯前端Worker.terminate()
+    纯前端Worker = undefined
+    纯前端Worker数据库文件名 = undefined
+  }
   if (纯前端Worker === undefined) {
     let WorkerURL = new URL('/worker-assets/pure-frontend-api-worker.js', globalThis.location.href)
     WorkerURL.searchParams.set('databaseFileName', 数据库文件名)
     纯前端Worker数据库文件名 = 数据库文件名
-    纯前端Worker = new Worker(WorkerURL, { type: 'module', name: `${项目标识}-pure-frontend-sqlite` })
-    纯前端Worker.addEventListener('message', (event: MessageEvent<纯前端Worker响应>) => {
+    let 当前Worker = new Worker(WorkerURL, { type: 'module', name: `${项目标识}-pure-frontend-sqlite` })
+    纯前端Worker = 当前Worker
+    当前Worker.addEventListener('message', (event: MessageEvent<纯前端Worker响应>) => {
       let 等待项 = 纯前端等待请求.get(event.data.id)
       if (等待项 === undefined) return
       纯前端等待请求.delete(event.data.id)
       等待项.resolve(event.data)
     })
-    纯前端Worker.addEventListener('error', (event) => {
+    当前Worker.addEventListener('error', (event) => {
+      if (纯前端Worker !== 当前Worker) return
       结束全部等待请求(event.error ?? new Error('纯前端 Worker 异常终止'))
       纯前端Worker = undefined
       纯前端Worker数据库文件名 = undefined
     })
   }
-  if (纯前端Worker数据库文件名 !== 数据库文件名)
-    throw new Error(`Worker 已绑定数据库 ${纯前端Worker数据库文件名}，不能切换到 ${数据库文件名}`)
   return 纯前端Worker
 }
 
@@ -91,8 +97,8 @@ function 结束全部等待请求(原因: unknown): void {
   纯前端等待请求.clear()
 }
 
-export function 终止纯前端Worker(): void {
-  结束全部等待请求(new Error('纯前端 Worker 已终止，请重试当前操作'))
+export function 终止纯前端Worker(原因: unknown = new Error('纯前端 Worker 已终止，请重试当前操作')): void {
+  结束全部等待请求(原因)
   纯前端Worker?.terminate()
   纯前端Worker = undefined
   纯前端Worker数据库文件名 = undefined
@@ -171,10 +177,16 @@ export async function 请求纯前端Worker(
 
 export function 请求纯前端Worker响应(消息: 纯前端Worker请求): Promise<纯前端Worker响应> {
   let id = ++纯前端请求id
+  let Worker实例: Worker
+  try {
+    Worker实例 = 获得纯前端Worker(获得Worker数据库文件名(消息))
+  } catch (错误) {
+    return Promise.reject(错误)
+  }
   return new Promise((resolve, reject) => {
     纯前端等待请求.set(id, { resolve, reject })
     try {
-      获得纯前端Worker(获得Worker数据库文件名(消息)).postMessage({ id, ...消息 })
+      Worker实例.postMessage({ id, ...消息 })
     } catch (错误) {
       纯前端等待请求.delete(id)
       reject(错误)
@@ -182,7 +194,9 @@ export function 请求纯前端Worker响应(消息: 纯前端Worker请求): Prom
   })
 }
 
-window.addEventListener('pagehide', 终止纯前端Worker)
+window.addEventListener('pagehide', (): void => {
+  终止纯前端Worker(new DOMException('页面已隐藏，纯前端 Worker 已终止', 'AbortError'))
+})
 window.addEventListener('storage', (event): void => {
   if (event.key === 本地优先状态键) 终止纯前端Worker()
 })

@@ -1,5 +1,6 @@
 import { API管理器, 本地优先同步解决方案, 本地优先同步问题 } from '../../global/manager/api-manager'
 import { 显示对话框 } from '../../global/manager/dialog-manager'
+import { 是中止错误 } from '../../global/tools/abort'
 
 export type 本地优先同步触发时机 = '登录' | '恢复登录' | '退出登录'
 
@@ -27,6 +28,7 @@ export async function 尝试同步项目本地优先数据(触发时机: 本地�
   try {
     await 同步项目本地优先数据()
   } catch (错误) {
+    if (是中止错误(错误) === true) return
     if (触发时机 === '退出登录')
       await 显示对话框(`本地优先同步失败：${错误 instanceof Error ? 错误.message : String(错误)}`)
     console.error(`${触发时机}时本地优先同步失败: %o`, { 类型: 错误 instanceof Error ? 错误.name : typeof 错误 })

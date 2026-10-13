@@ -11,7 +11,13 @@ import { init } from '../../init/init'
 import { 数据库快照, 数据库快照模式 } from '../../model/local-first/sync-model'
 import { 验证密码 } from '../../model/user/user-validation'
 import { 设置浏览器运行时数据库文件名 } from '../mock/db-dialect-mock'
-import { 创建浏览器数据库管理器, 导入数据库快照, 导出数据库快照, 应用浏览器迁移 } from './browser-database'
+import {
+  创建浏览器数据库管理器,
+  删除浏览器数据库,
+  导入数据库快照,
+  导出数据库快照,
+  应用浏览器迁移,
+} from './browser-database'
 import { 本地接口列表 } from './local-api-list'
 
 declare let self: DedicatedWorkerGlobalScope
@@ -77,6 +83,7 @@ self.addEventListener('message', (event: MessageEvent<本地Worker消息>) => {
 })
 
 async function 创建并导入数据库(文件名: string, 数据库快照: 数据库快照): Promise<void> {
+  await 删除浏览器数据库(文件名)
   let 管理器 = 创建浏览器数据库管理器(文件名)
   try {
     await 应用浏览器迁移(管理器.获得句柄())

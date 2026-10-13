@@ -27,6 +27,15 @@ export function 创建浏览器数据库管理器(文件名: string): Kysely管�
   return Kysely管理器.从适配器创建<DB>(创建浏览器sqlite数据库适配器(文件名))
 }
 
+export function 删除浏览器数据库(文件名: string): Promise<void> {
+  return new Promise((resolve, reject): void => {
+    let 请求 = indexedDB.deleteDatabase(文件名)
+    请求.onsuccess = (): void => resolve()
+    请求.onerror = (): void => reject(请求.error ?? new Error(`删除浏览器数据库失败: ${文件名}`))
+    请求.onblocked = (): void => reject(new Error(`浏览器数据库仍被其他页面占用: ${文件名}`))
+  })
+}
+
 export async function 执行SQLite脚本(数据库: Kysely<DB>, SQL: string): Promise<void> {
   await 数据库.getExecutor().provideConnection(async (连接): Promise<void> => {
     let Worker连接 = 连接 as Worker数据库连接

@@ -1,6 +1,7 @@
 import { 环境变量 } from '../../../../global/env'
 import { 组件基类 } from '../../../base/base'
 import { API管理器 } from '../../../global/manager/api-manager'
+import { 是中止错误 } from '../../../global/tools/abort'
 import { 创建元素 } from '../../../global/tools/create-element'
 import { 主要按钮, 文本按钮, 链接按钮 } from '../../general/base/base-button'
 import { 表单 } from '../../general/form/form'
@@ -69,6 +70,7 @@ export class 登录组件 extends 组件基类<发出事件类型, 监听事件�
           try {
             await 同步项目本地优先数据()
           } catch (错误) {
+            if (是中止错误(错误) === true) return
             this.shadow.append(
               创建本地优先恢复入口({
                 错误,

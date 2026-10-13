@@ -3,6 +3,7 @@ import { 组件基类 } from '../../base/base'
 import { API管理器 } from '../../global/manager/api-manager'
 import { 本地优先远程不可用错误, 本地优先远程同步错误 } from '../../global/manager/local-first-error'
 import { 读取本地优先状态 } from '../../global/manager/local-first-state'
+import { 是中止错误 } from '../../global/tools/abort'
 import { 创建本地优先恢复入口 } from '../general/local-first-recovery'
 import { 同步项目本地优先数据 } from '../project/local-first-sync'
 
@@ -20,6 +21,7 @@ export class 检查登录组件 extends 组件基类<发出事件类型, 监听�
         await 同步项目本地优先数据()
         return
       } catch (错误) {
+        if (是中止错误(错误) === true) return
         if (错误 instanceof 本地优先远程同步错误 && 错误.code === 'NOT_LOGGED_IN') {
           await API管理器.清除token()
           this.跳转登录页()
@@ -41,6 +43,7 @@ export class 检查登录组件 extends 组件基类<发出事件类型, 监听�
       try {
         await 同步项目本地优先数据()
       } catch (错误) {
+        if (是中止错误(错误) === true) return
         if (this.允许离线登录(错误) === false) this.显示本地优先恢复入口(错误)
       }
       return
