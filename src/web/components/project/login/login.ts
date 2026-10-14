@@ -1,13 +1,10 @@
 import { 环境变量 } from '../../../../global/env'
 import { 组件基类 } from '../../../base/base'
 import { API管理器 } from '../../../global/manager/api-manager'
-import { 是中止错误 } from '../../../global/tools/abort'
 import { 创建元素 } from '../../../global/tools/create-element'
 import { 主要按钮, 文本按钮, 链接按钮 } from '../../general/base/base-button'
 import { 表单 } from '../../general/form/form'
 import { 密码输入框, 普通输入框 } from '../../general/form/form-input'
-import { 创建本地优先恢复入口 } from '../../general/local-first-recovery'
-import { 同步项目本地优先数据 } from '../local-first-sync'
 
 type 登录数据 = { username: string; password: string }
 type 注册数据 = { username: string; password: string; confirmPassword: string }
@@ -67,19 +64,6 @@ export class 登录组件 extends 组件基类<发出事件类型, 监听事件�
             userPassword: 数据.password,
           })
           await API管理器.设置token(响应.token)
-          try {
-            await 同步项目本地优先数据()
-          } catch (错误) {
-            if (是中止错误(错误) === true) return
-            this.shadow.append(
-              创建本地优先恢复入口({
-                错误,
-                重试: async (): Promise<void> => await 同步项目本地优先数据(),
-                恢复成功: (): void => window.location.assign(this.获得安全重定向()),
-              }),
-            )
-            return
-          }
           window.location.assign(this.获得安全重定向())
         })
       } catch (错误) {

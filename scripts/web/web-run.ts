@@ -47,19 +47,23 @@ function 启动任务(): void {
   }
 
   正在重启 = false
-  let Worker进程 = crossSpawn(
-    'parcel',
-    [
-      'watch',
-      ...ParcelWorker选项,
-      '--dist-dir',
-      'dist/src/web/worker-assets',
-      '--no-hmr',
-      '--watch-for-stdin',
-      ParcelWorker入口,
-    ],
-    { stdio: 'inherit' },
-  )
+  Parcel进程列表 = []
+  if (process.env['BUILD_TARGET'] === 'pure-frontend') {
+    let Worker进程 = crossSpawn(
+      'parcel',
+      [
+        'watch',
+        ...ParcelWorker选项,
+        '--dist-dir',
+        'dist/src/web/worker-assets',
+        '--no-hmr',
+        '--watch-for-stdin',
+        ParcelWorker入口,
+      ],
+      { stdio: 'inherit' },
+    )
+    Parcel进程列表.push(Worker进程)
+  }
   let Web进程 = crossSpawn(
     'parcel',
     [
@@ -77,7 +81,7 @@ function 启动任务(): void {
     ],
     { stdio: 'inherit' },
   )
-  Parcel进程列表 = [Worker进程, Web进程]
+  Parcel进程列表.push(Web进程)
   for (let Parcel进程 of Parcel进程列表) Parcel进程.on('close', 处理Parcel进程关闭)
 }
 

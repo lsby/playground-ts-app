@@ -1,22 +1,29 @@
 # 纯前端 (Pure Frontend) 架构与规范
 
+## 定位
+
+- 纯前端模式用于无需部署后端的场景: 页面和静态资源通过网络加载, 接口逻辑和数据库在浏览器内运行。
+- 普通 Web 与纯前端模式都按有网络的环境使用, 不承诺离线可用, 不提供 Service Worker 或离线资源预缓存。
+- 框架不提供本地与远程数据同步、冲突合并或多端一致性机制, 有此需求的项目自行实现。
+
 ## 核心组件
 
-- UI 层面的请求转发以及处理跨标签页锁均由 `src/web/global/manager/api-manager.ts` 负责
-- 后端业务逻辑以 API Worker 的形式运行在 `src/web/pure-frontend/pure-frontend-api-worker.ts` 中
-- 底层数据存储依赖 SQLite Worker 并依托 IndexedDB 持久化, 相关实现在 `src/web/pure-frontend/local-sqlite-worker.ts`
-- 对 Node 运行时的模拟实现在 `src/web/mock/` 目录中, 并通过 `package.json` 的 `browser` 与 `alias` 字段进行替换配置
+- `src/web/global/manager/api-manager.ts` 根据构建目标选择请求通道: 普通 Web 请求服务端, 纯前端请求 API Worker。
+- Worker 通信及跨标签页写入锁由 `src/web/global/manager/pure-frontend-client.ts` 负责。
+- 接口逻辑在 `src/web/pure-frontend/pure-frontend-api-worker.ts` 中执行, 使用本机 JWT 认证, 不依赖远程认证服务。
+- SQLite Worker 位于 `src/web/pure-frontend/local-sqlite-worker.ts`, 数据依托 IndexedDB 持久化, 刷新页面后保留。
+- 对 Node 运行时的模拟实现在 `src/web/mock/` 中, 通过 `package.json` 的 `browser` 与 `alias` 字段进行替换配置。
 
 ## 生成与配置
 
-- 构建系统会派生浏览器可用接口列表 `src/web/pure-frontend/local-api-list.ts`, 轻量路由策略 `src/web/pure-frontend/local-api-policy.ts`, 本地数据库 Schema `src/web/pure-frontend/local-schema.ts`, 以及迁移和主键元信息 `src/types/local-first-database-meta.ts`
-- 并不是所有接口都自动进入浏览器环境, 只有明确带有 `{ 浏览器支持: '纯前端' | '本地优先' }` 声明的接口才会被生成器收录
-  - `'纯前端'` 表示接口及依赖可以打包到浏览器, 仅在纯前端构建中本地执行
-  - `'本地优先'` 是纯前端能力的超集, 在普通 Web 构建中也会基于用户的本地同步数据库执行
-  - 可以参考 `src/interface/demo/auth/is-login/index.ts` 和 `src/interface/user/get-user-config/index.ts`
+- 构建系统派生浏览器可用接口列表 `src/web/pure-frontend/local-api-list.ts` 和数据库迁移清单 `src/web/pure-frontend/local-schema.ts`。
+- 只有明确声明 `{ 浏览器支持: '纯前端' }` 的接口才会被生成器收录, 表示接口及其依赖可以打包到浏览器; 普通 Web 中这些接口仍在服务端执行。
+- 登录接口示例见 `src/interface/demo/auth/is-login/index.ts`, 用户配置示例见 `src/interface/user/get-user-config/index.ts`。
+- 浏览器数据库执行 `prisma/migrations/` 中的迁移链, 通过 `_prisma_migrations` 记录和校验迁移, 迁移失败时明确报错。
+- 仅纯前端构建会生成 API Worker 及 SQLite 资源, 普通 Web 构建不包含这些数据库运行资源。
 
 ## 运行与并发
 
-- 启动开发环境时, 必须运行完整的 `npm run task -- dev:pure-frontend` 任务, 这样才能同时监听本地 API 列表和 Schema 等派生文件的更新
-- 为了保证并发安全, 在本地执行 API 调用或 DB 管理命令期间, 系统必须持有 Web Locks 的排他锁, 防止多标签页同时写入 IndexedDB 内的 SQLite 数据库
-- 普通 Web 构建的本地优先同步同样持有该排他锁, 同步期间禁止执行本地接口
+- 开发时必须运行完整的 `npm run task -- dev:pure-frontend`, 同时监听本地 API 列表、数据库迁移清单和 Worker 的更新。
+- 本地 API 调用和数据库管理命令必须持有 Web Locks 排他锁, 防止多标签页同时写入 IndexedDB 中的 SQLite 数据库。
+- 登录和退出只处理认证状态, 不执行数据同步、快照替换或恢复操作。

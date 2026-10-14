@@ -6,7 +6,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       reportsDirectory: './test-outputs/coverage',
-      include: ['src/interface/**/*.ts', 'src/model/local-first/sync-model.ts'],
+      include: ['src/interface/**/*.ts'],
       exclude: ['node_modules/', 'test/', 'src/interface/**/*.test.ts', 'src/model/**/*.test.ts'],
     },
     include: ['test/**/*.test.ts'],

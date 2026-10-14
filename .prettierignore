@@ -56,8 +56,8 @@ pnpm-lock.yaml
 /src/tools/electron/preload.js
 /src/web/components/index.ts
 /test/unit/unit-test.test.ts
-/src/web/local-api-list.ts
-/src/web/local-schema.ts
+/src/web/pure-frontend/local-api-list.ts
+/src/web/pure-frontend/local-schema.ts
 
 # 忽略静态文件
 /public

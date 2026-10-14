@@ -133,13 +133,10 @@
 
 ### 纯前端
 
+- **定位**: 纯前端用于无需部署后端的场景, 页面和资源仍通过网络加载, 不承诺离线使用; 框架不提供本地与远程数据同步机制。
+
 - **核心规范与架构设计**: 纯前端 (Pure Frontend) 的核心组件（API Worker, SQLite Worker, IndexedDB 持久化）、生成与配置、以及并发锁机制等详细设计规范，请参见 [doc/framework/pure-frontend.md](doc/framework/pure-frontend.md)。
 - **注意**: 纯前端标注的接口会在本地浏览器运行，开发时必须运行完整的 `npm run task -- dev:pure-frontend` 以监听派生文件的更新。
-
-### 本地优先
-
-- **核心规范与架构设计**: 本地优先 (Local-First) 的核心概念（基线与当前双库、字段级三方合并）、同步协议、生命周期以及离线保证等详细设计规范，请参见 [doc/framework/local-first.md](doc/framework/local-first.md)。
-- **注意**: 进行本地优先的业务开发或维护时，**必须**完整阅读并遵循上述文档中的同步边界与并发排他保护机制。
 
 ### 样例模式
 
@@ -217,7 +214,7 @@
   - 运行 `npm run task -- generate:all` 即可触发全量代码生成
   - 所有派生文件都交由生成器覆盖维护. 任何手动修改都会在下次生成时被冲掉, 正确做法是去修改源头定义然后重新生成. 这些派生文件包含:
     - 数据库与接口层面的 `src/types/db.ts`, `src/interface/interface-list.ts` 以及 `src/types/interface-type.ts`
-    - 前端相关与本地数据库层面的 `src/web/page/entry/**/*.ts`, `src/web/pure-frontend/local-api-list.ts`, `src/web/pure-frontend/local-api-policy.ts`, `src/web/pure-frontend/local-schema.ts` 和 `src/types/local-first-database-meta.ts`
+    - 前端相关与本地数据库层面的 `src/web/page/entry/**/*.ts`, `src/web/pure-frontend/local-api-list.ts` 和 `src/web/pure-frontend/local-schema.ts`
     - 此外还包括注入到应用里的元信息文件 `src/app/meta-info.ts`, 其中项目标识由 `package.json` 的包名派生, 浏览器持久化键名和数据库文件名应复用该标识
 
 ### 部署与发布追溯

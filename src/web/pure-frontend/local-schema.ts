@@ -1,38 +1,9 @@
 // 该文件由脚本自动生成, 请勿修改.
-// 这是供前端 IndexedDB 持久化的 WASM-SQLite 数据库建表使用的 SQL 语句
-export let 初始建表SQL = `
--- CreateTable
-CREATE TABLE "system_config" (
-    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'SYSTEM_DEFAULT',
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "is_initialized" BOOLEAN NOT NULL DEFAULT false,
-    "enable_register" BOOLEAN NOT NULL,
-    "enable_get_interface_type" BOOLEAN NOT NULL DEFAULT false,
-    "version" TEXT NOT NULL,
-    "jwt_secret" TEXT NOT NULL
-);
-
--- CreateTable
-CREATE TABLE "user_config" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "user_id" TEXT NOT NULL,
-    "theme" TEXT NOT NULL,
-    CONSTRAINT "user_config_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user" ("id") ON DELETE RESTRICT ON UPDATE RESTRICT
-);
-
--- CreateTable
-CREATE TABLE "user" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "name" TEXT NOT NULL,
-    "pwd" TEXT NOT NULL,
-    "is_admin" BOOLEAN NOT NULL
-);
-
--- CreateIndex
-CREATE UNIQUE INDEX "user_config_user_id_key" ON "user_config"("user_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "user_name_key" ON "user"("name");
-`
+// 纯前端数据库使用与服务端相同的 Prisma 迁移链。
+export let 浏览器迁移列表: { 名称: string; 校验和: string; SQL: string }[] = [
+  {
+    "名称": "00000000000000_init",
+    "SQL": "-- CreateTable\nCREATE TABLE \"system_config\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY DEFAULT 'SYSTEM_DEFAULT',\n    \"created_at\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"is_initialized\" BOOLEAN NOT NULL DEFAULT false,\n    \"enable_register\" BOOLEAN NOT NULL,\n    \"enable_get_interface_type\" BOOLEAN NOT NULL DEFAULT false,\n    \"version\" TEXT NOT NULL,\n    \"jwt_secret\" TEXT NOT NULL\n);\n\n-- CreateTable\nCREATE TABLE \"user_config\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"created_at\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"user_id\" TEXT NOT NULL,\n    \"theme\" TEXT NOT NULL,\n    CONSTRAINT \"user_config_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"user\" (\"id\") ON DELETE RESTRICT ON UPDATE RESTRICT\n);\n\n-- CreateTable\nCREATE TABLE \"user\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"created_at\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"name\" TEXT NOT NULL,\n    \"pwd\" TEXT NOT NULL,\n    \"is_admin\" BOOLEAN NOT NULL\n);\n\n-- CreateIndex\nCREATE UNIQUE INDEX \"user_config_user_id_key\" ON \"user_config\"(\"user_id\");\n\n-- CreateIndex\nCREATE UNIQUE INDEX \"user_name_key\" ON \"user\"(\"name\");\n",
+    "校验和": "332b843d9dcdd07ca9af4c528ba765899abe797ead9f0138f0fab9fc362d8ae0"
+  }
+]

@@ -9,6 +9,7 @@ export function getRawEnv<T extends z.ZodRawShape>(schema: z.ZodObject<T>): z.in
     DEBUG_NAME: process.env['DEBUG_NAME'],
     LOCAL_MODE: process.env['LOCAL_MODE'],
     SAMPLE_MODE: process.env['SAMPLE_MODE'],
+    DEPLOY_ALLOW_DIRTY_GIT: process.env['DEPLOY_ALLOW_DIRTY_GIT'],
     DB_TYPE: process.env['DB_TYPE'],
     DB_PATH: process.env['DB_PATH'],
     DB_BACKUP_PATH: process.env['DB_BACKUP_PATH'],

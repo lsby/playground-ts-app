@@ -64,6 +64,7 @@ async function 执行构建(): Promise<void> {
       '',
       '这是一个完全由前端托管的应用产物（包含了所有的纯前端模拟层和 WASM-SQLite 数据库引擎）。',
       '你只需要将当前文件夹下的所有文件部署到任意的**静态文件服务器**（如 Nginx、Vercel、Github Pages 等）即可。',
+      '页面和资源需要通过网络加载；纯前端模式仅表示无需部署后端，不承诺离线使用，也不提供远程数据同步。',
       '',
       '**⚠️ 注意：**',
       '1. 必须在安全上下文（HTTPS 或 localhost）下运行。数据库通过 IndexedDB 持久化，并使用 Web Locks API 串行化不同标签页的本地 API 请求；部署前请确认目标浏览器支持 IndexedDB、Web Worker 和 Web Locks API。',

@@ -1,10 +1,7 @@
-import { Kysely管理器 } from '@lsby/ts-kysely'
 import { DatabaseConnection, Kysely, sql } from 'kysely'
 import { z } from 'zod'
-import { 数据库快照, 数据库快照模式, 数据库标量 } from '../../model/local-first/sync-model'
 import { DB } from '../../types/db'
-import { 本地数据库Schema指纹, 浏览器迁移列表 } from '../../types/local-first-database-meta'
-import { 创建浏览器sqlite数据库适配器 } from '../mock/db-dialect-mock'
+import { 浏览器迁移列表 } from './local-schema'
 
 type Worker数据库连接 = DatabaseConnection & { request: <T>(type: string, payload?: unknown) => Promise<T> }
 type 迁移记录 = {
@@ -22,19 +19,6 @@ let 迁移记录模式 = z
     rolled_back_at: z.union([z.string(), z.number(), z.null()]),
   })
   .strict()
-
-export function 创建浏览器数据库管理器(文件名: string): Kysely管理器<DB> {
-  return Kysely管理器.从适配器创建<DB>(创建浏览器sqlite数据库适配器(文件名))
-}
-
-export function 删除浏览器数据库(文件名: string): Promise<void> {
-  return new Promise((resolve, reject): void => {
-    let 请求 = indexedDB.deleteDatabase(文件名)
-    请求.onsuccess = (): void => resolve()
-    请求.onerror = (): void => reject(请求.error ?? new Error(`删除浏览器数据库失败: ${文件名}`))
-    请求.onblocked = (): void => reject(new Error(`浏览器数据库仍被其他页面占用: ${文件名}`))
-  })
-}
 
 export async function 执行SQLite脚本(数据库: Kysely<DB>, SQL: string): Promise<void> {
   await 数据库.getExecutor().provideConnection(async (连接): Promise<void> => {
@@ -63,7 +47,7 @@ async function 读取迁移记录(数据库: Kysely<DB>): Promise<Map<string, �
   return 结果
 }
 
-export async function 应用浏览器迁移(数据库: Kysely<DB>): Promise<string> {
+export async function 应用浏览器迁移(数据库: Kysely<DB>): Promise<void> {
   await 执行SQLite脚本(
     数据库,
     `CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
@@ -103,7 +87,7 @@ export async function 应用浏览器迁移(数据库: Kysely<DB>): Promise<stri
     if (迁移.校验和 !== 记录.checksum) throw new Error(`浏览器迁移 checksum 不一致: ${记录.migration_name}`)
   }
   let 待执行迁移 = 浏览器迁移列表.filter((迁移) => 已完成记录表.has(迁移.名称) === false)
-  if (待执行迁移.length === 0) return 本地数据库Schema指纹
+  if (待执行迁移.length === 0) return
 
   await sql`PRAGMA foreign_keys = OFF`.execute(数据库)
   try {
@@ -118,59 +102,16 @@ export async function 应用浏览器迁移(数据库: Kysely<DB>): Promise<stri
             (${crypto.randomUUID()}, ${迁移.校验和}, ${当前时间}, ${迁移.名称}, ${当前时间}, 1)
         `.execute(事务)
       }
-      let 外键错误 = await sql<Record<string, 数据库标量>>`PRAGMA foreign_key_check`.execute(事务)
+      let 外键错误 = await sql<{
+        table: string
+        rowid: number | null
+        parent: string
+        fkid: number
+      }>`PRAGMA foreign_key_check`.execute(事务)
       if (外键错误.rows.length !== 0) throw new Error('浏览器迁移完成后存在外键约束错误')
     })
   } finally {
     await sql`PRAGMA foreign_keys = ON`.execute(数据库)
   }
-  return 本地数据库Schema指纹
-}
-
-function 检查标识符(名称: string): void {
-  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(名称) === false) throw new Error(`数据库标识符不合法: ${名称}`)
-}
-
-export async function 导出数据库快照(数据库: Kysely<DB>, 表名列表: string[]): Promise<数据库快照> {
-  let 结果: 数据库快照 = {}
-  for (let 表名 of 表名列表) {
-    检查标识符(表名)
-    let 查询结果 = await sql.raw<Record<string, unknown>>(`SELECT * FROM "${表名}"`).execute(数据库)
-    结果[表名] = z
-      .array(z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])))
-      .parse(查询结果.rows)
-  }
-  return 数据库快照模式.parse(结果)
-}
-
-export async function 导入数据库快照(数据库: Kysely<DB>, 快照: 数据库快照): Promise<void> {
-  let 已校验快照 = 数据库快照模式.parse(快照)
-  await sql`PRAGMA foreign_keys = OFF`.execute(数据库)
-  try {
-    await 数据库.transaction().execute(async (事务): Promise<void> => {
-      let 已有表结果 = await sql<{ name: string }>`
-        SELECT name FROM sqlite_master
-        WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != '_prisma_migrations'
-      `.execute(事务)
-      for (let 已有表 of 已有表结果.rows) {
-        检查标识符(已有表.name)
-        await sql.raw(`DELETE FROM "${已有表.name}"`).execute(事务)
-      }
-      for (let [表名, 行列表] of Object.entries(已校验快照)) {
-        检查标识符(表名)
-        for (let 行 of 行列表) {
-          let 字段名列表 = Object.keys(行)
-          if (字段名列表.length === 0) throw new Error(`不能导入空数据行: ${表名}`)
-          for (let 字段名 of 字段名列表) 检查标识符(字段名)
-          let 字段列表 = 字段名列表.map((字段名) => sql.ref(字段名))
-          let 值列表 = 字段名列表.map((字段名) => sql.val(行[字段名] ?? null))
-          await sql`INSERT INTO ${sql.table(表名)} (${sql.join(字段列表)}) VALUES (${sql.join(值列表)})`.execute(事务)
-        }
-      }
-      let 外键错误 = await sql<Record<string, unknown>>`PRAGMA foreign_key_check`.execute(事务)
-      if (外键错误.rows.length !== 0) throw new Error('导入数据库快照后存在外键约束错误')
-    })
-  } finally {
-    await sql`PRAGMA foreign_keys = ON`.execute(数据库)
-  }
+  return
 }

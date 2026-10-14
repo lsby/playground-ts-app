@@ -56,19 +56,19 @@ export let 开发任务表 = 定义任务({
   'run:web:dev': {
     说明: '启动 Web 前端开发服务器',
     环境文件: Web开发环境文件,
-    依赖: ['clean:web', 'bundle:worker:dev'],
+    依赖: ['clean:web'],
     运行: 命令('tsx', 'scripts/web/web-run.ts'),
   },
   'run:web:dev:preview': {
     说明: '启动 Web 样例前端开发服务器',
     环境文件: Web样例开发环境文件,
-    依赖: ['clean:web', 'bundle:worker:dev'],
+    依赖: ['clean:web'],
     运行: 命令('tsx', 'scripts/web/web-run.ts'),
   },
   'run:pure-frontend:dev': {
     说明: '启动纯前端开发服务器',
     环境文件: 纯前端开发环境文件,
-    依赖: ['clean:web', 'bundle:worker:dev'],
+    依赖: ['clean:web', 'bundle:worker:pure-frontend'],
     运行: 命令('tsx', 'scripts/web/web-run.ts'),
   },
   'run:electron:dev': {

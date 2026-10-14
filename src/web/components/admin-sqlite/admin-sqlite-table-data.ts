@@ -1,6 +1,5 @@
 import { z } from 'zod'
 import { JSON值 } from '../../../model/json-value'
-import { 数据库标量模式 } from '../../../model/local-first/sync-model'
 import { 组件基类 } from '../../base/base'
 import { API管理器 } from '../../global/manager/api-manager'
 import { 显示确认对话框 } from '../../global/manager/dialog-manager'
@@ -15,6 +14,8 @@ import { 数据表加载数据参数 } from '../general/table/types'
 
 type 发出事件类型 = {}
 type 监听事件类型 = {}
+
+let 数据库标量模式 = z.union([z.string(), z.number().finite(), z.boolean(), z.null()])
 
 type 数据项 = Record<string, JSON值>
 

@@ -1,18 +1,5 @@
 import { WaSqliteWorkerDialect } from 'kysely-wasqlite-worker'
-import { z } from 'zod'
 import { 项目标识 } from '../../app/meta-info'
-
-let 数据库文件名模式 = z.string().min(1).max(63)
-let 当前URL = new URL(globalThis.location.href)
-let 数据库文件名查询参数 = 当前URL.searchParams.get('databaseFileName')
-let 运行时数据库文件名 = 数据库文件名查询参数 === null ? undefined : 数据库文件名模式.parse(数据库文件名查询参数)
-
-export function 设置浏览器运行时数据库文件名(文件名: string): void {
-  数据库文件名模式.parse(文件名)
-  if (运行时数据库文件名 !== undefined && 运行时数据库文件名 !== 文件名)
-    throw new Error(`浏览器运行时数据库已绑定为 ${运行时数据库文件名}，不能切换到 ${文件名}`)
-  运行时数据库文件名 = 文件名
-}
 
 /**
  * SQLite runs in a dedicated Worker and persists its database through IndexedDB.
@@ -27,5 +14,8 @@ export let 创建浏览器sqlite数据库适配器 = (fileName: string): WaSqlit
     worker: new Worker(new URL('../pure-frontend/local-sqlite-worker.ts', import.meta.url), { type: 'module' }),
   })
 
-export let 创建sqlite数据库适配器 = (path: string): WaSqliteWorkerDialect =>
-  创建浏览器sqlite数据库适配器(运行时数据库文件名 ?? `${项目标识}-${path.split(/[/\\]/).pop() ?? 'local.db'}`)
+export function 创建sqlite数据库适配器(path: string): WaSqliteWorkerDialect {
+  let 文件名 = path.split(/[/\\]/).pop()
+  if (文件名 === undefined || 文件名 === '') throw new Error('无法从数据库路径获得文件名')
+  return 创建浏览器sqlite数据库适配器(`${项目标识}-${文件名}`)
+}
