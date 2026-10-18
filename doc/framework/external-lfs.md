@@ -49,7 +49,7 @@ EXTERNAL_LFS_COS_SECRET_KEY=替换为SecretKey
 - 每次上传使用随机对象名，不覆盖旧对象；取消登记不会删除云端历史对象。
 - 文件使用 AES-256-GCM 加密，每个对象和清单都使用随机盐，通过 HKDF 从 `.project-config.key` 派生独立密钥。
 - 清单文件名是随机 UUID，文件路径、SHA-256、云端 object key 和 versionId 都在加密清单内部。
-- `.external-lfs/manifests/` 必须提交 Git；`.project-config.key`、管辖目录明文、恢复区和 `.decode` 文件禁止提交。
+- `.external-lfs/manifests/` 无需预创建，首次产生清单时由 `push` 自动创建；其中生成的加密清单文件必须提交 Git。`.project-config.key`、管辖目录明文、恢复区和 `.decode` 文件禁止提交。
 - 第一版拒绝符号链接，加密后单文件上限为 5 GiB。
 - 同一组清单只属于一个 provider；切换云厂商前必须显式迁移。
 
