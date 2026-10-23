@@ -94,7 +94,7 @@ async function 主函数(): Promise<void> {
         { name: '开发环境 (development)', value: 'development' },
         { name: '生产环境 (production)', value: 'production' },
       ],
-      default: 'production',
+      default: 'development',
       when: (待回答: any): boolean => 待回答.模式 !== 'delete',
     },
     {
