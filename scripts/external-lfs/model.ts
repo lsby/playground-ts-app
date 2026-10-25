@@ -7,17 +7,61 @@ let 相对路径Schema = z
   .refine((值) => 值.startsWith('/') === false && /^[A-Za-z]:/u.test(值) === false, '路径必须是相对路径')
   .refine((值) => 值.split('/').includes('..') === false, '路径不能包含 ..')
 
-export let 外挂LFS配置Schema = z
+let 目标名称Schema = z.string().regex(/^[a-z0-9][a-z0-9-]*$/u, '目标名称仅支持小写字母、数字和短横线')
+
+export let 阿里云目标配置Schema = z
   .object({
-    version: z.literal(1),
-    provider: z.enum(['aliyun-oss', 'tencent-cos']),
-    credentialsFile: 相对路径Schema,
-    keyFile: 相对路径Schema,
-    manifestDirectory: 相对路径Schema,
+    provider: z.literal('aliyun-oss'),
     remotePrefix: z
       .string()
       .min(1)
-      .refine((值) => 值.startsWith('/') === false && 值.endsWith('/') === false),
+      .refine((值) => 值.startsWith('/') === false && 值.endsWith('/') === false, 'remotePrefix 前后不能有 /'),
+    env: z
+      .object({
+        region: z.string().min(1),
+        endpoint: z.string().min(1),
+        bucket: z.string().min(1),
+        accessKeyId: z.string().min(1),
+        accessKeySecret: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict()
+
+export type 阿里云目标配置 = z.infer<typeof 阿里云目标配置Schema>
+
+export let 腾讯云目标配置Schema = z
+  .object({
+    provider: z.literal('tencent-cos'),
+    remotePrefix: z
+      .string()
+      .min(1)
+      .refine((值) => 值.startsWith('/') === false && 值.endsWith('/') === false, 'remotePrefix 前后不能有 /'),
+    env: z
+      .object({
+        region: z.string().min(1),
+        bucket: z.string().min(1),
+        secretId: z.string().min(1),
+        secretKey: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict()
+
+export type 腾讯云目标配置 = z.infer<typeof 腾讯云目标配置Schema>
+
+export let 目标配置Schema = z.discriminatedUnion('provider', [阿里云目标配置Schema, 腾讯云目标配置Schema])
+export type 目标配置 = z.infer<typeof 目标配置Schema>
+
+export let 外挂LFS配置Schema = z
+  .object({
+    version: z.literal(1),
+    credentialsFile: 相对路径Schema,
+    keyFile: 相对路径Schema,
+    manifestDirectory: 相对路径Schema,
+    targets: z
+      .record(目标名称Schema, 目标配置Schema)
+      .refine((值) => Object.keys(值).length > 0, '至少配置一个存储目标'),
     managedPaths: z
       .array(z.object({ path: 相对路径Schema, scope: z.string().regex(/^[a-z0-9][a-z0-9-]*$/u) }).strict())
       .min(1),
@@ -27,33 +71,32 @@ export let 外挂LFS配置Schema = z
 
 export type 外挂LFS配置 = z.infer<typeof 外挂LFS配置Schema>
 
-export let OSS凭据Schema = z
+export let 纯OSS凭据Schema = z
   .object({
-    CONFIG_ENCRYPTION: z.literal('false'),
-    EXTERNAL_LFS_OSS_REGION: z.string().min(1),
-    EXTERNAL_LFS_OSS_ENDPOINT: z.string().url(),
-    EXTERNAL_LFS_OSS_BUCKET: z.string().min(1),
-    EXTERNAL_LFS_OSS_ACCESS_KEY_ID: z.string().min(1),
-    EXTERNAL_LFS_OSS_ACCESS_KEY_SECRET: z.string().min(1),
+    region: z.string().min(1),
+    endpoint: z.string().url(),
+    bucket: z.string().min(1),
+    accessKeyId: z.string().min(1),
+    accessKeySecret: z.string().min(1),
   })
   .strict()
 
-export type OSS凭据 = z.infer<typeof OSS凭据Schema>
+export type 纯OSS凭据 = z.infer<typeof 纯OSS凭据Schema>
 
-export let COS凭据Schema = z
+export let 纯COS凭据Schema = z
   .object({
-    CONFIG_ENCRYPTION: z.literal('false'),
-    EXTERNAL_LFS_COS_REGION: z.string().min(1),
-    EXTERNAL_LFS_COS_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9-]*-\d+$/u),
-    EXTERNAL_LFS_COS_SECRET_ID: z.string().min(1),
-    EXTERNAL_LFS_COS_SECRET_KEY: z.string().min(1),
+    region: z.string().min(1),
+    bucket: z.string().regex(/^[a-z0-9][a-z0-9-]*-\d+$/u),
+    secretId: z.string().min(1),
+    secretKey: z.string().min(1),
   })
   .strict()
 
-export type COS凭据 = z.infer<typeof COS凭据Schema>
-export type 云凭据 =
-  | { provider: 'aliyun-oss'; credentials: OSS凭据 }
-  | { provider: 'tencent-cos'; credentials: COS凭据 }
+export type 纯COS凭据 = z.infer<typeof 纯COS凭据Schema>
+
+export type 目标云凭据 =
+  | { targetName: string; provider: 'aliyun-oss'; credentials: 纯OSS凭据 }
+  | { targetName: string; provider: 'tencent-cos'; credentials: 纯COS凭据 }
 
 export let 清单Schema = z
   .object({
@@ -64,6 +107,7 @@ export let 清单Schema = z
     plaintext: z.object({ size: z.number().int().nonnegative(), sha256: z.string().regex(/^[a-f0-9]{64}$/u) }).strict(),
     remote: z
       .object({
+        target: 目标名称Schema,
         provider: z.enum(['aliyun-oss', 'tencent-cos']),
         objectKey: z.string().min(1),
         versionId: z.string().min(1),

@@ -2,7 +2,7 @@ import COS from 'cos-nodejs-sdk-v5'
 import fs from 'node:fs'
 import { z } from 'zod'
 import type { 云存储仓库, 远端元数据 } from './cloud-store'
-import type { COS凭据, 清单 } from './model'
+import type { 清单, 纯COS凭据 } from './model'
 
 let 响应头Schema = z
   .object({
@@ -18,10 +18,10 @@ export class 腾讯云COS仓库 implements 云存储仓库 {
   private readonly region: string
   private readonly bucket: string
 
-  public constructor(凭据: COS凭据) {
-    this.客户端 = new COS({ SecretId: 凭据.EXTERNAL_LFS_COS_SECRET_ID, SecretKey: 凭据.EXTERNAL_LFS_COS_SECRET_KEY })
-    this.region = 凭据.EXTERNAL_LFS_COS_REGION
-    this.bucket = 凭据.EXTERNAL_LFS_COS_BUCKET
+  public constructor(凭据: 纯COS凭据) {
+    this.客户端 = new COS({ SecretId: 凭据.secretId, SecretKey: 凭据.secretKey })
+    this.region = 凭据.region
+    this.bucket = 凭据.bucket
   }
 
   private 解析响应头(输入: COS.Headers | undefined): 远端元数据 {

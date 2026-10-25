@@ -1,10 +1,31 @@
 {
   "version": 1,
-  "provider": "tencent-cos",
   "credentialsFile": ".env/.env.external-lfs",
   "keyFile": ".project-config.key",
   "manifestDirectory": ".external-lfs/manifests",
-  "remotePrefix": "replace-with-project-name/private-files/v1",
+  "targets": {
+    "default-cos": {
+      "provider": "tencent-cos",
+      "remotePrefix": "replace-with-project-name/private-files/v1",
+      "env": {
+        "region": "EXTERNAL_LFS_COS_REGION",
+        "bucket": "EXTERNAL_LFS_COS_BUCKET",
+        "secretId": "EXTERNAL_LFS_COS_SECRET_ID",
+        "secretKey": "EXTERNAL_LFS_COS_SECRET_KEY"
+      }
+    },
+    "backup-oss": {
+      "provider": "aliyun-oss",
+      "remotePrefix": "replace-with-project-name/backup-files/v1",
+      "env": {
+        "region": "EXTERNAL_LFS_OSS_REGION",
+        "endpoint": "EXTERNAL_LFS_OSS_ENDPOINT",
+        "bucket": "EXTERNAL_LFS_OSS_BUCKET",
+        "accessKeyId": "EXTERNAL_LFS_OSS_ACCESS_KEY_ID",
+        "accessKeySecret": "EXTERNAL_LFS_OSS_ACCESS_KEY_SECRET"
+      }
+    }
+  },
   "managedPaths": [{ "path": "doc/private", "scope": "private" }],
   "exclude": ["**/.DS_Store", "**/*.tmp", "**/.gitkeep"]
 }

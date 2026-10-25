@@ -1,7 +1,7 @@
 import OSS from 'ali-oss'
 import { z } from 'zod'
 import type { 云存储仓库, 远端元数据 } from './cloud-store'
-import type { OSS凭据, 清单 } from './model'
+import type { 清单, 纯OSS凭据 } from './model'
 
 let 响应头Schema = z
   .object({
@@ -16,13 +16,13 @@ let 上传响应头Schema = z.object({ 'x-oss-version-id': z.string().min(1) }).
 export class 阿里云OSS仓库 implements 云存储仓库 {
   private readonly 客户端: OSS
 
-  public constructor(凭据: OSS凭据) {
+  public constructor(凭据: 纯OSS凭据) {
     this.客户端 = new OSS({
-      region: 凭据.EXTERNAL_LFS_OSS_REGION,
-      endpoint: 凭据.EXTERNAL_LFS_OSS_ENDPOINT,
-      bucket: 凭据.EXTERNAL_LFS_OSS_BUCKET,
-      accessKeyId: 凭据.EXTERNAL_LFS_OSS_ACCESS_KEY_ID,
-      accessKeySecret: 凭据.EXTERNAL_LFS_OSS_ACCESS_KEY_SECRET,
+      region: 凭据.region,
+      endpoint: 凭据.endpoint,
+      bucket: 凭据.bucket,
+      accessKeyId: 凭据.accessKeyId,
+      accessKeySecret: 凭据.accessKeySecret,
       authorizationV4: true,
       secure: true,
     })

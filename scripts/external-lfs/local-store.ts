@@ -5,10 +5,20 @@ import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { 项目根目录 } from './config'
 import { 加密文件, 解密文件 } from './crypto'
-import { 清单Schema, type 外挂LFS配置, type 本地文件, type 清单 } from './model'
+import { type 外挂LFS配置, type 本地文件, type 清单, 清单Schema } from './model'
 
-function 规范路径(值: string): string {
+export function 规范路径(值: string): string {
   return 值.replaceAll('\\', '/')
+}
+
+export function 文件匹配模式(相对路径: string, 模式: string): boolean {
+  let 规范 = 规范路径(模式)
+  if (相对路径 === 规范) return true
+  let 目录前缀 = 规范.endsWith('/') ? 规范 : `${规范}/`
+  if (相对路径.startsWith(目录前缀)) return true
+  if (path.matchesGlob(相对路径, 规范)) return true
+  if (规范.includes('/') === false && path.matchesGlob(相对路径, `**/${规范}`)) return true
+  return false
 }
 
 function 是否排除(相对路径: string, 配置: 外挂LFS配置): boolean {
@@ -54,6 +64,20 @@ export async function 扫描本地文件(配置: 外挂LFS配置, scope?: string
   return 映射
 }
 
+export async function 获取单个本地文件(配置: 外挂LFS配置, 相对路径: string): Promise<本地文件> {
+  let 规范化 = 规范路径(相对路径)
+  let 管辖项 = 配置.managedPaths.find((项) => 规范化 === 项.path || 规范化.startsWith(`${项.path}/`))
+  if (管辖项 === undefined || 是否排除(规范化, 配置) === true) {
+    throw new Error(`文件不属于任何管辖路径或已被排除: ${规范化}`)
+  }
+  let 绝对路径 = path.resolve(项目根目录, 规范化)
+  if (fs.existsSync(绝对路径) === false || fs.statSync(绝对路径).isFile() === false) {
+    throw new Error(`本地文件不存在: ${规范化}`)
+  }
+  let 摘要 = await 计算摘要(绝对路径)
+  return { path: 规范化, scope: 管辖项.scope, absolutePath: 绝对路径, ...摘要 }
+}
+
 function 临时目录(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'nugget-external-lfs-'))
 }
@@ -74,14 +98,18 @@ export async function 读取清单组(配置: 外挂LFS配置): Promise<Map<stri
       let 清单 = 清单Schema.parse(JSON.parse(fs.readFileSync(明文路径, 'utf8')))
       if (清单.id !== 标识) throw new Error(`清单文件名与 id 不一致: ${名称}`)
       let 管辖项 = 配置.managedPaths.find((项) => 项.scope === 清单.scope)
-      if (管辖项 === undefined || 清单.path.startsWith(`${管辖项.path}/`) === false) {
+      if (管辖项 === undefined || (清单.path !== 管辖项.path && 清单.path.startsWith(`${管辖项.path}/`) === false)) {
         throw new Error(`清单路径不属于声明的 scope: ${清单.path}`)
       }
-      if (清单.remote.objectKey.startsWith(`${配置.remotePrefix}/objects/`) === false) {
-        throw new Error(`清单对象不属于声明的云端前缀: ${清单.path}`)
+      let 目标配置 = 配置.targets[清单.remote.target]
+      if (目标配置 === undefined) {
+        throw new Error(`清单指定的存储目标未在配置中声明: ${清单.remote.target} (${清单.path})`)
       }
-      if (清单.remote.provider !== 配置.provider) {
-        throw new Error(`清单 provider 与当前配置不一致: ${清单.path}`)
+      if (清单.remote.objectKey.startsWith(`${目标配置.remotePrefix}/objects/`) === false) {
+        throw new Error(`清单对象不属于目标声明的云端前缀: ${清单.path}`)
+      }
+      if (清单.remote.provider !== 目标配置.provider) {
+        throw new Error(`清单 provider 与当前目标配置不一致: ${清单.path}`)
       }
       if (结果.has(清单.path) === true) throw new Error(`存在重复清单路径: ${清单.path}`)
       结果.set(清单.path, 清单)

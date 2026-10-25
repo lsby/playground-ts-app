@@ -2,7 +2,7 @@ import dotenv from 'dotenv'
 import fs from 'node:fs'
 import path from 'node:path'
 import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
-import { COS凭据Schema, OSS凭据Schema, 外挂LFS配置Schema, type 云凭据, type 外挂LFS配置 } from './model'
+import { type 外挂LFS配置, 外挂LFS配置Schema, type 目标云凭据, 纯COS凭据Schema, 纯OSS凭据Schema } from './model'
 
 export let 项目根目录 = path.resolve(import.meta.dirname, '../..')
 
@@ -24,18 +24,40 @@ export function 读取配置(配置参数?: string): { 配置: 外挂LFS配置; 
   return { 配置, 配置路径 }
 }
 
-export function 读取云凭据(配置: 外挂LFS配置): 云凭据 {
+export function 读取云凭据(配置: 外挂LFS配置, 目标名称: string): 目标云凭据 {
   let 文件路径 = path.resolve(项目根目录, 配置.credentialsFile)
   if (fs.existsSync(文件路径) === false) {
     throw new Error(`找不到云存储凭据文件: ${文件路径}\n请按 doc/framework/external-lfs.md 创建并加密它。`)
   }
+  let 目标配置 = 配置.targets[目标名称]
+  if (目标配置 === undefined) {
+    throw new Error(`未声明的存储目标: ${目标名称}`)
+  }
   let 内容 = 读取环境文件明文(项目根目录, 文件路径)
   let 环境字段 = dotenv.parse(内容)
-  switch (配置.provider) {
-    case 'aliyun-oss':
-      return { provider: 'aliyun-oss', credentials: OSS凭据Schema.parse(环境字段) }
-    case 'tencent-cos':
-      return { provider: 'tencent-cos', credentials: COS凭据Schema.parse(环境字段) }
+  if (环境字段['CONFIG_ENCRYPTION'] !== 'false') {
+    throw new Error(`凭据文件必须包含 CONFIG_ENCRYPTION=false: ${文件路径}`)
+  }
+  switch (目标配置.provider) {
+    case 'aliyun-oss': {
+      let 映射凭据 = {
+        region: 环境字段[目标配置.env.region] ?? '',
+        endpoint: 环境字段[目标配置.env.endpoint] ?? '',
+        bucket: 环境字段[目标配置.env.bucket] ?? '',
+        accessKeyId: 环境字段[目标配置.env.accessKeyId] ?? '',
+        accessKeySecret: 环境字段[目标配置.env.accessKeySecret] ?? '',
+      }
+      return { targetName: 目标名称, provider: 'aliyun-oss', credentials: 纯OSS凭据Schema.parse(映射凭据) }
+    }
+    case 'tencent-cos': {
+      let 映射凭据 = {
+        region: 环境字段[目标配置.env.region] ?? '',
+        bucket: 环境字段[目标配置.env.bucket] ?? '',
+        secretId: 环境字段[目标配置.env.secretId] ?? '',
+        secretKey: 环境字段[目标配置.env.secretKey] ?? '',
+      }
+      return { targetName: 目标名称, provider: 'tencent-cos', credentials: 纯COS凭据Schema.parse(映射凭据) }
+    }
   }
 }
 
@@ -43,4 +65,13 @@ export function 校验范围(配置: 外挂LFS配置, 范围?: string): string |
   if (范围 === undefined) return undefined
   if (配置.managedPaths.some((项) => 项.scope === 范围) === false) throw new Error(`未知 scope: ${范围}`)
   return 范围
+}
+
+export function 校验目标(配置: 外挂LFS配置, 目标?: string): string | undefined {
+  if (目标 === undefined) return undefined
+  if (配置.targets[目标] === undefined) {
+    let 可选目标 = Object.keys(配置.targets).join(', ')
+    throw new Error(`未知 target: ${目标}。当前配置的目标有: ${可选目标}`)
+  }
+  return 目标
 }
