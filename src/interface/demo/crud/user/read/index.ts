@@ -9,7 +9,6 @@ import {
 } from '@lsby/net-core'
 import { Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
-import { 环境变量 } from '../../../../../global/env'
 import { kysely插件 } from '../../../../../global/plugin'
 import { 检查管理员登录 } from '../../../../../interface-logic/check/check-login-jwt-admin'
 
@@ -38,18 +37,6 @@ let 接口逻辑实现 = 接口逻辑
         kysely插件,
       ],
       async (参数) => {
-        // 样例模式 返回假数据
-        if (环境变量.SAMPLE_MODE === true) {
-          return new Right({
-            data: [
-              { id: 'preview-user-1', name: '用户一' },
-              { id: 'preview-user-2', name: '用户二' },
-              { id: 'preview-user-3', name: '管理员' },
-            ],
-            total: 3,
-          })
-        }
-
         let { page, size, orderBy, filter } = 参数.json
         let 查询 = 参数.kysely.获得句柄().selectFrom('user')
         if (filter !== undefined) {

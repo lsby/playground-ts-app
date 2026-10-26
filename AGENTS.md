@@ -138,10 +138,6 @@
 - **核心规范与架构设计**: 纯前端 (Pure Frontend) 的核心组件（API Worker, SQLite Worker, IndexedDB 持久化）、生成与配置、以及并发锁机制等详细设计规范，请参见 [doc/framework/pure-frontend.md](doc/framework/pure-frontend.md)。
 - **注意**: 纯前端标注的接口会在本地浏览器运行，开发时必须运行完整的 `npm run task -- dev:pure-frontend` 以监听派生文件的更新。
 
-### 样例模式
-
-- **规范与最佳实践**: 样例模式的设计哲学、编写原则（坚持硬编码、杜绝过度设计、容忍联动断裂）以及运行机制，请参见 [doc/framework/sample-mode.md](doc/framework/sample-mode.md)。
-
 ### 任务系统
 
 - **即时任务**:
@@ -169,7 +165,6 @@
 
 - **设计与实践原则**:
   - **杜绝过度设计**: 不为了形式上的分层去机械封装缺乏行为的类、薄仓储包装或重复的 DTO。利用好 TypeScript 的判别联合、纯函数和 Zod Schema 即可清晰表达领域。
-  - **样例模式边界**: 样例模式下的硬编码 Mock 数据属于临时接口逻辑，就近存放在接口分支内，不得进入 `src/interface-logic/` 和 `src/model/`；只有真实业务成立的契约与不变量才属于领域模型。
 
 ## 工程化与运维部署
 
@@ -177,7 +172,7 @@
 
 - **环境变量机制**:
   - 环境变量的模型被定义在 `src/global/env.ts` 中, 而加载它的机制位于 `src/global/env-provider.ts`
-  - 工程任务直接指定入库的正式环境文件. `CONFIG_ENCRYPTION` 控制明文或逐项加密模式, 加密模式的项目密钥位于根目录 `.project-config.key` 并严禁入库. `NODE_ENV` 与 `BUILD_TARGET` 在加载时校验运行环境, `LOCAL_MODE` 控制本地免登录, `SAMPLE_MODE` 控制选中业务接口的样例分支
+  - 工程任务直接指定入库的正式环境文件. `CONFIG_ENCRYPTION` 控制明文或逐项加密模式, 加密模式的项目密钥位于根目录 `.project-config.key` 并严禁入库. `NODE_ENV` 与 `BUILD_TARGET` 在加载时校验运行环境, `LOCAL_MODE` 控制本地免登录
   - `DEPLOY_ALLOW_DIRTY_GIT` 控制部署脚本是否允许工作区、暂存区或未跟踪文件不干净. 它只放宽 dirty 检查, 发布信息中的提交哈希必须始终由发布脚本直接从当前 Git 仓库计算
   - 人工修改加密配置时先运行 `env:decode` 生成 `.decode`, 修改后运行 `env:encode` 写回正式文件并清理全部 `.decode`; 程序运行、构建和发布过程只在内存中解密
   - 环境加密相关任务为 `env:decode`, `env:encode`, `env:enable-encryption`, `env:disable-encryption` 和 `env:status`; 均通过 `npm run task -- <任务名>` 执行

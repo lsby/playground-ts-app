@@ -37,8 +37,6 @@ export let 环境变量 = getRawEnv(
       DEBUG_NAME: 非空字符串,
       // 本地免登录模式
       LOCAL_MODE: z.enum(['true', 'false']).transform((值): boolean => 值 === 'true'),
-      // 样例模式, 仅由显式选择的接口模拟数据
-      SAMPLE_MODE: z.enum(['true', 'false']).transform((值): boolean => 值 === 'true'),
       // 部署时是否允许工作区或暂存区包含未提交修改
       DEPLOY_ALLOW_DIRTY_GIT: z.enum(['true', 'false']).transform((值): boolean => 值 === 'true'),
       // ========= 数据库部分 开始 =========

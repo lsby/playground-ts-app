@@ -7,7 +7,12 @@
       "command": "npm run task -- watch:api-list",
       "problemMatcher": [
         {
-          "pattern": { "kind": "file", "regexp": "(错误: .*)", "file": 1, "message": 1 },
+          "pattern": {
+            "kind": "file",
+            "regexp": "(错误: .*)",
+            "file": 1,
+            "message": 1
+          },
           "background": {
             "activeOnStart": true,
             "beginsPattern": "^========生成开始========$",
@@ -16,8 +21,13 @@
         }
       ],
       "isBackground": true,
-      "presentation": { "reveal": "never" },
-      "group": { "kind": "build", "isDefault": true }
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     },
     {
       "label": "_持续生成API接口类型",
@@ -25,7 +35,12 @@
       "command": "npm run task -- watch:api-type",
       "problemMatcher": [
         {
-          "pattern": { "kind": "file", "regexp": "(错误: .*)", "file": 1, "message": 1 },
+          "pattern": {
+            "kind": "file",
+            "regexp": "(错误: .*)",
+            "file": 1,
+            "message": 1
+          },
           "background": {
             "activeOnStart": true,
             "beginsPattern": "^========生成开始========$",
@@ -34,8 +49,13 @@
         }
       ],
       "isBackground": true,
-      "presentation": { "reveal": "never" },
-      "group": { "kind": "build", "isDefault": true }
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     },
     {
       "label": "_持续生成web页面入口",
@@ -43,7 +63,12 @@
       "command": "npm run task -- watch:web-page-entry",
       "problemMatcher": [
         {
-          "pattern": { "kind": "file", "regexp": "(错误: .*)", "file": 1, "message": 1 },
+          "pattern": {
+            "kind": "file",
+            "regexp": "(错误: .*)",
+            "file": 1,
+            "message": 1
+          },
           "background": {
             "activeOnStart": true,
             "beginsPattern": "^========生成开始========$",
@@ -52,17 +77,29 @@
         }
       ],
       "isBackground": true,
-      "presentation": { "reveal": "never" },
-      "group": { "kind": "build", "isDefault": true }
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     },
     {
       "label": "_持续类型检查",
       "type": "shell",
       "command": "npm run task -- watch:type",
-      "problemMatcher": ["$tsc-watch"],
+      "problemMatcher": [
+        "$tsc-watch"
+      ],
       "isBackground": true,
-      "presentation": { "reveal": "never" },
-      "group": { "kind": "build", "isDefault": true }
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     },
     {
       "label": "_持续ESLint检查",
@@ -72,7 +109,10 @@
         "owner": "eslint",
         "source": "eslint",
         "pattern": [
-          { "regexp": "^(.+)$", "file": 1 },
+          {
+            "regexp": "^(.+)$",
+            "file": 1
+          },
           {
             "regexp": "^\\s+(\\d+):(\\d+)\\s+(error|warning|info)\\s+(.*?)\\s+(.+)$",
             "line": 1,
@@ -89,48 +129,52 @@
         }
       },
       "isBackground": true,
-      "presentation": { "reveal": "never" },
-      "group": { "kind": "build", "isDefault": true }
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     },
     {
       "label": "_运行web后端",
       "type": "shell",
       "command": "npm run task -- run:service:dev",
       "isBackground": true,
-      "presentation": { "reveal": "never" },
-      "group": { "kind": "build", "isDefault": true }
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     },
     {
       "label": "_运行前端",
       "type": "shell",
       "command": "npm run task -- run:web:dev",
       "isBackground": true,
-      "presentation": { "reveal": "never" },
-      "group": { "kind": "build", "isDefault": true }
-    },
-    {
-      "label": "_运行web样例模式后端",
-      "type": "shell",
-      "command": "npm run task -- run:service:dev:preview",
-      "isBackground": true,
-      "presentation": { "reveal": "never" },
-      "group": { "kind": "build", "isDefault": true }
-    },
-    {
-      "label": "_运行web样例模式前端",
-      "type": "shell",
-      "command": "npm run task -- run:web:dev:preview",
-      "isBackground": true,
-      "presentation": { "reveal": "never" },
-      "group": { "kind": "build", "isDefault": true }
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     },
     {
       "label": "_运行electron后端",
       "type": "shell",
       "command": "npm run task -- run:electron:dev",
       "isBackground": true,
-      "presentation": { "reveal": "never" },
-      "group": { "kind": "build", "isDefault": true }
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     },
     {
       "label": "运行web开发套件",
@@ -143,20 +187,6 @@
         "_持续生成web页面入口",
         "_运行web后端",
         "_运行前端"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "运行web样例模式开发套件",
-      "dependsOrder": "parallel",
-      "dependsOn": [
-        "_持续类型检查",
-        "_持续ESLint检查",
-        "_持续生成API接口列表",
-        "_持续生成API接口类型",
-        "_持续生成web页面入口",
-        "_运行web样例模式后端",
-        "_运行web样例模式前端"
       ],
       "problemMatcher": []
     },
@@ -180,7 +210,12 @@
       "command": "npm run task -- watch:local-api-list",
       "problemMatcher": [
         {
-          "pattern": { "kind": "file", "regexp": "(错误: .*)", "file": 1, "message": 1 },
+          "pattern": {
+            "kind": "file",
+            "regexp": "(错误: .*)",
+            "file": 1,
+            "message": 1
+          },
           "background": {
             "activeOnStart": true,
             "beginsPattern": "^========生成开始========$",
@@ -189,8 +224,13 @@
         }
       ],
       "isBackground": true,
-      "presentation": { "reveal": "never" },
-      "group": { "kind": "build", "isDefault": true }
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     },
     {
       "label": "_持续生成纯前端本地数据库Schema",
@@ -198,7 +238,12 @@
       "command": "npm run task -- watch:local-schema",
       "problemMatcher": [
         {
-          "pattern": { "kind": "file", "regexp": "(错误: .*)", "file": 1, "message": 1 },
+          "pattern": {
+            "kind": "file",
+            "regexp": "(错误: .*)",
+            "file": 1,
+            "message": 1
+          },
           "background": {
             "activeOnStart": true,
             "beginsPattern": "^========生成开始========$",
@@ -207,16 +252,26 @@
         }
       ],
       "isBackground": true,
-      "presentation": { "reveal": "never" },
-      "group": { "kind": "build", "isDefault": true }
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     },
     {
       "label": "_运行纯前端",
       "type": "shell",
       "command": "npm run task -- run:pure-frontend:dev",
       "isBackground": true,
-      "presentation": { "reveal": "never" },
-      "group": { "kind": "build", "isDefault": true }
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     },
     {
       "label": "运行纯前端开发套件",
