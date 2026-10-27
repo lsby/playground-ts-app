@@ -200,6 +200,8 @@ namespace LsbyLauncher
             appProcess.StartInfo.CreateNoWindow = true;
             appProcess.StartInfo.RedirectStandardOutput = true;
             appProcess.StartInfo.RedirectStandardError = true;
+            appProcess.StartInfo.StandardOutputEncoding = Encoding.UTF8;
+            appProcess.StartInfo.StandardErrorEncoding = Encoding.UTF8;
 
             appProcess.OutputDataReceived += (s, e) =>
             {
