@@ -9,7 +9,7 @@ if exist "data\update-in-progress" (
   exit /b 1
 )
 
-set "ENV_FILE_PATH=app\.env\.env.production.electron"
+set "ENV_FILE_PATH=%~dp0app\.env\.env.production.electron"
 set "DEBUG=@lsby:*,@lsby:playground-ts-app:*"
 start /wait "" "app\lsby-playground-ts-app.exe"
 if errorlevel 1 (

@@ -182,8 +182,8 @@ namespace LsbyLauncher
                     string[] envFiles = Directory.GetFiles(envDir, ".env.production.*");
                     if (envFiles.Length > 0)
                     {
-                        string relativePath = Path.Combine("app", ".env", Path.GetFileName(envFiles[0]));
-                        Environment.SetEnvironmentVariable("ENV_FILE_PATH", relativePath);
+                        string fullPath = Path.GetFullPath(envFiles[0]);
+                        Environment.SetEnvironmentVariable("ENV_FILE_PATH", fullPath);
                     }
                 }
             }

@@ -151,6 +151,10 @@ async function 执行构建(): Promise<void> {
     let 环境目标路径组: string[] = [
       path.join(process.platform === 'win32' ? path.join(生成目录, 'app') : 生成目录, '.env'),
     ]
+    let winResourcesEnv = path.join(生成目录, 'app/resources/app/.env')
+    if (fs.existsSync(path.dirname(winResourcesEnv)) === true) {
+      环境目标路径组.push(winResourcesEnv)
+    }
     let appResourcesEnv = path.join(生成目录, 'lsby-playground-ts-app.app/Contents/Resources/app/.env')
     if (fs.existsSync(path.dirname(appResourcesEnv)) === true) {
       环境目标路径组.push(appResourcesEnv)
