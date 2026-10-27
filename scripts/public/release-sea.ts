@@ -83,7 +83,7 @@ async function 执行构建(): Promise<void> {
     console.log('[2/9] 正在使用 esbuild 合并代码...')
     execSync(
       `npx esbuild src/server.ts --bundle --platform=node --target=node22 --outfile=${相对发布目录}/server.bundle.cjs --format=cjs --packages=bundle --define:import.meta.dirname=__dirname --define:import.meta.url=__import_meta_url --banner:js="var __import_meta_url = typeof __filename !== 'undefined' && __filename ? require('url').pathToFileURL(__filename).href : 'file:///'; var __dirname = typeof __dirname !== 'undefined' ? __dirname : '/';"`,
-      { stdio: 'inherit', cwd: 项目根目录 },
+      { stdio: ['ignore', 'inherit', 'inherit'], cwd: 项目根目录 },
     )
 
     console.log('[3/9] 正在生成 SEA 配置...')
@@ -96,7 +96,10 @@ async function 执行构建(): Promise<void> {
     fs.writeFileSync(path.join(项目根目录, `${相对发布目录}/sea-config.json`), JSON.stringify(SEA配置, null, 2))
 
     console.log('[4/9] 正在生成 SEA blob...')
-    execSync(`node --experimental-sea-config ${相对发布目录}/sea-config.json`, { stdio: 'inherit', cwd: 项目根目录 })
+    execSync(`node --experimental-sea-config ${相对发布目录}/sea-config.json`, {
+      stdio: ['ignore', 'inherit', 'inherit'],
+      cwd: 项目根目录,
+    })
 
     console.log('[5/9] 正在准备可执行文件...')
     let Node可执行文件 = process.execPath
@@ -108,14 +111,17 @@ async function 执行构建(): Promise<void> {
       console.log('[6/9] 正在移除 Windows 代码签名...')
       // Windows 下 node.exe 是签名的, postject 无法注入已签名的二进制
       try {
-        execSync(`signtool remove /s "${目标可执行文件}"`, { stdio: 'inherit', cwd: 项目根目录 })
+        execSync(`signtool remove /s "${目标可执行文件}"`, { stdio: ['ignore', 'inherit', 'inherit'], cwd: 项目根目录 })
       } catch (_) {
         console.log('  signtool 不可用, 将使用 --overwrite 标志')
       }
     } else if (process.platform === 'darwin') {
       console.log('[6/9] 正在移除 macOS 代码签名...')
       try {
-        execSync(`codesign --remove-signature "${目标可执行文件}"`, { stdio: 'inherit', cwd: 项目根目录 })
+        execSync(`codesign --remove-signature "${目标可执行文件}"`, {
+          stdio: ['ignore', 'inherit', 'inherit'],
+          cwd: 项目根目录,
+        })
       } catch (_) {
         console.log('  codesign 移除签名失败，将使用 --overwrite 标志')
       }
@@ -125,7 +131,7 @@ async function 执行构建(): Promise<void> {
     let machoFlags = process.platform === 'darwin' ? '--macho-segment-name NODE_SEA' : ''
     execSync(
       `npx postject "${目标可执行文件}" NODE_SEA_BLOB "${相对发布目录}/sea-prep.blob" --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 ${machoFlags} --overwrite`,
-      { stdio: 'inherit', cwd: 项目根目录 },
+      { stdio: ['ignore', 'inherit', 'inherit'], cwd: 项目根目录 },
     )
 
     if (process.platform !== 'win32') {
@@ -134,7 +140,7 @@ async function 执行构建(): Promise<void> {
       } catch (_) {}
       if (process.platform === 'darwin') {
         try {
-          execSync(`codesign -s - "${目标可执行文件}"`, { stdio: 'inherit', cwd: 项目根目录 })
+          execSync(`codesign -s - "${目标可执行文件}"`, { stdio: ['ignore', 'inherit', 'inherit'], cwd: 项目根目录 })
         } catch (_) {}
       }
     }
@@ -197,7 +203,7 @@ async function 执行构建(): Promise<void> {
           // 使用 Windows GUI 子系统，默认只显示托盘图标；控制台由引导器按需创建
           execSync(
             `"${cscPath}" /nologo /target:winexe /out:"${runExe路径}" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll "${launcher源文件}"`,
-            { stdio: 'inherit' },
+            { stdio: ['ignore', 'inherit', 'inherit'] },
           )
           console.log(`✅ 已生成 ${runExe路径}`)
         } catch (error) {

@@ -49,7 +49,7 @@ async function 执行发布(): Promise<void> {
     }
 
     console.log('📦 正在发布到 NPM...')
-    execSync('npm publish --access public', { stdio: 'inherit', cwd: 项目根目录 })
+    execSync('npm publish --access public', { stdio: ['ignore', 'inherit', 'inherit'], cwd: 项目根目录 })
 
     console.log('✨ NPM 发布成功！')
   } catch (错误) {

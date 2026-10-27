@@ -33,6 +33,7 @@
   - 更新模型后执行 `npm run task -- test:requirement:coverage` 刷新覆盖率。
   - 执行测试使用 `npm run test:requirement`（支持交互、`--all` 全量、`--scenario=<流程名>`、`--requirement=<需求名>`、`--auto` / `--demo`）。
   - 选中人工验收流程时会询问是否跳过（可用 `--skip-manual` / `--no-skip-manual` 指定）。非 TTY 环境默认跳过人工验收；不跳过时，非演示模式的人工确认会以"需人工验收"明确失败。
+  - 通过任务系统运行时，流程、演示模式和人工验收策略会在覆盖关系检查及测试执行前集中收集。可使用 `npm run task -- test:requirement --prepare-only -- <参数>` 只确认最终计划。
   - 测试快照默认仅保留最近10个，显式清空请运行 `npm run task -- clean:requirement-snapshots`。
   - 生成报告位于 `test-outputs/requirement-report/index.html`，包含 Playwright HTML 报告与业务证据附件。
 

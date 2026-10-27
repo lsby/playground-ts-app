@@ -1,6 +1,5 @@
 import crossSpawn from 'cross-spawn'
 import * as fs from 'fs'
-import inquirer from 'inquirer'
 import * as path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 import { 生成集成测试报告, type 单个集成测试结果 } from './integration-report-generator'
@@ -22,7 +21,7 @@ async function 运行单个集成测试(
 
   let 退出码 = await new Promise<number>((resolve) => {
     let 参数列表 = [文件绝对路径, ...附加参数组]
-    let 子进程 = crossSpawn('tsx', 参数列表, { env: process.env, stdio: ['inherit', 'pipe', 'pipe'] })
+    let 子进程 = crossSpawn('tsx', 参数列表, { env: process.env, stdio: ['ignore', 'pipe', 'pipe'] })
 
     if (子进程.stdout !== null) {
       子进程.stdout.on('data', (数据: Buffer) => {
@@ -117,16 +116,6 @@ async function 主函数(): Promise<void> {
     运行目标 = 'all'
   } else if (指定目标文件 !== undefined) {
     运行目标 = 指定目标文件
-  } else if (process.stdin.isTTY === true) {
-    let 选项列表 = [
-      { name: '[全部运行]', value: 'all' },
-      ...源代码文件列表.map((文件) => ({ name: 文件, value: 文件 })),
-    ]
-
-    let 回答 = await inquirer.prompt<{ 运行目标: string }>([
-      { type: 'list', name: '运行目标', message: '请选择要运行的集成测试文件:', choices: 选项列表, default: 'all' },
-    ])
-    运行目标 = 回答.运行目标
   } else {
     运行目标 = 'all'
   }
@@ -152,7 +141,7 @@ async function 主函数(): Promise<void> {
 
   if (自动打开报告 === true) {
     let { sync } = await import('cross-spawn')
-    sync('open-cli', [html路径], { stdio: 'inherit' })
+    sync('open-cli', [html路径], { stdio: ['ignore', 'inherit', 'inherit'] })
   }
 
   if (全部通过 === false) {

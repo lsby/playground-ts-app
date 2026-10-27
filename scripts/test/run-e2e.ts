@@ -1,6 +1,5 @@
 import { spawn } from 'child_process'
 import * as fs from 'fs'
-import inquirer from 'inquirer'
 import * as path from 'path'
 import { pathToFileURL } from 'url'
 
@@ -62,15 +61,6 @@ async function 主函数(): Promise<void> {
   let 运行目标: string
   if (指定运行目标 !== undefined) {
     运行目标 = 指定运行目标
-  } else if (process.stdin.isTTY === true) {
-    let 选项列表 = [
-      { name: '[全部运行]', value: 'all' },
-      ...测试文件列表.map((文件) => ({ name: 文件, value: `test/e2e/${文件}` })),
-    ]
-    let 回答 = await inquirer.prompt<{ 运行目标: string }>([
-      { type: 'list', name: '运行目标', message: '请选择要运行的端到端测试文件:', choices: 选项列表, default: 'all' },
-    ])
-    运行目标 = 回答.运行目标
   } else {
     运行目标 = 'all'
   }
@@ -78,16 +68,6 @@ async function 主函数(): Promise<void> {
   let 演示模式: boolean
   if (指定模式 !== undefined) {
     演示模式 = 指定模式 === 'demo'
-  } else if (process.stdin.isTTY === true) {
-    let 回答 = await inquirer.prompt<{ 演示模式: boolean }>([
-      {
-        type: 'confirm',
-        name: '演示模式',
-        message: '是否使用演示 (Demo) 模式? (将开启浏览器 UI 并减慢执行速度)',
-        default: false,
-      },
-    ])
-    演示模式 = 回答.演示模式
   } else {
     演示模式 = false
   }
@@ -113,7 +93,12 @@ async function 主函数(): Promise<void> {
   console.log(`\n🚀 正在执行命令: playwright ${参数列表.join(' ')}\n`)
 
   // 4. 执行命令
-  let 进程 = spawn('playwright', 参数列表, { stdio: 'inherit', env: 环境变量, shell: true, cwd: 根目录 })
+  let 进程 = spawn('playwright', 参数列表, {
+    stdio: ['ignore', 'inherit', 'inherit'],
+    env: 环境变量,
+    shell: true,
+    cwd: 根目录,
+  })
 
   进程.on('error', (错误) => {
     console.error('\n💥 启动 playwright 失败:', 错误)

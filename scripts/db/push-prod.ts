@@ -115,7 +115,7 @@ let 读取迁移组 = (迁移目录: string): 迁移[] => {
 }
 
 let 执行Prisma命令 = (命令: 'generate'): void => {
-  execSync(`prisma ${命令}`, { stdio: 'inherit' })
+  execSync(`prisma ${命令}`, { stdio: ['ignore', 'inherit', 'inherit'] })
 }
 
 let 确保迁移记录表 = (数据库: sqlite3.Database): void => {

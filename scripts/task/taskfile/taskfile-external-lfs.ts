@@ -15,6 +15,7 @@ export let 外挂LFS任务表 = 定义任务({
     说明: '加密并上传本地变化，随后更新逐文件加密清单',
     运行: 命令('tsx', 'scripts/external-lfs/index.ts', 'push'),
     传递参数: true,
+    运行时终端输入: true,
   },
   'external-lfs:pull': {
     说明: '按清单中的云存储精确版本拉取并解密缺失或变化文件',

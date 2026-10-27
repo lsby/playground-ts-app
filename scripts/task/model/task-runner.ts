@@ -7,6 +7,14 @@ import path from 'path'
 import { 读取环境文件明文 } from '../../setup/env-crypto-core.mjs'
 
 export type 命令配置 = { 程序: string; 参数: string[] }
+export type 任务准备上下文 = {
+  任务名称: string
+  是否根任务: boolean
+  参数: string[]
+  环境变量: NodeJS.ProcessEnv
+  工作目录: string
+}
+export type 任务准备结果 = { 参数: string[] }
 export type 任务配置 = {
   说明: string
   详细说明?: string
@@ -17,13 +25,22 @@ export type 任务配置 = {
   工作目录?: string
   运行?: 命令配置 | 命令配置[]
   传递参数?: boolean
+  准备运行?: (上下文: 任务准备上下文) => Promise<任务准备结果>
+  运行时终端输入?: boolean
   需要环境文件?: boolean
   公开?: boolean
 }
 export type 任务表类型 = Record<string, 任务配置>
-export type 执行选项 = { 环境文件?: string; 传递参数?: string[]; 仅显示计划?: boolean; 取消信号?: AbortSignal }
+export type 执行选项 = {
+  环境文件?: string
+  传递参数?: string[]
+  仅显示计划?: boolean
+  仅准备?: boolean
+  取消信号?: AbortSignal
+}
 type 执行上下文 = { 环境变量: NodeJS.ProcessEnv; 标识: string }
 type 执行记录 = { 上下文标识: string; 执行Promise: Promise<void> }
+type 任务节点 = { 名称: string; 任务: 任务配置; 上下文: 执行上下文 }
 
 let 项目根目录 = path.resolve(import.meta.dirname, '../../..')
 let 活动进程组 = new Set<ChildProcess>()
@@ -148,6 +165,7 @@ async function 执行命令配置(
   环境变量: NodeJS.ProcessEnv,
   工作目录: string,
   附加参数: string[],
+  运行时终端输入: boolean,
   取消信号?: AbortSignal,
 ): Promise<void> {
   取消信号?.throwIfAborted()
@@ -156,8 +174,8 @@ async function 执行命令配置(
   await new Promise<void>((resolve, reject) => {
     let 进程 = crossSpawn(配置.程序, 参数, {
       cwd: 工作目录,
-      env: 环境变量,
-      stdio: 'inherit',
+      env: { ...环境变量, TASK_EXECUTION_PHASE: 'execute' },
+      stdio: 运行时终端输入 === true ? ['inherit', 'inherit', 'inherit'] : ['ignore', 'inherit', 'inherit'],
       detached: process.platform !== 'win32',
     })
     活动进程组.add(进程)
@@ -186,7 +204,12 @@ function 格式化命令(配置: 命令配置, 附加参数: string[]): string {
   return [配置.程序, ...配置.参数, ...附加参数].map(格式化参数).join(' ')
 }
 
-function 打印执行计划(任务表: 任务表类型, 根任务名称: string, 选项: 执行选项): void {
+function 打印执行计划(
+  任务表: 任务表类型,
+  根任务名称: string,
+  选项: 执行选项,
+  准备参数表?: ReadonlyMap<string, string[]>,
+): void {
   console.log(`执行计划: ${根任务名称}`)
   if (选项.环境文件 !== undefined) console.log(`显式环境文件: ${选项.环境文件}`)
   let 访问 = (任务名称: string, 前缀: string, 是否最后一项: boolean, 路径: string[]): void => {
@@ -197,6 +220,7 @@ function 打印执行计划(任务表: 任务表类型, 根任务名称: string,
     let 标记组: string[] = []
     if ((任务.依赖 ?? []).length > 0) 标记组.push(任务.依赖方式 ?? '串行')
     if (选项.环境文件 === undefined && 任务.环境文件 !== undefined) 标记组.push(`env: ${任务.环境文件}`)
+    if (任务.准备运行 !== undefined) 标记组.push('准备运行选项')
     let 标记 = 标记组.length === 0 ? '' : ` [${标记组.join(', ')}]`
     console.log(`${前缀}${连接符}${任务名称}${标记} - ${任务.说明}`)
     let 子前缀 = 路径.length === 0 ? '' : `${前缀}${是否最后一项 === true ? '   ' : '│  '}`
@@ -211,11 +235,66 @@ function 打印执行计划(任务表: 任务表类型, 根任务名称: string,
       let 当前命令 = 命令组[索引]
       if (当前命令 === undefined) throw new Error(`任务 ${任务名称} 的命令索引越界: ${索引}`)
       let 附加参数 =
-        任务名称 === 根任务名称 && 任务.传递参数 === true && 索引 === 命令组.length - 1 ? (选项.传递参数 ?? []) : []
+        索引 === 命令组.length - 1
+          ? (准备参数表?.get(任务名称) ??
+            (任务名称 === 根任务名称 && 任务.传递参数 === true ? (选项.传递参数 ?? []) : []))
+          : []
       console.log(`${子前缀}   $ ${格式化命令(当前命令, 附加参数)}`)
     }
   }
   访问(根任务名称, '', true, [])
+}
+
+function 收集任务节点(
+  任务表: 任务表类型,
+  根任务名称: string,
+  根上下文: 执行上下文,
+  是否使用显式环境文件: boolean,
+): 任务节点[] {
+  let 节点组: 任务节点[] = []
+  let 节点表 = new Map<string, 任务节点>()
+  let 访问 = (任务名称: string, 上下文: 执行上下文, 路径: string[]): void => {
+    if (路径.includes(任务名称) === true) throw new Error(`检测到循环依赖: ${[...路径, 任务名称].join(' -> ')}`)
+    let 任务 = 任务表[任务名称]
+    if (任务 === undefined) throw new Error(`不存在任务: ${任务名称}`)
+    let 当前上下文 = 应用任务环境(上下文, 任务, 是否使用显式环境文件 === false)
+    let 已有节点 = 节点表.get(任务名称)
+    if (已有节点 !== undefined) {
+      if (已有节点.上下文.标识 !== 当前上下文.标识) throw new Error(`任务 ${任务名称} 被要求在两个不同环境中执行`)
+      return
+    }
+    let 节点 = { 名称: 任务名称, 任务, 上下文: 当前上下文 }
+    节点表.set(任务名称, 节点)
+    节点组.push(节点)
+    for (let 依赖名称 of 任务.依赖 ?? []) 访问(依赖名称, 当前上下文, [...路径, 任务名称])
+  }
+  访问(根任务名称, 根上下文, [])
+  return 节点组
+}
+
+async function 准备任务参数(节点组: 任务节点[], 根任务名称: string, 选项: 执行选项): Promise<Map<string, string[]>> {
+  let 准备参数表 = new Map<string, string[]>()
+  let 是否存在准备器 = 节点组.some((节点) => 节点.任务.准备运行 !== undefined)
+  if (是否存在准备器 === true) console.log('[task] 开始收集整条任务链的运行选项')
+  for (let 节点 of 节点组) {
+    选项.取消信号?.throwIfAborted()
+    let 原始参数 = 节点.名称 === 根任务名称 && 节点.任务.传递参数 === true ? [...(选项.传递参数 ?? [])] : []
+    if (节点.任务.准备运行 === undefined) {
+      准备参数表.set(节点.名称, 原始参数)
+      continue
+    }
+    console.log(`[task] 准备 ${节点.名称} - ${节点.任务.说明}`)
+    let 结果 = await 节点.任务.准备运行({
+      任务名称: 节点.名称,
+      是否根任务: 节点.名称 === 根任务名称,
+      参数: 原始参数,
+      环境变量: 节点.上下文.环境变量,
+      工作目录: path.resolve(项目根目录, 节点.任务.工作目录 ?? '.'),
+    })
+    准备参数表.set(节点.名称, 结果.参数)
+  }
+  if (是否存在准备器 === true) console.log('[task] 全部运行选项已收集，正式执行阶段不再询问启动配置')
+  return 准备参数表
 }
 
 export async function 执行任务(任务表: 任务表类型, 根任务名称: string, 选项: 执行选项 = {}): Promise<void> {
@@ -233,6 +312,12 @@ export async function 执行任务(任务表: 任务表类型, 根任务名称: 
   let 根环境变量 = { ...process.env }
   let 根上下文: 执行上下文 = { 环境变量: 根环境变量, 标识: 获得环境标识(根环境变量) }
   if (选项.环境文件 !== undefined) 根上下文 = 加载环境文件(根上下文, 选项.环境文件)
+  let 节点组 = 收集任务节点(任务表, 根任务名称, 根上下文, 选项.环境文件 !== undefined)
+  let 准备参数表 = await 准备任务参数(节点组, 根任务名称, 选项)
+  if (选项.仅准备 === true) {
+    打印执行计划(任务表, 根任务名称, 选项, 准备参数表)
+    return
+  }
   let 执行记录表 = new Map<string, 执行记录>()
 
   let 访问 = async (任务名称: string, 上下文: 执行上下文, 路径: string[]): Promise<void> => {
@@ -264,14 +349,14 @@ export async function 执行任务(任务表: 任务表类型, 根任务名称: 
         let 当前命令 = 命令组[索引]
         if (当前命令 === undefined) throw new Error(`任务 ${任务名称} 的命令索引越界: ${索引}`)
         let 是否最后命令 = 索引 === 命令组.length - 1
-        let 附加参数 =
-          任务名称 === 根任务名称 && 任务.传递参数 === true && 是否最后命令 === true ? (选项.传递参数 ?? []) : []
+        let 附加参数 = 是否最后命令 === true ? (准备参数表.get(任务名称) ?? []) : []
         await 执行命令配置(
           任务名称,
           当前命令,
           当前上下文.环境变量,
           path.resolve(项目根目录, 任务.工作目录 ?? '.'),
           附加参数,
+          任务.运行时终端输入 === true,
           选项.取消信号,
         )
       }

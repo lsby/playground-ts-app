@@ -2,7 +2,6 @@ import { execFileSync, execSync } from 'child_process'
 import fs from 'fs'
 import open from 'open'
 import path from 'path'
-import readline from 'readline/promises'
 import { fileURLToPath } from 'url'
 import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
 import { 写入AppPackageJson, 生成Electron便携资源, 获得Prisma迁移名称组 } from './electron-update-release'
@@ -52,39 +51,24 @@ async function 移动目录并等待文件句柄释放(源目录: string, 目标
   }
 }
 
-async function 询问是否打包Zip(): Promise<boolean> {
-  if (process.argv.includes('--zip') === true) {
+function 获得是否打包Zip(): boolean {
+  let 是否指定Zip = process.argv.includes('--zip')
+  let 是否指定不生成Zip = process.argv.includes('--nozip') === true || process.argv.includes('--no-zip') === true
+  if (是否指定Zip === true && 是否指定不生成Zip === true) throw new Error('--zip 与 --no-zip 不能同时使用')
+  if (是否指定Zip === true) {
     console.log('📦 检测到 --zip 参数，自动生成 Electron 完整便携压缩包。')
     return true
   }
-  if (process.argv.includes('--nozip') === true || process.argv.includes('--no-zip') === true) {
+  if (是否指定不生成Zip === true) {
     console.log('💡 检测到 --nozip 参数，跳过 ZIP 压缩包打包。')
     return false
   }
-  if (
-    process.argv.includes('--yes') === true ||
-    process.argv.includes('-y') === true ||
-    process.argv.includes('--silent') === true
-  ) {
-    console.log('💡 静默模式且未指定 --zip，默认跳过 ZIP 压缩包打包。')
-    return false
-  }
-
-  let 终端 = readline.createInterface({ input: process.stdin, output: process.stdout })
-  try {
-    let 回答 = await 终端.question('📦 是否打包 Electron 完整便携压缩包 (.zip)？(y/N): ')
-    终端.close()
-    let 确认输入 = 回答.trim().toLowerCase()
-    return 确认输入 === 'y' || 确认输入 === 'yes'
-  } catch (_交互错误) {
-    终端.close()
-    return false
-  }
+  throw new Error('必须通过 --zip 或 --no-zip 明确指定是否生成 Electron ZIP 包')
 }
 
 async function 执行构建(): Promise<void> {
   try {
-    let 是否生成Zip = await 询问是否打包Zip()
+    let 是否生成Zip = 获得是否打包Zip()
 
     let 环境源文件相对路径 = process.env['ENV_FILE_PATH']
     if (环境源文件相对路径 === undefined || 环境源文件相对路径 === '') {
@@ -111,7 +95,10 @@ async function 执行构建(): Promise<void> {
 
     // 3. 运行 electron-builder
     console.log('正在启动 electron-builder...')
-    execSync(`npx electron-builder -c.directories.output=${相对发布目录}`, { stdio: 'inherit', cwd: 项目根目录 })
+    execSync(`npx electron-builder -c.directories.output=${相对发布目录}`, {
+      stdio: ['ignore', 'inherit', 'inherit'],
+      cwd: 项目根目录,
+    })
 
     // 4. 定位生成的目录
     let 生成目录 = ''
@@ -265,7 +252,11 @@ async function 执行构建(): Promise<void> {
         PRISMA_ROOT_DIR: appPrisma目标目录,
       }
       console.log('正在验证默认数据库的原生 SQL migrations...')
-      execFileSync(process.execPath, [PushProdCli路径], { cwd: appPrisma目标目录, env: Prisma环境, stdio: 'inherit' })
+      execFileSync(process.execPath, [PushProdCli路径], {
+        cwd: appPrisma目标目录,
+        env: Prisma环境,
+        stdio: ['ignore', 'inherit', 'inherit'],
+      })
     }
 
     if (process.platform === 'win32') {
@@ -283,7 +274,7 @@ async function 执行构建(): Promise<void> {
         // 使用 Windows GUI 子系统，默认只显示托盘图标；控制台由引导器按需创建
         execSync(
           `"${cscPath}" /nologo /target:winexe /out:"${runExe路径}" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll "${launcher源文件}"`,
-          { stdio: 'inherit' },
+          { stdio: ['ignore', 'inherit', 'inherit'] },
         )
         console.log(`✅ 已生成 ${runExe路径}`)
       }

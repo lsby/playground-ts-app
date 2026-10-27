@@ -7,7 +7,7 @@ export function 执行开发数据库初始化(项目根目录) {
   let 结果 = spawnSync(process.execPath, [Tsx入口, 'scripts/task/index.ts', 'db:push:dev:web'], {
     cwd: 项目根目录,
     env: process.env,
-    stdio: 'inherit',
+    stdio: ['ignore', 'inherit', 'inherit'],
     windowsHide: true,
   })
   if (结果.error instanceof Error) throw 结果.error

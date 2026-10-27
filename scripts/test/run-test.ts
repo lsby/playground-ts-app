@@ -1,5 +1,4 @@
 import crossSpawn from 'cross-spawn'
-import inquirer from 'inquirer'
 import * as path from 'path'
 import { pathToFileURL } from 'url'
 import { 获得单元测试生成参数 } from './unit-test-config'
@@ -60,21 +59,14 @@ function 解析参数(): 测试选项 {
 }
 
 function 执行命令(程序: string, 参数组: string[]): void {
-  let 结果 = crossSpawn.sync(程序, 参数组, { env: process.env, stdio: 'inherit' })
+  let 结果 = crossSpawn.sync(程序, 参数组, { env: process.env, stdio: ['ignore', 'inherit', 'inherit'] })
   if (结果.error instanceof Error) throw 结果.error
   if (结果.status !== 0) throw new Error(`命令 ${程序} 执行失败，退出码: ${String(结果.status)}`)
 }
 
 async function 主函数(): Promise<void> {
   let 选项 = 解析参数()
-  if (选项.过滤器 === undefined) {
-    if (process.stdin.isTTY === true) {
-      let 回答 = await inquirer.prompt<{ 过滤器: string }>([
-        { type: 'input', name: '过滤器', message: '请输入要运行的接口路径正则:', default: '.*' },
-      ])
-      选项.过滤器 = 回答.过滤器
-    } else 选项.过滤器 = '.*'
-  }
+  选项.过滤器 ??= '.*'
 
   // 默认行为即生成覆盖率报告
   选项.生成覆盖率 ??= true

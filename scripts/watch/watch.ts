@@ -17,7 +17,7 @@ function 任务(): void {
   console.log('========生成开始========')
   try {
     console.log('执行', 程序, ...程序参数)
-    let 结果 = crossSpawn.sync(程序, 程序参数, { env: process.env, stdio: 'inherit' })
+    let 结果 = crossSpawn.sync(程序, 程序参数, { env: process.env, stdio: ['ignore', 'inherit', 'inherit'] })
     if (结果.error instanceof Error) throw 结果.error
     if (结果.status !== 0) throw new Error(`程序退出码: ${String(结果.status)}`)
   } catch (e: unknown) {

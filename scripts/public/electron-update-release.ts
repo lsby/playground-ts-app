@@ -75,7 +75,7 @@ export async function 生成Electron便携资源(项目根目录: string, 便携
     if (fs.existsSync(资源路径) === true) {
       fs.rmSync(资源路径, { force: true })
     }
-    execSync(`ditto -c -k --sequesterRsrc "${便携包目录}" "${资源路径}"`, { stdio: 'inherit' })
+    execSync(`ditto -c -k --sequesterRsrc "${便携包目录}" "${资源路径}"`, { stdio: ['ignore', 'inherit', 'inherit'] })
   } else {
     await 创建便携压缩包(便携包目录, 资源路径)
   }

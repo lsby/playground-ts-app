@@ -1,5 +1,9 @@
 import { 测试环境文件, 测试调试环境 } from '../model/task-common'
 import { 命令, 定义任务 } from '../model/task-runner'
+import { 准备端到端测试参数 } from '../prepare/test-e2e'
+import { 准备集成测试参数 } from '../prepare/test-integration'
+import { 准备需求测试参数 } from '../prepare/test-requirement'
+import { 准备单元测试参数 } from '../prepare/test-unit'
 
 export let 测试任务表 = 定义任务({
   // 单元测试
@@ -8,6 +12,7 @@ export let 测试任务表 = 定义任务({
     环境文件: 测试环境文件,
     环境变量: 测试调试环境,
     依赖: ['db:ensure:test:web'],
+    准备运行: 准备单元测试参数,
     运行: 命令('tsx', 'scripts/test/run-test.ts'),
     传递参数: true,
   },
@@ -18,6 +23,7 @@ export let 测试任务表 = 定义任务({
     环境文件: 测试环境文件,
     环境变量: 测试调试环境,
     依赖: ['db:ensure:test:web'],
+    准备运行: 准备集成测试参数,
     运行: 命令('tsx', 'scripts/test/run-integration.ts'),
     传递参数: true,
   },
@@ -34,6 +40,7 @@ export let 测试任务表 = 定义任务({
     说明: '运行端到端测试',
     环境文件: 测试环境文件,
     环境变量: 测试调试环境,
+    准备运行: 准备端到端测试参数,
     运行: 命令('tsx', 'scripts/test/run-e2e.ts'),
     传递参数: true,
   },
@@ -53,6 +60,7 @@ export let 测试任务表 = 定义任务({
     环境文件: 测试环境文件,
     环境变量: 测试调试环境,
     依赖: ['test:requirement:coverage'],
+    准备运行: 准备需求测试参数,
     运行: 命令('tsx', 'scripts/test/run-requirement.ts'),
     传递参数: true,
   },

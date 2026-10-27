@@ -28,7 +28,11 @@ console.log('项目名称: %O, 项目版本: %O', 项目名称, 包信息.versio
 // 命令行执行函数
 function 执行命令行(命令: string, 参数: string[], 工作目录?: string, 环境变量?: NodeJS.ProcessEnv): Promise<number> {
   return new Promise<number>((解决, 拒绝) => {
-    let 进程 = spawn(命令, 参数, { cwd: 工作目录, stdio: 'inherit', env: 环境变量 ?? process.env })
+    let 进程 = spawn(命令, 参数, {
+      cwd: 工作目录,
+      stdio: ['ignore', 'inherit', 'inherit'],
+      env: 环境变量 ?? process.env,
+    })
 
     进程.on('close', (退出码) => {
       if (退出码 === null) {

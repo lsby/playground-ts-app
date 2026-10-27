@@ -36,7 +36,7 @@ type 任务选项 = 候选任务项
 function 打印帮助(): void {
   console.log(`用法:
   npm run task
-  npm run task -- <任务名称> [--env <环境文件>] [--dry-run] [-- <任务参数>]
+  npm run task -- <任务名称> [--env <环境文件>] [--dry-run] [--prepare-only] [-- <任务参数>]
   npm run task -- --list
   npm run task -- --list-all`)
 }
@@ -47,6 +47,7 @@ function 获得详细说明(任务名称: string, 任务: 任务配置): string 
   let 说明组 = [任务.详细说明 ?? `执行“${任务.说明}”任务。`, `前置任务：${依赖说明}。`]
   if (任务.环境文件 !== undefined) 说明组.push(`环境文件：${任务.环境文件}。`)
   if (任务.传递参数 === true) 说明组.push('支持在第二个 -- 后传递任务参数。')
+  if (任务.准备运行 !== undefined) 说明组.push('正式执行前会集中收集运行选项，可使用 --prepare-only 仅完成准备。')
   说明组.push(`执行：npm run task -- ${任务名称}`)
   return 说明组.join('\n')
 }
@@ -102,11 +103,16 @@ if (执行器参数.includes('--help') === true || 执行器参数.includes('-h'
   let 任务名称: string | undefined
   let 环境文件: string | undefined
   let 仅显示计划 = false
+  let 仅准备 = false
   for (let 索引 = 0; 索引 < 执行器参数.length; 索引 += 1) {
     let 参数 = 执行器参数[索引]
     if (参数 === undefined) throw new Error(`执行器参数索引越界: ${索引}`)
     if (参数 === '--dry-run') {
       仅显示计划 = true
+      continue
+    }
+    if (参数 === '--prepare-only') {
+      仅准备 = true
       continue
     }
     if (参数 === '--env') {
@@ -148,6 +154,7 @@ if (执行器参数.includes('--help') === true || 执行器参数.includes('-h'
       ...(环境文件 === undefined ? {} : { 环境文件 }),
       传递参数: 任务参数,
       仅显示计划,
+      仅准备,
       取消信号: 取消控制器.signal,
     })
     if (退出状态.处理Promise !== null) await 退出状态.处理Promise

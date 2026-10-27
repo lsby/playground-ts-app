@@ -6,6 +6,7 @@ import {
   测试环境文件,
 } from '../model/task-common'
 import { 命令, 定义任务 } from '../model/task-runner'
+import { 准备数据库迁移参数 } from '../prepare/db-migration'
 
 export let 数据库任务表 = 定义任务({
   // 数据库
@@ -18,6 +19,7 @@ export let 数据库任务表 = 定义任务({
     说明: '仅生成 Web 开发数据库 migration，供检查或手工调整 SQL',
     环境文件: Web开发环境文件,
     运行: 命令('prisma', 'migrate', 'dev', '--create-only'),
+    准备运行: 准备数据库迁移参数,
     传递参数: true,
   },
   'db:migrate:deploy:dev:web': {

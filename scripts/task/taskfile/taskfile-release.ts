@@ -1,10 +1,17 @@
 import { Electron生产环境文件, Sea生产环境文件, Web生产环境文件, 纯前端生产环境文件 } from '../model/task-common'
 import { 命令, 定义任务 } from '../model/task-runner'
+import { 准备Electron发布参数 } from '../prepare/release-electron'
+import { 准备发布版本参数 } from '../prepare/release-version'
 
 export let 发布任务表 = 定义任务({
   // capacitor
-  'capacitor:init': { 说明: '初始化 Capacitor', 运行: 命令('cap', 'init'), 传递参数: true },
-  'capacitor:add:android': { 说明: '添加 Android 平台', 运行: 命令('cap', 'add', 'android'), 传递参数: true },
+  'capacitor:init': { 说明: '初始化 Capacitor', 运行: 命令('cap', 'init'), 传递参数: true, 运行时终端输入: true },
+  'capacitor:add:android': {
+    说明: '添加 Android 平台',
+    运行: 命令('cap', 'add', 'android'),
+    传递参数: true,
+    运行时终端输入: true,
+  },
   'capacitor:sync:android': {
     说明: '构建并同步 Android 平台',
     依赖: ['build:web'],
@@ -19,16 +26,19 @@ export let 发布任务表 = 定义任务({
     说明: '执行本地 Docker 发布',
     运行: 命令('tsx', 'scripts/public/release-docker-local.ts'),
     传递参数: true,
+    运行时终端输入: true,
   },
   'public:docker:remote': {
     说明: '执行远程 Docker 发布',
     运行: 命令('tsx', 'scripts/public/release-docker-remote.ts'),
     传递参数: true,
+    运行时终端输入: true,
   },
   'public:electron': {
     说明: '构建 Electron 发布包',
     环境文件: Electron生产环境文件,
     依赖: ['build:all', 'db:push:prod:electron'],
+    准备运行: 准备Electron发布参数,
     运行: 命令('tsx', 'scripts/public/release-electron.ts'),
     传递参数: true,
   },
@@ -59,6 +69,8 @@ export let 发布任务表 = 定义任务({
   'release:version': {
     说明: '交互式选择新版本号',
     运行: 命令('bumpp', '--no-commit', '--no-tag', '--no-push'),
+    准备运行: 准备发布版本参数,
+    传递参数: true,
     公开: false,
   },
   'release:all': {

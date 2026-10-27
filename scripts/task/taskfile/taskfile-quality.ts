@@ -3,9 +3,16 @@ import { 命令, 定义任务 } from '../model/task-runner'
 export let 质量任务表 = 定义任务({
   // 检查
   'check:format': { 说明: '检查代码格式', 运行: 命令('prettier', '--check', '.'), 公开: false },
+  'check:task-interaction': {
+    说明: '检查工程任务是否绕过准备阶段读取终端输入',
+    运行: 命令('tsx', 'scripts/check/check-task-interaction.ts'),
+  },
   'check:lint': { 说明: '运行 ESLint', 运行: 命令('eslint', '.'), 公开: false },
   'check:type': { 说明: '运行 TypeScript 类型检查', 运行: 命令('tsc', '--noEmit'), 公开: false },
-  'check:all': { 说明: '运行全部静态检查', 依赖: ['check:format', 'check:lint', 'check:type'] },
+  'check:all': {
+    说明: '运行全部静态检查',
+    依赖: ['check:format', 'check:task-interaction', 'check:lint', 'check:type'],
+  },
 
   // 修复
   'fix:format': { 说明: '写入代码格式', 运行: 命令('prettier', '--write', '.'), 公开: false },

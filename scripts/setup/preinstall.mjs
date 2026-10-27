@@ -217,12 +217,7 @@ async function 运行初始化向导() {
 
     // 运行目标不影响初始化结果，仅保留旧状态值以维持当前状态文件契约。
     let 目标组 = 上次状态?.目标组 ?? ['web']
-
     let GitHub仓库 = 获得GitHub仓库()
-    if (GitHub仓库 === null) console.log('[跳过] 未检测到 GitHub origin，不修改 package.json repository')
-    else 同步包仓库字段(GitHub仓库)
-
-    初始化全部配置()
     let 是否使用随机端口 = await 获得确认值(
       询问器,
       参数.使用随机端口,
@@ -230,16 +225,15 @@ async function 运行初始化向导() {
       上次状态?.是否使用随机端口 ?? true,
     )
     let 端口表 = 上次状态?.端口表 ?? null
+    let 是否重新生成端口 = false
     if (是否使用随机端口 === true) {
       if (端口表 === null && 参数.重新生成端口 === false) {
         throw new Error('当前没有可复用的端口表，不能使用 --no-regenerate-ports')
       }
-      let 是否重新生成端口 =
+      是否重新生成端口 =
         端口表 === null
           ? true
           : await 获得确认值(询问器, 参数.重新生成端口, '已存在上次分配的端口，是否重新生成？', false)
-      if (是否重新生成端口 === true) 端口表 = await 生成随机端口表()
-      应用端口表(项目根目录, 所有环境文件组, 端口表)
     } else if (参数.重新生成端口 === true) {
       throw new Error('--regenerate-ports 与 --no-random-ports 不能同时使用')
     }
@@ -250,9 +244,6 @@ async function 运行初始化向导() {
       '是否启用项目环境文件加密？',
       上次状态?.是否启用环境加密 ?? true,
     )
-    if (是否启用环境加密 === true) 启用环境加密()
-    else 停用环境加密()
-
     let 是否配置GitHubSecret = false
     if (GitHub仓库 !== null && 是否启用环境加密 === true) {
       是否配置GitHubSecret = await 获得确认值(
@@ -284,23 +275,39 @@ async function 运行初始化向导() {
       '是否重命名项目？',
       上次状态?.是否重命名项目 ?? 默认重命名,
     )
+    let 新作者名
+    let 新项目名
+    let 是否执行项目重命名 = false
     if (是否重命名项目 === true) {
-      let 新作者名 = await 获得文本值(询问器, 参数.新作者名, '--new-author', '新的作者名：', 当前名称.作者名)
-      let 新项目名 = await 获得文本值(询问器, 参数.新项目名, '--new-project', '新的项目名：', 当前名称.项目名)
+      新作者名 = await 获得文本值(询问器, 参数.新作者名, '--new-author', '新的作者名：', 当前名称.作者名)
+      新项目名 = await 获得文本值(询问器, 参数.新项目名, '--new-project', '新的项目名：', 当前名称.项目名)
       if (/^[a-z0-9-]+$/u.test(新作者名) === false || /^[a-z0-9-]+$/u.test(新项目名) === false) {
         console.log('[跳过] 作者名和项目名只能包含小写字母、数字和短横线')
       } else if (新作者名 === 当前名称.作者名 && 新项目名 === 当前名称.项目名) {
         console.log('[跳过] 项目名称没有变化')
-      } else if (
-        (await 获得确认值(
+      } else {
+        是否执行项目重命名 = await 获得确认值(
           询问器,
           参数.确认重命名,
           `确认将项目从 "@${当前名称.作者名}/${当前名称.项目名}" 重命名为 "@${新作者名}/${新项目名}"？`,
           false,
-        )) === true
-      ) {
-        执行项目重命名({ 项目根目录, 新作者名, 新项目名 })
+        )
       }
+    }
+
+    console.log('\n初始化选项已全部收集，开始应用配置。')
+    if (GitHub仓库 === null) console.log('[跳过] 未检测到 GitHub origin，不修改 package.json repository')
+    else 同步包仓库字段(GitHub仓库)
+    初始化全部配置()
+    if (是否使用随机端口 === true) {
+      if (是否重新生成端口 === true) 端口表 = await 生成随机端口表()
+      if (端口表 === null) throw new Error('随机端口已启用，但没有可应用的端口表')
+      应用端口表(项目根目录, 所有环境文件组, 端口表)
+    }
+    if (是否启用环境加密 === true) 启用环境加密()
+    else 停用环境加密()
+    if (是否执行项目重命名 === true && 新作者名 !== undefined && 新项目名 !== undefined) {
+      执行项目重命名({ 项目根目录, 新作者名, 新项目名 })
     }
     if (GitHub仓库 !== null && 是否配置GitHubSecret === true) 配置项目密钥Secret(GitHub仓库)
     let 新状态 = {

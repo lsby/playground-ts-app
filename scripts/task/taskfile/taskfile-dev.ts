@@ -66,7 +66,7 @@ export let 开发任务表 = 定义任务({
       命令(
         'node',
         '-e',
-        "if (process.platform === 'win32') { try { require('child_process').execSync('chcp 65001', { stdio: 'inherit' }); } catch {} }",
+        "if (process.platform === 'win32') { try { require('child_process').execSync('chcp 65001', { stdio: ['ignore', 'inherit', 'inherit'] }); } catch {} }",
       ),
       命令(
         'nodemon',
