@@ -174,22 +174,21 @@ async function 创建主窗口(): Promise<void> {
     await 验证并修正窗口(主窗口, 保存的状态)
   }
 
-  if (保存的状态 !== null && 使用保存的位置 === true) {
-    if (保存的状态.isMaximized === true) {
-      await log.info('恢复最大化状态')
-      主窗口.maximize()
-    }
-    if (保存的状态.isFullScreen === true) {
-      await log.info('恢复全屏状态')
-      主窗口.setFullScreen(true)
-    }
-  }
-
   主窗口.once('ready-to-show', async () => {
     if (主窗口 !== null) {
       let 显示前的边界 = 主窗口.getBounds()
       await log.info('窗口显示前的边界:', 显示前的边界)
       主窗口.show()
+      if (保存的状态 !== null && 使用保存的位置 === true) {
+        if (保存的状态.isMaximized === true) {
+          await log.info('恢复最大化状态')
+          主窗口.maximize()
+        }
+        if (保存的状态.isFullScreen === true) {
+          await log.info('恢复全屏状态')
+          主窗口.setFullScreen(true)
+        }
+      }
     }
   })
 
