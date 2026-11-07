@@ -19,7 +19,6 @@ let 允许规则表 = new Map<string, ReadonlySet<string>>([
   ['scripts/setup/preinstall.mjs', new Set(['TASK_INTERACTION_002'])],
   ['scripts/setup/rename-project.ts', new Set(['TASK_INTERACTION_001'])],
   ['scripts/task/index.ts', new Set(['TASK_INTERACTION_001'])],
-  ['scripts/test/requirement-selection.ts', new Set(['TASK_INTERACTION_003'])],
 ])
 let 允许命中组 = new Set<string>()
 

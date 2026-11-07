@@ -12,7 +12,7 @@ import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { 系统配置ID } from '../../../global/const'
-import { 环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env'
 import { kysely插件 } from '../../../global/plugin'
 import { 验证密码, 验证用户名 } from '../../../model/user/user-validation'
 
@@ -55,7 +55,7 @@ let 接口逻辑实现 = 接口逻辑.空逻辑().绑定(
           .values({
             id: 用户ID,
             name: 注册参数.userName,
-            pwd: await bcrypt.hash(注册参数.userPassword, 环境变量.BCRYPT_ROUNDS),
+            pwd: await bcrypt.hash(注册参数.userPassword, 获得环境变量().BCRYPT_ROUNDS),
             is_admin: 0,
           })
           .execute()

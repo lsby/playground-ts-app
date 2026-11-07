@@ -9,7 +9,7 @@ import {
 } from '@lsby/net-core'
 import { Left, Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
-import { 环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env'
 import { jwt插件, kysely插件 } from '../../../global/plugin'
 
 let 接口路径 = '/api/project/local-login' as const
@@ -21,7 +21,7 @@ let 接口逻辑实现 = 接口逻辑.空逻辑().绑定(
     async (参数, 逻辑附加参数, 请求附加参数) => {
       let _log = 请求附加参数.log.extend(接口路径)
 
-      if (环境变量.LOCAL_MODE !== true) {
+      if (获得环境变量().LOCAL_MODE !== true) {
         return new Left('未开启本地模式' as const)
       }
 
@@ -29,7 +29,7 @@ let 接口逻辑实现 = 接口逻辑.空逻辑().绑定(
         .获得句柄()
         .selectFrom('user')
         .select(['id'])
-        .where('name', '=', 环境变量.DEFAULT_SYSTEM_USER)
+        .where('name', '=', 获得环境变量().DEFAULT_SYSTEM_USER)
         .executeTakeFirst()
 
       if (默认用户 === undefined) return new Left('默认系统用户不存在' as const)

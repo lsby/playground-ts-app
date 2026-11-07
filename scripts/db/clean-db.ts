@@ -1,9 +1,9 @@
 import { CompiledQuery, Kysely } from 'kysely'
-import { 环境变量 } from '../../src/global/env'
+import { 获得环境变量 } from '../../src/global/env'
 import { DB } from '../../src/types/db'
 
 export async function cleanDB(db: Kysely<DB>): Promise<void> {
-  let 数据库类型 = 环境变量.DB_TYPE
+  let 数据库类型 = 获得环境变量().DB_TYPE
 
   switch (数据库类型) {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition

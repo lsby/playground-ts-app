@@ -56,8 +56,6 @@ export function 获取完整忽略名单(项目根目录: string): string[] {
     '.idea/**',
     'test-outputs',
     'test-outputs/**',
-    'playwright.config.ts',
-    'playwright.requirement.config.ts',
     // 手机端/移动端工程及配置
     'android',
     'android/**',

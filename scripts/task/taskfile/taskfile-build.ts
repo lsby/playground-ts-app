@@ -21,7 +21,7 @@ export let 构建任务表 = 定义任务({
     公开: false,
   },
   'bundle:web-test': {
-    说明: '打包端到端测试使用的 Web 前端',
+    说明: '打包测试使用的 Web 前端',
     运行: 命令('parcel', ...Parcel基础参数, '--dist-dir', 'test-outputs/web-test'),
     公开: false,
   },
@@ -49,7 +49,7 @@ export let 构建任务表 = 定义任务({
     需要环境文件: true,
   },
   'build:web:test': {
-    说明: '生成并构建端到端测试前端',
+    说明: '生成并构建 Web 测试前端',
     环境文件: 测试环境文件,
     依赖: ['generate:all', 'clean:web-test', 'bundle:web-test'],
   },

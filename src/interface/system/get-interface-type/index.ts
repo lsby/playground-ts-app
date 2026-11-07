@@ -4,17 +4,17 @@ import fs from 'fs/promises'
 import path from 'path'
 import { z } from 'zod'
 import { 系统配置ID } from '../../../global/const'
-import { 环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env'
 import { kysely插件 } from '../../../global/plugin'
 
 let 接口路径 = '/api/system/get-interface-type' as const
 let 接口方法 = 'get' as const
 
 let 获得类型文件路径 = (): string => {
-  if (环境变量.BUILD_TARGET === 'sea') {
+  if (获得环境变量().BUILD_TARGET === 'sea') {
     return path.resolve(import.meta.dirname, './src/types/interface-type.ts')
   }
-  if (环境变量.NODE_ENV === 'development' || 环境变量.NODE_ENV === 'test') {
+  if (获得环境变量().NODE_ENV === 'development' || 获得环境变量().NODE_ENV === 'test') {
     return path.join(path.resolve(import.meta.dirname, '../../../../'), 'src/types/interface-type.ts')
   }
   return path.join(path.resolve(import.meta.dirname, '../../../../../'), 'dist/src/types/interface-type.ts')

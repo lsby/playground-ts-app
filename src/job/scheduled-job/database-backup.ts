@@ -2,8 +2,8 @@ import { 默认请求附加参数 } from '@lsby/net-core'
 import { Log } from '@lsby/ts-log'
 import fs from 'fs'
 import path from 'path'
-import { 环境变量 } from '../../global/env'
-import { globalLog, kysely管理器 } from '../../global/global'
+import { 获得环境变量 } from '../../global/env'
+import { 全局资源 } from '../../global/global'
 import { 备份数据库 } from '../../interface/admin-sqlite/backup-database'
 import { 定时任务上下文, 定时任务抽象类 } from '../../model/job-scheduled/scheduled-job'
 
@@ -15,7 +15,8 @@ class 定时任务实现 extends 定时任务抽象类 {
     return '0 0 0 * * *' // 每天0点执行
   }
   public override async 任务逻辑(上下文: 定时任务上下文): Promise<void> {
-    let log = globalLog
+    let log = 全局资源
+      .获得日志()
       .extend('数据库自动备份')
       .pipe(async (level, namespace, content) => 上下文.输出日志(`[${level}] [${namespace}] ${content}`))
 
@@ -26,7 +27,8 @@ class 定时任务实现 extends 定时任务抽象类 {
     try {
       await log.info('开始执行数据库备份')
 
-      let 管理员用户 = await kysely管理器
+      let 管理员用户 = await 全局资源
+        .获得数据库()
         .获得句柄()
         .selectFrom('user')
         .select('id')
@@ -37,13 +39,13 @@ class 定时任务实现 extends 定时任务抽象类 {
       }
 
       await log.info(`找到管理员用户ID：${管理员用户.id}`)
-      await log.info(`备份路径：${环境变量.DB_BACKUP_PATH}`)
+      await log.info(`备份路径：${获得环境变量().DB_BACKUP_PATH}`)
 
       await log.info('开始备份数据库')
       await 备份数据库.调用(
         {
           json: {},
-          kysely: kysely管理器,
+          kysely: 全局资源.获得数据库(),
           ws操作: {
             关闭ws连接: async () => {},
             发送ws信息: async () => {},
@@ -56,7 +58,7 @@ class 定时任务实现 extends 定时任务抽象类 {
       )
       await log.info('数据库备份完成')
 
-      let 删除数量 = await this.清理旧备份(环境变量.DB_BACKUP_PATH, 环境变量.DB_BACKUP_RETENTION_DAYS, log)
+      let 删除数量 = await this.清理旧备份(获得环境变量().DB_BACKUP_PATH, 获得环境变量().DB_BACKUP_RETENTION_DAYS, log)
       await log.info(`清理完成，共删除 ${删除数量} 个旧备份文件`)
 
       await log.info('数据库备份定时任务执行完成')
@@ -74,7 +76,7 @@ class 定时任务实现 extends 定时任务抽象类 {
 
     for (let 文件名 of 文件列表) {
       if (
-        文件名.startsWith(`${环境变量.DB_BACKUP_PREFIX}${环境变量.DB_BACKUP_AUTO_PREFIX}`) &&
+        文件名.startsWith(`${获得环境变量().DB_BACKUP_PREFIX}${获得环境变量().DB_BACKUP_AUTO_PREFIX}`) &&
         文件名.endsWith('.db')
       ) {
         let 文件路径 = path.join(备份目录, 文件名)

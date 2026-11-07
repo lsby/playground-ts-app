@@ -10,7 +10,7 @@ import {
 } from '@lsby/net-core'
 import { Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
-import { 定时任务管理器 } from '../../../../global/global'
+import { 全局资源 } from '../../../../global/global'
 import { 检查管理员登录 } from '../../../../interface-logic/check/check-login-jwt-admin'
 import { 集线器监听器宿主 } from '../../../../model/hub/hub-model'
 
@@ -32,7 +32,7 @@ let 接口逻辑实现 = 接口逻辑
       async (参数, 逻辑附加参数, 请求附加参数) => {
         let _log = 请求附加参数.log.extend(接口路径)
 
-        let 任务 = 定时任务管理器.通过id获得任务(参数.json.任务id)
+        let 任务 = 全局资源.获得定时任务管理器().通过id获得任务(参数.json.任务id)
         if (任务 === null) {
           throw new Error('任务不存在')
         }

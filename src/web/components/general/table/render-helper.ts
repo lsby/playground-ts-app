@@ -150,6 +150,10 @@ export function 渲染表体<数据项>(上下文: 表格渲染上下文<数据�
     })
     行.setAttribute('aria-selected', 上下文.选中行键.has(行键) ? 'true' : 'false')
     行.dataset['rowKey'] = String(行键)
+    行.onmousedown = (event: MouseEvent): void => {
+      // Shift 点击用于表格范围选择，阻止浏览器同时扩展文本选区。
+      if (event.button === 0 && event.shiftKey === true) event.preventDefault()
+    }
     行.onclick = (event: MouseEvent): void => {
       上下文.处理行点击(行索引, event.ctrlKey, event.shiftKey)
       上下文.更新选中状态()

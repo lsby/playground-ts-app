@@ -10,7 +10,7 @@ import {
 import { Left } from '@lsby/ts-fp-data'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
-import { 环境变量 } from '../../../../global/env'
+import { 获得环境变量 } from '../../../../global/env'
 import { kysely插件 } from '../../../../global/plugin'
 
 let 接口路径 = '/api/demo/logic-advanced/rollback-test' as const
@@ -29,7 +29,7 @@ let 接口逻辑实现 = 接口逻辑.空逻辑().绑定(
           .values({
             id: userId,
             name: 参数.json.name,
-            pwd: await bcrypt.hash(参数.json.pwd, 环境变量.BCRYPT_ROUNDS),
+            pwd: await bcrypt.hash(参数.json.pwd, 获得环境变量().BCRYPT_ROUNDS),
             is_admin: 0,
           })
           .executeTakeFirst()

@@ -250,7 +250,7 @@ async function 运行初始化向导() {
         询问器,
         参数.配置GitHubSecret,
         '是否将项目配置密钥写入 GitHub Actions Secret？',
-        上次状态?.是否配置GitHubSecret ?? false,
+        上次状态?.是否配置GitHubSecret ?? true,
       )
     } else if (参数.配置GitHubSecret === true) {
       throw new Error(

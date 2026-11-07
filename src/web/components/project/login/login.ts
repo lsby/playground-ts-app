@@ -1,4 +1,4 @@
-import { 环境变量 } from '../../../../global/env'
+import { 获得环境变量 } from '../../../../global/env'
 import { 组件基类 } from '../../../base/base'
 import { API管理器 } from '../../../global/manager/api-manager'
 import { 创建元素 } from '../../../global/tools/create-element'
@@ -141,7 +141,7 @@ export class 登录组件 extends 组件基类<发出事件类型, 监听事件�
     })
     卡片.append(标题, 登录表单容器, 注册表单容器, 结果, 登录按钮, 注册按钮)
     if (允许注册 === true) 卡片.append(切换按钮)
-    if (环境变量.BUILD_TARGET === 'pure-frontend')
+    if (获得环境变量().BUILD_TARGET === 'pure-frontend')
       卡片.append(
         new 文本按钮({
           文本: '重设本机管理员密码',

@@ -10,11 +10,11 @@ import {
 import { Right } from '@lsby/ts-fp-data'
 import path from 'path'
 import { z } from 'zod'
-import { 环境变量 } from '../global/env'
-import { globalLog, kysely管理器, syncLogCallBack, 即时任务管理器, 定时任务管理器 } from '../global/global'
+import { 获得环境变量 } from '../global/env'
+import { syncLogCallBack, 全局资源 } from '../global/global'
 import { init } from '../init/init'
 import { interfaceApiList } from '../interface/interface-list'
-import { 报告系统情况任务 } from '../job/instant-job/report-system-status'
+import { 创建报告系统情况任务 } from '../job/instant-job/report-system-status'
 import { databaseBackupCron } from '../job/scheduled-job/database-backup'
 import { onTimeAlarm } from '../job/scheduled-job/on-time-alarm'
 
@@ -35,19 +35,20 @@ class App {
   private constructor() {}
 
   private 获得项目根路径(): string {
-    if (环境变量.BUILD_TARGET === 'sea') {
+    if (获得环境变量().BUILD_TARGET === 'sea') {
       return path.resolve(import.meta.dirname, './')
     }
-    if (环境变量.NODE_ENV === 'development' || 环境变量.NODE_ENV === 'test') {
+    if (获得环境变量().NODE_ENV === 'development' || 获得环境变量().NODE_ENV === 'test') {
       return path.resolve(import.meta.dirname, '../../')
     }
     return path.resolve(import.meta.dirname, '../../../')
   }
 
   private async 执行启动(): Promise<服务器运行信息> {
+    获得环境变量()
     await init()
-    let log = globalLog.extend('service')
-    await 定时任务管理器.执行([onTimeAlarm, databaseBackupCron])
+    let log = 全局资源.获得日志().extend('service')
+    await 全局资源.获得定时任务管理器().执行([onTimeAlarm, databaseBackupCron])
 
     this.服务 = new 服务器({
       接口们: [
@@ -95,7 +96,7 @@ class App {
           接口逻辑.构造([new 路径解析插件()], async (参数) => {
             let 路径 = 参数.path.rawPath === '/' ? '/index.html' : 参数.path.rawPath
             let 项目根路径 = this.获得项目根路径()
-            let web目录名 = 环境变量.NODE_ENV === 'test' ? 'test-outputs/web-test' : 'dist/src/web'
+            let web目录名 = 获得环境变量().NODE_ENV === 'test' ? 'test-outputs/web-test' : 'dist/src/web'
             let web根目录 = path.join(项目根路径, web目录名)
 
             let 基准目录 = path.resolve(web根目录)
@@ -114,7 +115,7 @@ class App {
           new 静态文件返回器({ MIME类型映射: { '.wasm': 'application/wasm' } }),
         ),
       ],
-      端口: 环境变量.APP_PORT,
+      端口: 获得环境变量().APP_PORT,
       日志回调: syncLogCallBack,
     })
     let 服务信息 = await this.服务.run()
@@ -122,7 +123,7 @@ class App {
     await log.debug('已加载的api路径: %O', 服务信息.api)
     await log.debug('服务器地址: %O', 服务信息.ip)
 
-    即时任务管理器.提交任务(报告系统情况任务)
+    全局资源.获得即时任务管理器().提交任务(创建报告系统情况任务())
     return 服务信息
   }
 
@@ -154,10 +155,8 @@ class App {
       }
       this.服务 = null
     }
-    let 任务关闭结果组 = await Promise.allSettled([定时任务管理器.关闭(), 即时任务管理器.关闭()])
-    for (let 结果 of 任务关闭结果组) if (结果.status === 'rejected') 错误组.push(结果.reason)
     try {
-      await kysely管理器.销毁()
+      await 全局资源.关闭()
     } catch (错误) {
       错误组.push(错误)
     }

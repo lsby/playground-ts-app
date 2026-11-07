@@ -9,7 +9,7 @@ import {
 } from '@lsby/net-core'
 import { Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
-import { 定时任务管理器 } from '../../../../global/global'
+import { 全局资源 } from '../../../../global/global'
 import { 检查管理员登录 } from '../../../../interface-logic/check/check-login-jwt-admin'
 
 let 接口路径 = '/api/admin-job/scheduled/list' as const
@@ -22,7 +22,8 @@ let 接口逻辑实现 = 接口逻辑
     接口逻辑.构造([new JSON参数解析插件(z.object({}).strict(), {})], async (参数, 逻辑附加参数, 请求附加参数) => {
       let _log = 请求附加参数.log.extend(接口路径)
 
-      let 任务列表 = 定时任务管理器
+      let 任务列表 = 全局资源
+        .获得定时任务管理器()
         .获取任务列表()
         .map((任务) => ({
           ...任务,

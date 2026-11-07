@@ -1,7 +1,7 @@
 import { web请求 } from '@lsby/ts-http-extend'
 import { z } from 'zod'
 import { 项目标识 } from '../../../app/meta-info'
-import { 环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env'
 import { JSON对象模式 } from '../../../model/json-value'
 import { 已审阅的any } from '../../../tools/types'
 import { InterfaceType } from '../../../types/interface-type'
@@ -47,7 +47,6 @@ type 所有GET文本路径 = InterfaceType extends readonly (infer Item)[]
 type GET查询参数组<接口路径 extends 所有GET文本路径> = [取QUERY输入<取接口<接口路径>>] extends [never]
   ? []
   : [参数: 取QUERY输入<取接口<接口路径>>]
-let API前缀 = 环境变量.BACKEND_URL.replace(/\/+$/, '')
 export class API管理器类 {
   private 本地存储名称 = `${项目标识}-api-token`
   private token: string | null = null
@@ -86,7 +85,7 @@ export class API管理器类 {
     if (this.token !== null) 头['authorization'] = 'Bearer ' + this.token
 
     try {
-      if (环境变量.BUILD_TARGET === 'pure-frontend') {
+      if (获得环境变量().BUILD_TARGET === 'pure-frontend') {
         let { 使用纯前端数据库锁, 请求纯前端Worker响应 } = await import('./pure-frontend-client')
         let 响应 = await 使用纯前端数据库锁(() =>
           请求纯前端Worker响应({ path: 完整路径, headers: 头, method: 'GET', body: '' }),
@@ -95,7 +94,7 @@ export class API管理器类 {
         return { status: 响应.status >= 200 && 响应.status < 300 ? 'success' : 'fail', data: 数据 } as 已审阅的any
       }
 
-      let 响应 = await fetch(API前缀 + 完整路径, { method: 'GET', headers: 头 })
+      let 响应 = await fetch(获得环境变量().BACKEND_URL.replace(/\/+$/, '') + 完整路径, { method: 'GET', headers: 头 })
       return { status: 响应.ok === true ? 'success' : 'fail', data: await 响应.text() } as 已审阅的any
     } catch (e) {
       console.error('GET 请求错误:\n路径: %o', 完整路径)
@@ -186,7 +185,7 @@ export class API管理器类 {
   }
 
   public async 重置纯前端管理员密码(password: string): Promise<void> {
-    if (环境变量.BUILD_TARGET !== 'pure-frontend') throw new Error('仅纯前端模式支持本机管理员密码重设')
+    if (获得环境变量().BUILD_TARGET !== 'pure-frontend') throw new Error('仅纯前端模式支持本机管理员密码重设')
     let { 请求纯前端命令 } = await import('./pure-frontend-client')
     let result = await 请求纯前端命令({ command: 'reset-admin-password', password })
     if (是标准接口响应(result) === false || result.status !== 'success')
@@ -194,7 +193,7 @@ export class API管理器类 {
   }
 
   public async 重置纯前端数据库(): Promise<void> {
-    if (环境变量.BUILD_TARGET !== 'pure-frontend') throw new Error('仅纯前端模式支持本机数据库重置')
+    if (获得环境变量().BUILD_TARGET !== 'pure-frontend') throw new Error('仅纯前端模式支持本机数据库重置')
     let { 请求纯前端命令 } = await import('./pure-frontend-client')
     let result = await 请求纯前端命令({ command: 'reset-database' })
     if (是标准接口响应(result) === false || result.status !== 'success')
@@ -250,13 +249,13 @@ export class API管理器类 {
       }
 
       // console.log('请求:\n路径: %o\n头: %o\n方法: %o\nbody: %o\n结果: %o', 接口路径, 头, 方法, body, 请求结果)
-      if (环境变量.BUILD_TARGET === 'pure-frontend') {
+      if (获得环境变量().BUILD_TARGET === 'pure-frontend') {
         let { 请求纯前端接口 } = await import('./pure-frontend-client')
         return await 等待可取消任务(请求纯前端接口(接口路径, 头, 方法, body), 请求选项?.信号)
       }
       请求结果 = await 等待可取消任务(
         web请求({
-          url: API前缀 + 接口路径,
+          url: 获得环境变量().BACKEND_URL.replace(/\/+$/, '') + 接口路径,
           body: body,
           headers: 头,
           method: 方法,

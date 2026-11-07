@@ -5,8 +5,8 @@ import { 应用单例 } from './app/app'
 import { 计算补偿后的窗口配置, 验证并修正窗口 } from './electron/multi-display'
 import { 检查端口可用, 等待端口就绪, 获取随机可用端口 } from './electron/port-utils'
 import { 保存窗口状态, 检查窗口是否在可见区域内, 获取默认窗口位置, 读取窗口状态 } from './electron/window-state'
-import { 环境变量 } from './global/env'
-import { globalLog } from './global/global'
+import { 获得环境变量 } from './global/env'
+import { 全局资源 } from './global/global'
 import { 启动异常兜底 } from './tools/fallback'
 
 let 是否允许退出 = false
@@ -60,19 +60,19 @@ let 窗口状态路径 = path.join(用户数据目录, 'window-state.json')
  * - 加载应用页面
  */
 async function 创建主窗口(): Promise<void> {
-  let log = globalLog.extend('electron')
-  let 开发环境 = 环境变量.NODE_ENV === 'development'
+  let log = 全局资源.获得日志().extend('electron')
+  let 开发环境 = 获得环境变量().NODE_ENV === 'development'
 
-  let 端口 = 环境变量.WEB_PORT
+  let 端口 = 获得环境变量().WEB_PORT
 
   if (开发环境 === false) {
-    端口 = 环境变量.APP_PORT
+    端口 = 获得环境变量().APP_PORT
     // 生产环境下：先处理端口冲突（先检查后启动）
     if ((await 检查端口可用(端口)) === false) {
       端口 = await 获取随机可用端口()
       // 覆盖环境变量，这样稍后启动的服务器就会使用新端口
-      环境变量.APP_PORT = 端口
-      环境变量.WEB_PORT = 端口
+      获得环境变量().APP_PORT = 端口
+      获得环境变量().WEB_PORT = 端口
       await log.info(`默认端口被占用，已切换为随机端口: ${端口}`)
     }
 

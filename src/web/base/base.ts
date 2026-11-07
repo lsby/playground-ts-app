@@ -1,4 +1,4 @@
-import { globalWebLog } from '../global/manager/log-manager'
+import { 获得网页日志 } from '../global/manager/log-manager'
 import { 获得滚动条样式 } from '../global/style/scrollbar'
 import { 创建中止错误, 是中止错误, 等待可取消任务 } from '../global/tools/abort'
 
@@ -18,7 +18,7 @@ export abstract class 组件基类<
     else console.warn(`组件名称 ${组件名称} 重复`)
   }
 
-  protected log = globalWebLog.extend(this.constructor.name)
+  protected log = 获得网页日志().extend(this.constructor.name)
   private 基础样式元素 = document.createElement('style')
   private 初始化完毕 = false
   private 初始化完成事件: Promise<void> | null = null

@@ -9,7 +9,7 @@
 - **单文件应用**: 使用 Node.js SEA 编译的单文件可执行程序
 - **命令行应用**: 命令行应用
 
-## 导引与通用规范
+## 导引与通用规则
 
 - 修改代码前, 先根据任务类型找到最接近的 demo, 完整阅读相关前后端实现和已有测试, 再沿用其结构
 - demo 用于展示标准写法, 项目定制业务代码应写入 `src/interface/project/`, `src/web/components/project/` 等项目目录. 除非任务本身是维护示例, 否则不要把业务需求写进 demo
@@ -44,7 +44,7 @@
   - 写出完整的类型, 谨慎使用 `any`, `unknown` 和 `as`, 尤其避免通过 `as Record<string, any>`, `as Record<string, unknown>`, `as any` 或 `as unknown` 绕过类型检查
   - 进行 Zod 校验时优先直接组合解析与校验, 例如 `Schema.parse(JSON.parse(json))`, 需要临时变量时, 应让未经校验的值保持在明确的边界内并立即收窄
 
-## 架构设计与各端规范
+## 架构设计与各端规则
 
 ### 接口
 
@@ -135,7 +135,7 @@
 
 - **定位**: 纯前端用于无需部署后端的场景, 页面和资源仍通过网络加载, 不承诺离线使用; 框架不提供本地与远程数据同步机制。
 
-- **核心规范与架构设计**: 纯前端 (Pure Frontend) 的核心组件（API Worker, SQLite Worker, IndexedDB 持久化）、生成与配置、以及并发锁机制等详细设计规范，请参见 [doc/framework/pure-frontend.md](doc/framework/pure-frontend.md)。
+- **核心架构设计**: 纯前端 (Pure Frontend) 的核心组件（API Worker, SQLite Worker, IndexedDB 持久化）、生成与配置、以及并发锁机制等详细设计，请参见 [doc/framework/pure-frontend.md](doc/framework/pure-frontend.md)。
 - **注意**: 纯前端标注的接口会在本地浏览器运行，开发时必须运行完整的 `npm run task -- dev:pure-frontend` 以监听派生文件的更新。
 
 ### 任务系统
@@ -143,6 +143,7 @@
 - **即时任务**:
   - 即时任务的示例实现位于 `src/job/instant-job/`, 核心抽象类定义在 `src/model/job-instant/instant-job.ts`
   - 相关任务由 `src/model/job-instant/instant-job-manager.ts` 负责管理
+  - 管理器构造时启动清理定时器，修改保留天数会重设定时器；全局实例由全局资源在首次获取时创建，并在关闭时清理定时器
 - **定时任务**:
   - 定时任务的示例实现位于 `src/job/scheduled-job/`, 核心抽象类定义在 `src/model/job-scheduled/scheduled-job.ts`
   - 相关任务由 `src/model/job-scheduled/scheduled-job-manager.ts` 负责管理
@@ -164,6 +165,7 @@
   - Web 前端需复用时，只允许引用 `src/model/` 或自动生成的接口类型，**严禁**引用 `src/interface-logic/`。
 
 - **设计与实践原则**:
+  - 核心领域建模采用本体驱动的充血对象风格。完整指南见 [本体驱动的充血对象建模指南](doc/framework/ontology-driven-modeling.md)。
   - **杜绝过度设计**: 不为了形式上的分层去机械封装缺乏行为的类、薄仓储包装或重复的 DTO。利用好 TypeScript 的判别联合、纯函数和 Zod Schema 即可清晰表达领域。
 
 ## 工程化与运维部署
@@ -180,7 +182,6 @@
   - Git 忽略但需要跨机器同步的证书、密钥与发布材料可通过 [外挂 LFS](doc/framework/external-lfs.md) 管理；Git 提交逐文件加密清单和加密的 `.env/.env.external-lfs`，阿里云 OSS 或腾讯云 COS 保存加密对象，唯一解密根密钥仍为 `.project-config.key`
   - 提交钩子会识别暂存区中的疑似二进制内容，并在放行前要求二次确认。此类文件原则上不应直接写入 Git；确有存储需求时，应优先纳入扩展 LFS，或采用其他合适的外部存储方案
   - 环境变量应当通过 Zod 进行严格校验, 并且不提供业务兜底值, 以便让缺失的配置在启动或构建阶段就能尽早报错
-  - 业务代码应统一使用解析好的 `环境变量` 对象, 而不要直接去读取 `process.env`. 这既能保留类型检查, 也能完美兼容前端环境的变量注入
   - 针对前端编译时的环境变量注入, 相关实现在 `src/web/mock/env-provider-mock.ts` 中
 - **路径解析**:
   - Web 服务运行时的项目根目录和静态资源路径集中在 `src/app/app.ts`
@@ -230,7 +231,7 @@
 - **策略与理念**:
   - 除非用户在交互中明确要求, 否则禁止擅自去补齐或新增测试代码, 并不是所有修改都有写测试的价值, 可以询问用户, 但应该让用户决定
   - 所有测试默认均会生成格式化测试报告, 统一输出在 `test-outputs/` 目录下, 并在运行结束时在控制台输出可直接点击的报告链接
-- **各级测试规范**: 关于单元测试、集成测试、端到端测试及需求测试的目录约定、运行命令和详细规范，请统一参阅 [doc/framework/testing.md](doc/framework/testing.md)。
+- **各级测试模型**: 关于单元测试、集成测试、端到端测试及需求测试的目录约定、运行命令和详细论述，请统一参阅 [doc/framework/testing.md](doc/framework/testing.md)。
 
 ### 修改完成后的验证
 

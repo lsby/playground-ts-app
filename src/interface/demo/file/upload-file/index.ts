@@ -6,9 +6,9 @@ import {
   计算接口逻辑正确结果,
   计算接口逻辑错误结果,
 } from '@lsby/net-core'
-import { Right } from '@lsby/ts-fp-data'
+import { Right, Task } from '@lsby/ts-fp-data'
 import { z } from 'zod'
-import { 环境变量 } from '../../../../global/env'
+import { 获得环境变量 } from '../../../../global/env'
 import { 检查登录 } from '../../../../interface-logic/check/check-login-jwt'
 
 let 接口路径 = '/api/demo/file/upload-file' as const
@@ -20,9 +20,12 @@ let 接口逻辑实现 = 接口逻辑
   .绑定(
     接口逻辑.构造(
       [
-        new Form参数解析插件(z.object({ description: z.string().optional() }).strict(), {
-          limits: { fileSize: 环境变量.UPLOAD_MAX_FILE_SIZE * 1024 * 1024 },
-        }),
+        new Task(
+          async () =>
+            new Form参数解析插件(z.object({ description: z.string().optional() }).strict(), {
+              limits: { fileSize: 获得环境变量().UPLOAD_MAX_FILE_SIZE * 1024 * 1024 },
+            }),
+        ),
       ],
       async (参数, 逻辑附加参数, 请求附加参数) => {
         let log = 请求附加参数.log.extend(接口路径)

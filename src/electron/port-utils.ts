@@ -1,5 +1,5 @@
 import net from 'net'
-import { globalLog } from '../global/global'
+import { 全局资源 } from '../global/global'
 
 /**
  * 检查指定端口是否可用
@@ -29,7 +29,7 @@ export async function 获取随机可用端口(): Promise<number> {
     }
   }
 
-  let log = globalLog.extend('electron')
+  let log = 全局资源.获得日志().extend('electron')
   await log.error('尝试10次后仍未找到可用端口，退出应用')
 
   throw new Error('未找到可用端口')
@@ -60,7 +60,7 @@ export async function 检查端口已监听(端口: number): Promise<boolean> {
  * @param 间隔毫秒 每次尝试间隔毫秒（默认 500ms，总限时约 30 秒）
  */
 export async function 等待端口就绪(端口: number, 最大尝试次数 = 60, 间隔毫秒 = 500): Promise<boolean> {
-  let log = globalLog.extend('electron')
+  let log = 全局资源.获得日志().extend('electron')
   for (let 尝试次数 = 1; 尝试次数 <= 最大尝试次数; 尝试次数++) {
     let 已监听 = await 检查端口已监听(端口)
     if (已监听 === true) {

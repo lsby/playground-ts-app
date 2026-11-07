@@ -10,7 +10,7 @@ import {
 } from '@lsby/net-core'
 import { Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
-import { 即时任务管理器 } from '../../../../global/global'
+import { 全局资源 } from '../../../../global/global'
 import { 检查管理员登录 } from '../../../../interface-logic/check/check-login-jwt-admin'
 import { 集线器监听器宿主 } from '../../../../model/hub/hub-model'
 
@@ -31,7 +31,7 @@ let 接口逻辑实现 = 接口逻辑
       ],
       async (参数, 逻辑附加参数, 请求附加参数) => {
         let _log = 请求附加参数.log.extend(接口路径)
-        let 任务管理器 = 即时任务管理器
+        let 任务管理器 = 全局资源.获得即时任务管理器()
 
         let 任务 = 任务管理器.获得所有任务列表().find((t) => t.获得id() === 参数.json.任务id)
         if (任务 === undefined) {

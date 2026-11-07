@@ -10,7 +10,7 @@ import {
 import { Right } from '@lsby/ts-fp-data'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
-import { 环境变量 } from '../../../../../global/env'
+import { 获得环境变量 } from '../../../../../global/env'
 import { kysely插件 } from '../../../../../global/plugin'
 import { 检查管理员登录 } from '../../../../../interface-logic/check/check-login-jwt-admin'
 
@@ -38,7 +38,7 @@ let 接口逻辑实现 = 接口逻辑
             .values({
               id: userId,
               name: 参数.json.name,
-              pwd: await bcrypt.hash(参数.json.pwd, 环境变量.BCRYPT_ROUNDS),
+              pwd: await bcrypt.hash(参数.json.pwd, 获得环境变量().BCRYPT_ROUNDS),
               is_admin: 参数.json.isAdmin ? 1 : 0,
             })
             .executeTakeFirst()

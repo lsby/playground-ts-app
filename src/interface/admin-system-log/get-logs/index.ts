@@ -10,7 +10,7 @@ import {
 } from '@lsby/net-core'
 import { Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
-import { 日志模型实例 } from '../../../global/global'
+import { 全局资源 } from '../../../global/global'
 import { 检查管理员登录 } from '../../../interface-logic/check/check-login-jwt-admin'
 import { 集线器监听器宿主 } from '../../../model/hub/hub-model'
 
@@ -36,13 +36,16 @@ let 接口逻辑实现 = 接口逻辑
           await 参数.ws操作?.发送ws信息({ 新日志: { 时间: 日志.时间.toISOString(), 消息: 日志.消息 } }).catch(() => {})
         }
         let 宿主 = new 集线器监听器宿主()
-        日志模型实例.添加日志监听器(监听器, 宿主)
+        全局资源.获得日志模型().添加日志监听器(监听器, 宿主)
 
         await 参数.ws操作?.设置清理函数(async () => {
           宿主.解绑()
         })
 
-        let 日志列表 = 日志模型实例.获得日志列表().map((日志) => ({ 时间: 日志.时间.toISOString(), 消息: 日志.消息 }))
+        let 日志列表 = 全局资源
+          .获得日志模型()
+          .获得日志列表()
+          .map((日志) => ({ 时间: 日志.时间.toISOString(), 消息: 日志.消息 }))
 
         return new Right({ 日志列表 })
       },

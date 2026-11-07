@@ -4,8 +4,8 @@ import { 任意接口, 执行已匹配接口, 默认请求附加参数 } from '@
 import bcrypt from 'bcryptjs'
 import { Request, Response } from 'express'
 import { sql } from 'kysely'
-import { 环境变量 } from '../../global/env'
-import { globalLog, kysely管理器 } from '../../global/global'
+import { 获得环境变量 } from '../../global/env'
+import { 全局资源 } from '../../global/global'
 import { init } from '../../init/init'
 import { 验证密码 } from '../../model/user/user-validation'
 import { 应用浏览器迁移 } from './browser-database'
@@ -23,7 +23,7 @@ let 已初始化 = false
 
 async function 确保已初始化(): Promise<void> {
   if (已初始化 === true) return
-  await 应用浏览器迁移(kysely管理器.获得句柄())
+  await 应用浏览器迁移(全局资源.获得数据库().获得句柄())
   await init()
   已初始化 = true
 }
@@ -50,24 +50,26 @@ async function 处理命令(命令: 本地Worker命令): Promise<本地API响应
       await 确保已初始化()
       let 密码错误 = 验证密码(命令.password)
       if (密码错误 !== undefined) return 本地返回(命令.id, 'fail', 密码错误)
-      let 管理员 = await kysely管理器
+      let 管理员 = await 全局资源
+        .获得数据库()
         .获得句柄()
         .selectFrom('user')
         .select('id')
-        .where('name', '=', 环境变量.DEFAULT_SYSTEM_USER)
+        .where('name', '=', 获得环境变量().DEFAULT_SYSTEM_USER)
         .executeTakeFirst()
       if (管理员 === undefined) return 本地返回(命令.id, 'unexpected', '未找到本机管理员账号')
-      await kysely管理器
+      await 全局资源
+        .获得数据库()
         .获得句柄()
         .updateTable('user')
-        .set({ pwd: await bcrypt.hash(命令.password, 环境变量.BCRYPT_ROUNDS) })
+        .set({ pwd: await bcrypt.hash(命令.password, 获得环境变量().BCRYPT_ROUNDS) })
         .where('id', '=', 管理员.id)
         .execute()
       return 本地返回(命令.id, 'success', {})
     }
     case 'reset-database': {
       await 确保已初始化()
-      let 数据库 = kysely管理器.获得句柄()
+      let 数据库 = 全局资源.获得数据库().获得句柄()
       await sql`PRAGMA foreign_keys = OFF`.execute(数据库)
       try {
         let 表结果 = await sql<{ name: string }>`
@@ -144,7 +146,7 @@ async function 处理请求(请求: 本地API请求): Promise<本地API响应> {
     req: reqMock as unknown as Request,
     res: resMock as unknown as Response,
     目标接口: 匹配接口,
-    请求附加参数: { ...默认请求附加参数, log: globalLog.extend(url.pathname), 请求id: String(请求.id) },
+    请求附加参数: { ...默认请求附加参数, log: 全局资源.获得日志().extend(url.pathname), 请求id: String(请求.id) },
   })
   return { id: 请求.id, status: responseStatus, body: JSON.stringify(responseBody) }
 }

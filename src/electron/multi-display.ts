@@ -1,5 +1,5 @@
 import { BrowserWindow, screen } from 'electron'
-import { globalLog } from '../global/global'
+import { 全局资源 } from '../global/global'
 import { 窗口状态数据 } from './window-state'
 
 /**
@@ -68,7 +68,7 @@ export function 计算补偿后的窗口配置(保存的状态: 窗口状态数�
  * setBounds 在窗口创建后调用，Electron 此时已知窗口在哪个显示器，会正确应用尺寸
  */
 export async function 验证并修正窗口(主窗口: BrowserWindow, 保存的状态: 窗口状态数据): Promise<void> {
-  let log = globalLog.extend('electron')
+  let log = 全局资源.获得日志().extend('electron')
 
   let 创建后的边界 = 主窗口.getBounds()
   await log.info('窗口创建后的实际边界:', 创建后的边界)

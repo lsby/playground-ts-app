@@ -1,0 +1,25 @@
+diff --git a/src/common.js b/src/common.js
+index 141cb578b7722324d8e1799b2a41bac473f6a9c1..c778d88b2a2dc7a8bbf6a63fa64b46d3bb093437 100644
+--- a/src/common.js
++++ b/src/common.js
+@@ -161,6 +161,10 @@ function setup(env) {
+ 	*/
+ 	function enable(namespaces) {
+ 		createDebug.save(namespaces);
++		configure(namespaces);
++	}
++
++	function configure(namespaces) {
+ 		createDebug.namespaces = namespaces;
+ 
+ 		createDebug.names = [];
+@@ -284,7 +288,8 @@ function setup(env) {
+ 		console.warn('Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.');
+ 	}
+ 
+-	createDebug.enable(createDebug.load());
++	// Loading existing configuration must not persist it again.
++	configure(createDebug.load());
+ 
+ 	return createDebug;
+ }

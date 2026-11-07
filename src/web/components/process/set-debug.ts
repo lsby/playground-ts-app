@@ -1,6 +1,6 @@
-import { 环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env'
 import { 组件基类 } from '../../base/base'
-import { globalWebLog } from '../../global/manager/log-manager'
+import { 获得网页日志 } from '../../global/manager/log-manager'
 
 type 发出事件类型 = {}
 type 监听事件类型 = {}
@@ -37,7 +37,7 @@ function 安装调试补丁(): void {
       return
     }
 
-    let 组件日志 = globalWebLog.extend(this.constructor.name)
+    let 组件日志 = 获得网页日志().extend(this.constructor.name)
     if (调试补丁引用数 > 0 && 是排除事件(type) === false) void 组件日志.debug('监听事件: %o', type)
     let 监听器映射 = 目标监听器映射.get(this)
     if (监听器映射 === undefined) {
@@ -79,7 +79,7 @@ function 安装调试补丁(): void {
 
   EventTarget.prototype.dispatchEvent = function (event): boolean {
     if (调试补丁引用数 > 0 && 是排除事件(event.type) === false) {
-      let 组件日志 = globalWebLog.extend(this.constructor.name)
+      let 组件日志 = 获得网页日志().extend(this.constructor.name)
       void 组件日志.debug(event instanceof CustomEvent ? '派发自定义事件: %o' : '派发事件: %o', event.type)
     }
     return 原始派发事件.call(this, event)
@@ -119,9 +119,9 @@ export class 设置调试组件 extends 组件基类<发出事件类型, 监听�
   }
 
   protected override async 当加载时(): Promise<void> {
-    console.log('当前环境: %o', 环境变量.NODE_ENV)
+    console.log('当前环境: %o', 获得环境变量().NODE_ENV)
 
-    if (环境变量.NODE_ENV !== 'development') {
+    if (获得环境变量().NODE_ENV !== 'development') {
       // 生产模式
       localStorage['debug'] = ''
     } else {

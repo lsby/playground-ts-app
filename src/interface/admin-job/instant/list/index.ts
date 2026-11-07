@@ -9,7 +9,7 @@ import {
 } from '@lsby/net-core'
 import { Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
-import { 即时任务管理器 } from '../../../../global/global'
+import { 全局资源 } from '../../../../global/global'
 import { 检查管理员登录 } from '../../../../interface-logic/check/check-login-jwt-admin'
 import { JSON值模式 } from '../../../../model/json-value'
 
@@ -22,7 +22,7 @@ let 接口逻辑实现 = 接口逻辑
   .绑定(
     接口逻辑.构造([new JSON参数解析插件(z.object({}).strict(), {})], async (参数, 逻辑附加参数, 请求附加参数) => {
       let _log = 请求附加参数.log.extend(接口路径)
-      let 任务管理器 = 即时任务管理器
+      let 任务管理器 = 全局资源.获得即时任务管理器()
 
       let 任务列表 = 任务管理器
         .获得所有任务列表()

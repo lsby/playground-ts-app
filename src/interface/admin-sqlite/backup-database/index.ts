@@ -13,7 +13,7 @@ import fs from 'fs'
 import { CompiledQuery } from 'kysely'
 import path from 'path'
 import { z } from 'zod'
-import { 环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env'
 import { kysely插件 } from '../../../global/plugin'
 import { 检查管理员登录 } from '../../../interface-logic/check/check-login-jwt-admin'
 
@@ -47,13 +47,13 @@ let 接口逻辑实现 = 接口逻辑
         await log.info('开始备份数据库...')
 
         await log.info('获取备份目录...')
-        let backupDir = 环境变量.DB_BACKUP_PATH
+        let backupDir = 获得环境变量().DB_BACKUP_PATH
         await log.info(`备份目录: ${backupDir}`)
 
         await log.info('计算备份文件路径...')
-        let envName = 环境变量.NODE_ENV
+        let envName = 获得环境变量().NODE_ENV
         let timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').split('.')[0]
-        let backupFileName = `${环境变量.DB_BACKUP_PREFIX}${逻辑附加参数.isAuto ? 环境变量.DB_BACKUP_AUTO_PREFIX : ''}${envName}_${timestamp}.db`
+        let backupFileName = `${获得环境变量().DB_BACKUP_PREFIX}${逻辑附加参数.isAuto ? 获得环境变量().DB_BACKUP_AUTO_PREFIX : ''}${envName}_${timestamp}.db`
         let backupPath = path.join(backupDir, backupFileName)
         await log.info(`备份文件路径: ${backupPath}`)
 
