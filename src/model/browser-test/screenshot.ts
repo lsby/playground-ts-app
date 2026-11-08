@@ -1,9 +1,49 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 
-type 位置 = { x: number; y: number }
-type 区域 = 位置 & { width: number; height: number }
+export type 截图标注坐标 = { x: number; y: number }
+type 区域 = 截图标注坐标 & { width: number; height: number }
 
-export async function 标注截图(页面: Page, 截图: Buffer, 标注: 位置 | 区域): Promise<Buffer> {
+export async function 获得视口内标注位置(目标: Locator): Promise<截图标注坐标 | undefined> {
+  if ((await 目标.isVisible()) === false) return undefined
+  let 位置 = await 目标.evaluate(
+    (元素): Promise<(截图标注坐标 & { 主帧: boolean; 水平比例: number; 垂直比例: number }) | null> =>
+      new Promise((完成): void => {
+        let 定时器 = setTimeout((): void => {
+          观察器.disconnect()
+          完成(null)
+        }, 200)
+        let 观察器 = new IntersectionObserver(([条目]): void => {
+          clearTimeout(定时器)
+          观察器.disconnect()
+          if (条目 === undefined || 条目.intersectionRect.width === 0 || 条目.intersectionRect.height === 0) {
+            完成(null)
+            return
+          }
+          let 可见 = 条目.intersectionRect
+          let 整体 = 条目.boundingClientRect
+          let x = 可见.left + 可见.width / 2
+          let y = 可见.top + 可见.height / 2
+          完成({
+            x,
+            y,
+            主帧: window === window.top,
+            水平比例: (x - 整体.left) / 整体.width,
+            垂直比例: (y - 整体.top) / 整体.height,
+          })
+        })
+        观察器.observe(元素)
+      }),
+    undefined,
+    { timeout: 200 },
+  )
+  if (位置 === null) return undefined
+  if (位置.主帧 === true) return { x: 位置.x, y: 位置.y }
+  let 边界 = await 目标.boundingBox({ timeout: 200 })
+  if (边界 === null) return undefined
+  return { x: 边界.x + 边界.width * 位置.水平比例, y: 边界.y + 边界.height * 位置.垂直比例 }
+}
+
+export async function 标注截图(页面: Page, 截图: Buffer, 标注: 截图标注坐标 | 区域): Promise<Buffer> {
   let 图片 = await 页面.evaluate(
     async ({ 原图, 目标 }): Promise<string> => {
       let 位图 = await createImageBitmap(new Blob([Uint8Array.from(atob(原图), (字符) => 字符.charCodeAt(0))]))

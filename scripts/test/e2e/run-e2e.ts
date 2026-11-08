@@ -1,26 +1,17 @@
-import { mkdir, mkdtemp, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { inspect, parseArgs, stripVTControlCharacters } from 'node:util'
 import { z } from 'zod'
 
 import { 全局资源 } from '../../../src/global/global'
-import { 浏览器测试引擎, type 浏览器测试模式 } from '../../../src/model/browser-test'
+import type { 浏览器测试模式 } from '../../../src/model/browser-test'
 import { 端到端测试 } from '../../../src/model/test-e2e'
 import { 测试服务 } from '../test-server'
+import { 执行端到端测试尝试, type 执行结果, type 端到端测试登记 } from './attempt'
+import { 保存端到端测试报告 } from './report'
 
 type 端到端测试选项 = { 目标们: readonly string[]; 模式: 浏览器测试模式 | undefined; 仅列出: boolean }
-type 端到端测试登记 = { 文件: string; 类: new () => 端到端测试 }
-type 测试附件 = { 名称: string; 相对路径: string; 内容类型: string }
-type 执行结果 = {
-  名称: string
-  文件: string
-  状态: '通过' | '失败'
-  尝试序号: number
-  耗时毫秒: number
-  错误们: string[]
-  附件们: 测试附件[]
-}
 
 /**
  * 端到端测试运行器管理项目里的浏览器测试用例及其运行环境。
@@ -116,7 +107,14 @@ export class 端到端测试运行器 {
       let 最大尝试次数 = 模式 === '自动' && process.env['CI'] !== undefined && process.env['CI'] !== '' ? 3 : 1
       for (let 测试 of 测试们) {
         for (let 尝试序号 = 1; 尝试序号 <= 最大尝试次数 && 中断码 === undefined; 尝试序号 += 1) {
-          let 结果 = await this.执行测试(测试, { 服务地址, 模式, 尝试序号, 本次报告目录, 取消信号: 取消控制器.signal })
+          let 结果 = await 执行端到端测试尝试(测试, {
+            根目录: this.根目录,
+            服务地址,
+            模式,
+            尝试序号,
+            本次报告目录,
+            取消信号: 取消控制器.signal,
+          })
           记录们.push(结果)
           if (结果.状态 === '通过') break
         }
@@ -135,17 +133,19 @@ export class 端到端测试运行器 {
     }
     let 最终结果们 = [...new Map(记录们.map((记录) => [记录.文件, 记录])).values()]
     let 失败数 = 最终结果们.filter((记录) => 记录.状态 === '失败').length
-    await this.保存报告(本次报告目录, {
+    let html路径 = await 保存端到端测试报告(本次报告目录, {
       模式,
       服务地址,
       开始时间: new Date(开始时间).toISOString(),
       耗时毫秒: Date.now() - 开始时间,
-      通过数: 最终结果们.length - 失败数,
+      通过数: 最终结果们.filter((记录) => 记录.状态 === '通过').length,
       失败数,
+      用例们: 测试们.map(({ 文件, 类 }) => ({ 文件, 名称: 类.name })),
       记录们,
       基础设施错误们,
       中断码,
     })
+    console.log(`端到端测试报告已生成：${pathToFileURL(html路径).href}`)
     return 中断码 ?? (失败数 > 0 || 基础设施错误们.length > 0 ? 1 : 0)
   }
 
@@ -170,119 +170,12 @@ export class 端到端测试运行器 {
     return 文件们.filter((文件) => 选中文件们.has(文件))
   }
 
-  private async 执行测试(
-    测试: 端到端测试登记,
-    参数: { 服务地址: string; 模式: 浏览器测试模式; 尝试序号: number; 本次报告目录: string; 取消信号: AbortSignal },
-  ): Promise<执行结果> {
-    let 开始时间 = Date.now()
-    let 错误们: string[] = []
-    let 附件们: 测试附件[] = []
-    console.log(`开始端到端测试：${测试.类.name}（${测试.文件}，第 ${String(参数.尝试序号)} 次）`)
-    try {
-      let 实例 = new 测试.类()
-      let 会话 = await 浏览器测试引擎.打开会话({
-        服务地址: 参数.服务地址,
-        模式: 参数.模式,
-        取消信号: 参数.取消信号,
-        附件目录: path.join(参数.本次报告目录, 'attachments', 测试.文件, String(参数.尝试序号)),
-      })
-      try {
-        参数.取消信号.throwIfAborted()
-        await 实例.运行(会话.引擎)
-      } catch (错误) {
-        错误们.push(this.错误文本(错误))
-      } finally {
-        try {
-          if (参数.取消信号.aborted === false) {
-            附件们 = (await 会话.收集附件()).map((附件) => ({
-              名称: 附件.名称,
-              相对路径: this.获得相对路径(参数.本次报告目录, 附件.路径),
-              内容类型: 附件.内容类型,
-            }))
-          }
-        } catch (错误) {
-          错误们.push(`收集浏览器附件失败：${this.错误文本(错误)}`)
-        } finally {
-          await 会话.关闭()
-        }
-      }
-    } catch (错误) {
-      错误们.push(this.错误文本(错误))
-    }
-    let 状态: 执行结果['状态'] = 错误们.length === 0 ? '通过' : '失败'
-    if (错误们.length > 0) console.error(错误们.join('\n'))
-    console.log(`${测试.类.name}：${状态}`)
-    return {
-      名称: 测试.类.name,
-      文件: 测试.文件,
-      状态,
-      尝试序号: 参数.尝试序号,
-      耗时毫秒: Date.now() - 开始时间,
-      错误们,
-      附件们,
-    }
-  }
-
-  private async 保存报告(
-    报告目录: string,
-    报告: {
-      模式: 浏览器测试模式
-      服务地址: string | undefined
-      开始时间: string
-      耗时毫秒: number
-      通过数: number
-      失败数: number
-      记录们: readonly 执行结果[]
-      基础设施错误们: readonly string[]
-      中断码: number | undefined
-    },
-  ): Promise<void> {
-    let 文件们 = await readdir(报告目录)
-    let 日志链接 = [
-      { 文件: 'server.stdout.log', 名称: '服务标准输出' },
-      { 文件: 'server.stderr.log', 名称: '服务错误输出' },
-    ]
-      .filter(({ 文件 }) => 文件们.includes(文件))
-      .map(({ 文件, 名称 }) => `<a href="${文件}">${名称}</a>`)
-      .join(' · ')
-    let 错误Html = (错误们: readonly string[]): string =>
-      错误们.map((错误) => `<pre>${this.转义Html(错误)}</pre>`).join('')
-    let 用例Html = 报告.记录们
-      .map((记录) => {
-        let 附件Html = 记录.附件们
-          .map((附件) => {
-            let 地址 = 附件.相对路径.split('/').map(encodeURIComponent).join('/')
-            let 新标签页 = 附件.内容类型.startsWith('image/') ? ' target="_blank" rel="noopener"' : ''
-            return `<li><a href="${this.转义Html(地址)}"${新标签页}>${this.转义Html(附件.名称)}</a></li>`
-          })
-          .join('')
-        return `<details ${记录.状态 === '失败' ? 'open' : ''}><summary>${记录.状态} · ${this.转义Html(记录.名称)} · 第 ${String(记录.尝试序号)} 次 · ${String(记录.耗时毫秒)}ms</summary>
-        <p>${this.转义Html(记录.文件)}</p>${错误Html(记录.错误们)}<ul>${附件Html}</ul></details>`
-      })
-      .join('')
-    let html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>端到端测试报告</title><style>:root{color-scheme:light dark}body{font:16px/1.5 system-ui,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem}details{border:1px solid #888;padding:.75rem;margin:1rem 0}summary{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style></head>
-    <body><h1>端到端测试报告</h1><p>${报告.开始时间} · ${报告.模式}模式 · ${String(报告.耗时毫秒)}ms</p>
-    <p>通过 ${String(报告.通过数)} · 失败 ${String(报告.失败数)}${报告.中断码 === undefined ? '' : ' · 已中断'}</p>
-    ${报告.服务地址 === undefined ? '' : `<p>${this.转义Html(报告.服务地址)}</p>`}
-    ${日志链接 === '' ? '' : `<p>${日志链接}</p>`}
-    ${错误Html(报告.基础设施错误们)}${用例Html}</body></html>`
-    let html路径 = path.join(报告目录, 'index.html')
-    await writeFile(path.join(报告目录, 'report.json'), JSON.stringify(报告, undefined, 2), 'utf8')
-    await writeFile(html路径, html, 'utf8')
-    console.log(`端到端测试报告已生成：${pathToFileURL(html路径).href}`)
-  }
-
   private 获得相对路径(目录: string, 文件: string): string {
     return path.relative(目录, 文件).replaceAll('\\', '/')
   }
 
   private 错误文本(错误: unknown): string {
     return stripVTControlCharacters(inspect(错误))
-  }
-
-  private 转义Html(文本: string): string {
-    return 文本.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
   }
 }
 

@@ -7,6 +7,7 @@ import { z } from 'zod'
 
 import { 测试提示卡片 } from './prompt-card'
 import { 标注截图 } from './screenshot'
+import { 浏览器步骤证据记录器, type 浏览器步骤证据配置 } from './step-evidence'
 import type { 人工核验结果, 浏览器测试作用域配置, 浏览器测试参数, 浏览器测试模式 } from './types'
 
 type 浏览器测试会话 = {
@@ -59,7 +60,7 @@ export class 浏览器测试引擎 {
       上下文.setDefaultTimeout(30_000)
       await 上下文.tracing.start({ screenshots: true, snapshots: true, sources: true })
       let 页面 = await 上下文.newPage()
-      let 引擎 = new 浏览器测试引擎({ 页面, 模式 })
+      let 引擎 = new 浏览器测试引擎({ 页面, 模式, ...(取消信号 === undefined ? {} : { 取消信号 }) })
       if (参数.初始地址 !== undefined) await 引擎.导航(参数.初始地址)
       取消信号?.throwIfAborted()
       return {
@@ -90,6 +91,7 @@ export class 浏览器测试引擎 {
   private 模式: 浏览器测试模式
   private 等待人工: (() => void) | undefined
   private 提示卡片: 测试提示卡片
+  private 证据: 浏览器步骤证据记录器
   private 步骤作用域 = new AsyncLocalStorage<浏览器测试作用域配置>()
 
   public constructor(参数: 浏览器测试参数) {
@@ -98,15 +100,39 @@ export class 浏览器测试引擎 {
     this.模式 = z.enum(['自动', '演示']).parse(参数.模式)
     this.等待人工 = 参数.等待人工
     this.提示卡片 = new 测试提示卡片(参数.页面)
+    this.证据 = new 浏览器步骤证据记录器(参数.页面, 参数.取消信号)
   }
 
   public get 断言(): typeof expect {
     return expect
   }
 
+  public async 记录步骤证据<T>(配置: 浏览器步骤证据配置, 执行: () => Promise<T>): Promise<T> {
+    return await this.证据.运行(配置, 执行)
+  }
+
+  public async 验证可见(
+    目标: Locator,
+    参数?: Parameters<ReturnType<typeof expect<Locator>>['toBeVisible']>[0],
+  ): Promise<void> {
+    await expect(目标).toBeVisible(参数)
+    if (this.证据.启用 === true && 目标.page() === this.页面) await this.证据.采集('断言通过', '目标已可见', 目标)
+  }
+
+  public async 验证隐藏(
+    目标: Locator,
+    参数?: Parameters<ReturnType<typeof expect<Locator>>['toBeHidden']>[0],
+  ): Promise<void> {
+    await expect(目标).toBeHidden(参数)
+    if (this.证据.启用 === true && 目标.page() === this.页面) await this.证据.采集('断言通过', '目标已隐藏')
+  }
+
   public async 导航(地址: string, 参数?: Parameters<Page['goto']>[1]): ReturnType<Page['goto']> {
     this.检查页面()
-    return await this.页面.goto(地址, 参数)
+    let 结果 = await this.页面.goto(地址, 参数)
+    this.证据.标记已导航()
+    if (this.证据.启用 === true) await this.证据.采集('导航完成', '导航完成后的页面')
+    return 结果
   }
 
   public 获得地址(): string {
@@ -120,6 +146,7 @@ export class 浏览器测试引擎 {
   ): Promise<void> {
     this.检查页面()
     await this.页面.waitForURL(地址, 参数)
+    if (this.证据.启用 === true) await this.证据.采集('等待达成', '已到达预期地址')
   }
 
   public 按角色(角色: Parameters<Page['getByRole']>[0], 参数?: Parameters<Page['getByRole']>[1]): Locator {
@@ -176,6 +203,7 @@ export class 浏览器测试引擎 {
     参数?: Parameters<Page['mouse']['click']>[2],
   ): Promise<void> {
     this.检查页面()
+    if (this.证据.启用 === true) await this.证据.采集('操作前', '点击坐标前', { x: 水平位置, y: 垂直位置 })
     await this.页面.mouse.click(水平位置, 垂直位置, 参数)
   }
 
@@ -191,6 +219,7 @@ export class 浏览器测试引擎 {
   public async 说明(说明: string, 目标?: Locator): Promise<void> {
     this.检查页面()
     this.检查文本(说明, '步骤说明')
+    if (this.证据.启用 === true) this.证据.记录说明(说明, 目标, this.步骤作用域.getStore())
     if (this.模式 === '自动' || this.步骤作用域.getStore()?.跳过步骤说明 === true) return
     if (目标 !== undefined) {
       this.检查操作目标(目标)
@@ -236,17 +265,21 @@ export class 浏览器测试引擎 {
 
   public async 点击(目标: Locator, 参数?: Parameters<Locator['click']>[0]): Promise<void> {
     await this.操作动画(目标, 'rgb(255, 0, 0)', 参数?.timeout)
+    if (参数?.trial !== true && this.证据.启用 === true)
+      await this.证据.采集('操作前', '点击目标前', 目标, { 作用域: this.步骤作用域.getStore() })
     await 目标.click(参数)
   }
 
   public async 输入(目标: Locator, 文本: string, 参数?: Parameters<Locator['fill']>[1]): Promise<void> {
     await this.操作动画(目标, 'rgb(0, 85, 255)', 参数?.timeout)
+    if (this.证据.启用 === true) await this.证据.采集('操作前', '填写输入框前', 目标)
     await 目标.fill(文本, 参数)
     await this.操作后等待()
   }
 
   public async 勾选(目标: Locator, 参数?: Parameters<Locator['check']>[0]): Promise<void> {
     await this.操作动画(目标, 'rgb(255, 165, 0)', 参数?.timeout)
+    if (参数?.trial !== true && this.证据.启用 === true) await this.证据.采集('操作前', '勾选目标前', 目标)
     await 目标.check(参数)
   }
 
@@ -256,6 +289,7 @@ export class 浏览器测试引擎 {
     参数?: Parameters<Locator['selectOption']>[1],
   ): Promise<string[]> {
     await this.操作动画(目标, 'rgb(0, 200, 0)', 参数?.timeout)
+    if (this.证据.启用 === true) await this.证据.采集('操作前', '选择选项前', 目标)
     let 结果 = await 目标.selectOption(选项, 参数)
     await this.操作后等待()
     return 结果
