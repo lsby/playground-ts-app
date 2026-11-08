@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 import type { 选择条件, 选择结果 } from './choice'
 
 function 解析领域文本(名称: string, 值: string): string {
@@ -65,37 +67,20 @@ export class 需求 {
   }
 }
 
-/**
- * 证据是一次成功观察对验收结论给出的具体支撑。
- * 它持有取证手段、证明内容以及可选的结构化内容或附件路径。
- */
-export class 证据 {
-  private readonly 手段: string
-  private readonly 描述: string
-  private readonly 内容?: unknown
-  private readonly 附件路径?: string | undefined
-  public constructor(参数: { 手段: string; 描述: string; 内容?: unknown; 附件路径?: string | undefined }) {
-    this.手段 = 解析领域文本('证据手段', 参数.手段)
-    this.描述 = 解析领域文本('证据描述', 参数.描述)
-    if ('内容' in 参数) this.内容 = 参数.内容
-    if (参数.附件路径 !== undefined) this.附件路径 = 解析领域文本('证据附件路径', 参数.附件路径)
-  }
-  public 获得手段(): string {
-    return this.手段
-  }
-  public 获得描述(): string {
-    return this.描述
-  }
-  public 具有内容(): boolean {
-    return '内容' in this
-  }
-  public 获得内容(): unknown {
-    return this.内容
-  }
-  public 获得附件路径(): string | undefined {
-    return this.附件路径
-  }
-}
+export let 流程步骤附件列表模型 = z
+  .discriminatedUnion('类型', [
+    z.object({ 类型: z.literal('文本'), 内容: z.string().trim().min(1) }).strict(),
+    z
+      .object({
+        类型: z.literal('图片'),
+        内容类型: z.enum(['image/png', 'image/jpeg', 'image/webp']),
+        内容: z.string().min(1).base64(),
+      })
+      .strict(),
+  ])
+  .array()
+export type 流程步骤附件 = z.infer<typeof 流程步骤附件列表模型>[number]
+export type 提交步骤附件 = (附件们: readonly 流程步骤附件[]) => void
 
 /**
  * 流程步骤是行为和观察共同具有的一般概念。
@@ -116,28 +101,31 @@ export abstract class 流程步骤 {
  * 它持有状态迁移函数，能够执行一次迁移。
  */
 export class 行为<系统状态 extends object> extends 流程步骤 {
-  private readonly 迁移函数: (当前状态: 系统状态) => Promise<系统状态>
-  public constructor(描述: string, 迁移函数: (当前状态: 系统状态) => Promise<系统状态>) {
+  private readonly 迁移函数: (当前状态: 系统状态, 提交附件: 提交步骤附件) => Promise<系统状态>
+  public constructor(描述: string, 迁移函数: (当前状态: 系统状态, 提交附件: 提交步骤附件) => Promise<系统状态>) {
     super(描述)
     this.迁移函数 = 迁移函数
   }
-  public 迁移(当前状态: 系统状态): Promise<系统状态> {
-    return this.迁移函数(当前状态)
+  public 迁移(当前状态: 系统状态, 提交附件: 提交步骤附件): Promise<系统状态> {
+    return this.迁移函数(当前状态, 提交附件)
   }
 }
 
 /**
  * 观察是对系统当前状态进行无副作用判定的流程步骤。
- * 它持有验证函数；验证成功时产生证据，验证失败时通过异常终止流程。
+ * 验证函数可提交附件，验证失败时通过异常终止流程。
  */
 export class 观察<系统状态 extends object> extends 流程步骤 {
-  private readonly 验证函数: (当前状态: Readonly<系统状态>) => 可等待结果<readonly 证据[]>
-  public constructor(描述: string, 验证函数: (当前状态: Readonly<系统状态>) => 可等待结果<readonly 证据[]>) {
+  private readonly 验证函数: (当前状态: Readonly<系统状态>, 提交附件: 提交步骤附件) => 可等待结果<void>
+  public constructor(
+    描述: string,
+    验证函数: (当前状态: Readonly<系统状态>, 提交附件: 提交步骤附件) => 可等待结果<void>,
+  ) {
     super(描述)
     this.验证函数 = 验证函数
   }
-  public async 验证(当前状态: Readonly<系统状态>): Promise<readonly 证据[]> {
-    return [...(await this.验证函数(当前状态))]
+  public async 验证(当前状态: Readonly<系统状态>, 提交附件: 提交步骤附件): Promise<void> {
+    await this.验证函数(当前状态, 提交附件)
   }
 }
 
@@ -150,8 +138,8 @@ export class 状态<系统状态 extends object> {
   public constructor(系统内容: 系统状态) {
     this.系统内容 = 系统内容
   }
-  public 迁移(当前行为: 行为<系统状态>): Promise<状态<系统状态>> {
-    return 当前行为.迁移(this.系统内容).then((迁移后内容): 状态<系统状态> => new 状态<系统状态>(迁移后内容))
+  public async 迁移(当前行为: 行为<系统状态>, 提交附件: 提交步骤附件): Promise<状态<系统状态>> {
+    return new 状态<系统状态>(await 当前行为.迁移(this.系统内容, 提交附件))
   }
   public 读取(): Readonly<系统状态> {
     return this.系统内容

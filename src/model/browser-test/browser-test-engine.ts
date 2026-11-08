@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { z } from 'zod'
 
 import { 测试提示卡片 } from './prompt-card'
+import { 标注截图 } from './screenshot'
 import type { 人工核验结果, 浏览器测试作用域配置, 浏览器测试参数, 浏览器测试模式 } from './types'
 
 type 浏览器测试会话 = {
@@ -144,6 +145,19 @@ export class 浏览器测试引擎 {
   public 视口大小(): ReturnType<Page['viewportSize']> {
     this.检查页面()
     return this.页面.viewportSize()
+  }
+
+  /** 截取当前视口，可标注视口坐标或目标元素可见区域的中心。 */
+  public async 截图(标注?: Locator | { x: number; y: number }): Promise<Buffer> {
+    this.检查页面()
+    if (标注 === undefined) return await this.页面.screenshot({ scale: 'css' })
+    if ('x' in 标注) return await 标注截图(this.页面, await this.页面.screenshot({ scale: 'css' }), 标注)
+
+    this.检查操作目标(标注)
+    await this.滚动到目标(标注)
+    let 区域 = await 标注.boundingBox()
+    if (区域 === null) throw new Error('截图标注目标不可见')
+    return await 标注截图(this.页面, await this.页面.screenshot({ scale: 'css' }), 区域)
   }
 
   public async 添加初始化脚本(脚本: () => void): Promise<void> {

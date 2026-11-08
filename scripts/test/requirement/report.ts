@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import {
   行为,
-  type 证据,
+  type 流程步骤附件,
   type 需求,
   type 需求测试流程,
   type 需求测试结果,
@@ -59,19 +59,21 @@ function 格式化耗时(耗时毫秒: number): string {
   return 耗时毫秒 < 1000 ? `${String(耗时毫秒)} ms` : `${(耗时毫秒 / 1000).toFixed(2)} s`
 }
 
-function 生成证据Html(证据们: readonly 证据[]): string {
-  return 证据们
-    .map((值) => {
-      let 原始内容 = 值.获得内容()
-      let 内容文本 = typeof 原始内容 === 'string' ? 原始内容 : String(JSON.stringify(原始内容, undefined, 2))
-      let 内容 = 值.具有内容()
-        ? `<details><summary>查看证据内容</summary><pre class="payload">${转义Html(内容文本)}</pre></details>`
-        : ''
-      let 路径 = 值.获得附件路径()
-      return `<div class="evidence"><div class="evhead">返回证据 ${状态标记(值.获得手段(), 'ok')}</div>
-      <p>${转义Html(值.获得描述())}</p>${内容}${路径 === undefined ? '' : `<p>附件路径　${转义Html(路径)}</p>`}</div>`
+function 生成步骤附件Html(附件们: readonly 流程步骤附件[]): string {
+  if (附件们.length === 0) return ''
+  let 内容 = 附件们
+    .map((附件, 序号) => {
+      switch (附件.类型) {
+        case '文本':
+          return `<p>${转义Html(附件.内容)}</p>`
+        case '图片':
+          return `<button type="button" class="step-image" aria-pressed="false" aria-label="放大步骤附件 ${String(序号 + 1)}" title="点击放大或缩小">
+            <img src="data:${转义Html(附件.内容类型)};base64,${转义Html(附件.内容)}" alt="步骤附件 ${String(序号 + 1)}" loading="lazy">
+          </button>`
+      }
     })
     .join('')
+  return `<div class="step-attachments">${内容}</div>`
 }
 
 function 生成步骤Html(步骤们: readonly 步骤条目[]): string {
@@ -84,7 +86,7 @@ function 生成步骤Html(步骤们: readonly 步骤条目[]): string {
       return `<li class="step${观察 ? ' observe' : ''}"><span class="num">${String(序号 + 1).padStart(2, '0')}</span>
       <div class="stepbody"><div class="stepmeta"><span class="type">${步骤.类型}</span>
       <span class="timing${步骤.状态 === '失败' ? ' fail' : ''}">${状态}${耗时}</span></div><h4>${转义Html(步骤.名称)}</h4>
-      ${观察 && 步骤.证据们 !== undefined ? 生成证据Html(步骤.证据们) : ''}${错误}</div></li>`
+      ${步骤.附件们 === undefined ? '' : 生成步骤附件Html(步骤.附件们)}${错误}</div></li>`
     })
     .join('')}</ol>`
 }
@@ -250,7 +252,7 @@ function 生成报告Html(报告目录: string, 参数: 报告参数, 失败数:
       <nav class="surface nav" aria-label="需求和验收点"><div class="navhead"><span class="label">需求目录</span></div>${导航.join('')}
         <div class="navfoot">已运行 ${String(参数.记录们.length)} 条流程 · ${String(失败数)} 条失败</div></nav>
       <main>${基础设施错误}${需求卡片.join('')}${验收卡片.join('')}${流程卡片}
-        ${验收项们.length === 0 ? '<p class="surface hero">没有已登记的需求测试。</p>' : '<p class="foot">按流程执行顺序展示步骤，证据随对应观察呈现。</p>'}</main>
+        ${验收项们.length === 0 ? '<p class="surface hero">没有已登记的需求测试。</p>' : '<p class="foot">按流程执行顺序展示步骤，附件随对应步骤呈现。</p>'}</main>
     </div><script>${交互脚本}</script></body></html>`
 }
 
@@ -347,6 +349,9 @@ let 交互脚本 = `
       else window.scrollTo(0, 0)
     })
   }
+  for (let imageButton of document.querySelectorAll('.step-image')) {
+    imageButton.onclick = () => imageButton.setAttribute('aria-pressed', String(imageButton.getAttribute('aria-pressed') !== 'true'))
+  }
   addEventListener('hashchange', showFromHash)
   showFromHash()
 `
@@ -358,7 +363,7 @@ html[data-theme=light]{color-scheme:light}
 html[data-theme=dark]{color-scheme:dark}
 body{margin:0;background:light-dark(#f2f5f4,#111a17);color:light-dark(#182824,#e5f0ea);font:14px/1.55 "Microsoft YaHei","PingFang SC",system-ui,sans-serif}
 button{font:inherit}
-a:focus-visible,summary:focus-visible,select:focus-visible{outline:2px solid light-dark(#367b68,#7bc7a8);outline-offset:2px}
+a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible{outline:2px solid light-dark(#367b68,#7bc7a8);outline-offset:2px}
 header{background:light-dark(#183d34,#122c23);color:light-dark(#fff,#e5f0ea)}
 .bar{max-width:1440px;margin:auto;min-height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 36px;gap:12px}
 .brand{display:flex;gap:12px;align-items:center;font-weight:700;font-size:17px;letter-spacing:.03em}
@@ -415,12 +420,12 @@ p{margin:0}
 .observe .stepmeta .type{color:light-dark(#216e51,#9ddcbd)}
 .timing{font-size:12px;color:light-dark(#576d62,#a8beb3);white-space:nowrap}
 .step h4{font-size:15px;margin:0;font-weight:670}
-.evidence{margin-top:9px;background:light-dark(#f4faf6,#1d3228);border:1px solid light-dark(#d4e7dc,#395e4d);border-radius:8px;padding:10px 12px}
-.evhead{font-size:12px;font-weight:700;color:light-dark(#22654c,#a2dfc3);display:flex;gap:8px;align-items:center;margin-bottom:4px}
-.evidence p{font-size:13px}
-.evidence details{margin-top:7px}
-.evidence summary,.attachments summary{font-size:12px;color:light-dark(#2f6752,#a2dfc3);cursor:pointer}
-.payload{overflow:auto;margin:6px 0 0;border-radius:6px;background:light-dark(#e9f1ed,#172820);padding:9px 10px;font:12px/1.55 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.step-attachments{display:grid;gap:8px;margin-top:9px;background:light-dark(#f4faf6,#1d3228);border:1px solid light-dark(#d4e7dc,#395e4d);border-radius:8px;padding:10px 12px}
+.step-attachments p{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.step-image{display:block;width:min(65%,420px);padding:0;border:0;background:none;border-radius:6px;cursor:zoom-in}
+.step-image[aria-pressed="true"]{width:100%;cursor:zoom-out}
+.step-image img{display:block;width:100%;height:auto;border-radius:6px}
+.attachments summary{font-size:12px;color:light-dark(#2f6752,#a2dfc3);cursor:pointer}
 .empty{margin:16px 25px 0;padding:12px 14px;background:light-dark(#fff7e9,#382c1a);color:light-dark(#785415,#f3d094);border-radius:7px}
 .attachments{border-top:1px solid light-dark(#e3ebe6,#35483f);padding:14px 25px;color:light-dark(#597165,#a8beb3);font-size:12px}
 .attachments p{margin-top:7px}
