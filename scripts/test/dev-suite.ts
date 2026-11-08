@@ -33,6 +33,7 @@ async function 运行开发套件(): Promise<void> {
       let { MCP测试会话 } = await import('./mcp/session')
       let { 启动测试MCP } = await import('./mcp/http')
       会话 = new MCP测试会话(项目根目录, 输出目录, 后端, 前端地址)
+      await 会话.操作记录.初始化()
       MCP = await 启动测试MCP(会话, MCP配置.端口)
       console.log(`测试 MCP：${MCP.地址}`)
     }

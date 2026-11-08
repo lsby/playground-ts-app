@@ -1,13 +1,10 @@
-import type {
-  CallToolResult,
-  JSONObject,
-  McpServer,
-  StandardSchemaWithJSON,
-  ToolAnnotations,
-} from '@modelcontextprotocol/server'
+import type { McpServer, ToolAnnotations } from '@modelcontextprotocol/server'
 import { z } from 'zod-mcp'
 
-import type { 测试服务日志内容, 需求测试工具 } from '../../../src/model/test-requirement'
+import type { 提交步骤附件, 测试服务日志内容, 需求测试工具 } from '../../../src/model/test-requirement'
+import type { 测试操作记录 } from '../../../src/test-tools/operation-record'
+import { 注册操作记录工具 } from './record-tools'
+import { 创建工具注册器, 直接返回, type MCP执行结果, type 工具输出 } from './register-tool'
 import {
   会话模型,
   定位目标,
@@ -20,66 +17,17 @@ import {
   页面模型,
 } from './tool-input'
 
-type MCP执行结果<T> = {
-  结果: { 成功: true; 值: T } | { 成功: false; 错误: string }
-  附件们: readonly { 路径: string; 说明?: string }[]
-  取证错误们: readonly string[]
-}
-type 工具输出 = { 数据: JSONObject; 图片?: Buffer }
-
 export type MCP测试工具宿主 = {
-  执行: <T>(调用: (工具: 需求测试工具) => Promise<T>) => Promise<MCP执行结果<T>>
+  readonly 操作记录: 测试操作记录
+  执行: <T>(调用: (工具: 需求测试工具, 提交: 提交步骤附件) => Promise<T>) => Promise<MCP执行结果<T>>
   获得测试地址: () => { 前端: string; 后端: string }
   读取后端日志: () => 测试服务日志内容
   获得输出目录: () => string
 }
 
-function 直接返回(数据: JSONObject): MCP执行结果<工具输出> {
-  return { 结果: { 成功: true, 值: { 数据 } }, 附件们: [], 取证错误们: [] }
-}
-
 export function 注册测试工具(server: McpServer, 宿主: MCP测试工具宿主): void {
-  let 注册 = <参数类型>(
-    名称: string,
-    描述: string,
-    参数模型: StandardSchemaWithJSON<unknown, 参数类型>,
-    执行: (参数: 参数类型) => Promise<MCP执行结果<工具输出>>,
-    注解?: ToolAnnotations,
-  ): void => {
-    server.registerTool(
-      名称,
-      { description: 描述, inputSchema: 参数模型, ...(注解 === undefined ? {} : { annotations: 注解 }) },
-      async (参数): Promise<CallToolResult> => {
-        try {
-          let { 结果, 附件们, 取证错误们 } = await 执行(参数)
-          let artifacts = 附件们.map(({ 路径, 说明 }) => ({
-            path: 路径,
-            ...(说明 === undefined ? {} : { description: 说明 }),
-          }))
-          let structuredContent = {
-            ...(结果.成功 ? { result: 结果.值.数据 } : { error: 结果.错误 }),
-            artifacts,
-            evidenceErrors: [...取证错误们],
-          }
-          let content: CallToolResult['content'] = [{ type: 'text', text: JSON.stringify(structuredContent) }]
-          if (结果.成功 && 结果.值.图片 !== undefined)
-            content.push({ type: 'image', data: 结果.值.图片.toString('base64'), mimeType: 'image/png' })
-          return { content, structuredContent, ...(结果.成功 ? {} : { isError: true }) }
-        } catch (错误) {
-          let structuredContent = {
-            error: 错误 instanceof Error ? 错误.message : String(错误),
-            artifacts: [],
-            evidenceErrors: [],
-          }
-          return {
-            content: [{ type: 'text', text: JSON.stringify(structuredContent) }],
-            structuredContent,
-            isError: true,
-          }
-        }
-      },
-    )
-  }
+  let 注册 = 创建工具注册器(server, 宿主.操作记录)
+  注册操作记录工具(server, 宿主.操作记录)
   let 本地只读: ToolAnnotations = { readOnlyHint: true, openWorldHint: false }
   let 页面只读: ToolAnnotations = { readOnlyHint: true, openWorldHint: true }
 
@@ -89,7 +37,12 @@ export function 注册测试工具(server: McpServer, 宿主: MCP测试工具宿
     无参数模型,
     async () => {
       let { 前端, 后端 } = 宿主.获得测试地址()
-      return 直接返回({ baseUrl: 前端, backendUrl: 后端, outputDirectory: 宿主.获得输出目录() })
+      return 直接返回({
+        baseUrl: 前端,
+        backendUrl: 后端,
+        outputDirectory: 宿主.获得输出目录(),
+        operationsPath: 宿主.操作记录.文件路径,
+      })
     },
     本地只读,
   )
@@ -240,9 +193,10 @@ export function 注册测试工具(server: McpServer, 宿主: MCP测试工具宿
     'Capture the current browser viewport and return a PNG image.',
     页面模型,
     ({ name, timeoutMs }) =>
-      宿主.执行(async (工具): Promise<工具输出> => {
+      宿主.执行(async (工具, 提交): Promise<工具输出> => {
         let 引擎 = 工具.浏览器.获得(name)
         let 图片 = await 引擎.截图(undefined, { timeout: timeoutMs })
+        提交([{ 类型: '图片', 内容类型: 'image/png', 内容: 图片.toString('base64'), 说明: `${name} · 请求的截图` }])
         return { 数据: { url: 引擎.获得地址(), mimeType: 'image/png' }, 图片 }
       }),
     页面只读,
