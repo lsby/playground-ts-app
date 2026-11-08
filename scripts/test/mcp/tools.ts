@@ -3,6 +3,7 @@ import { z } from 'zod-mcp'
 
 import type { 提交步骤附件, 测试服务日志内容, 需求测试工具 } from '../../../src/model/test-requirement'
 import type { 测试操作记录 } from '../../../src/test-tools/operation-record'
+import { 整理数据库查询结果 } from '../../../src/test-tools/operation-values'
 import { 注册操作记录工具 } from './record-tools'
 import { 创建工具注册器, 直接返回, type MCP执行结果, type 工具输出 } from './register-tool'
 import {
@@ -11,7 +12,6 @@ import {
   无参数模型,
   查询模型,
   目标操作模型,
-  编码数据库值,
   解码数据库参数,
   页面地址模型,
   页面模型,
@@ -27,7 +27,7 @@ export type MCP测试工具宿主 = {
 
 export function 注册测试工具(server: McpServer, 宿主: MCP测试工具宿主): void {
   let 注册 = 创建工具注册器(server, 宿主.操作记录)
-  注册操作记录工具(server, 宿主.操作记录)
+  注册操作记录工具(server, 宿主.操作记录, () => 宿主.获得测试地址())
   let 本地只读: ToolAnnotations = { readOnlyHint: true, openWorldHint: false }
   let 页面只读: ToolAnnotations = { readOnlyHint: true, openWorldHint: true }
 
@@ -243,10 +243,7 @@ export function 注册测试工具(server: McpServer, 宿主: MCP测试工具宿
     ({ sql, parameters, maxRows, evidenceColumns }) =>
       宿主.执行(async (工具): Promise<工具输出> => {
         let 结果 = 工具.数据库.查询(sql, parameters.map(解码数据库参数), evidenceColumns)
-        let rows = 结果
-          .slice(0, maxRows)
-          .map((行) => Object.fromEntries(Object.entries(行).map(([列, 值]) => [列, 编码数据库值(值)])))
-        return { 数据: { rows, rowCount: 结果.length, truncated: rows.length < 结果.length } }
+        return { 数据: 整理数据库查询结果(结果, maxRows) }
       }),
     本地只读,
   )

@@ -13,7 +13,7 @@ type 证据文件 = { path: string; description?: string }
 type 调用结论 = { status: 'passed'; result: JSON对象 } | { status: 'failed'; error: string }
 export type 操作调用结果 = 调用结论 & { artifacts: readonly 证据文件[]; evidenceErrors: readonly string[] }
 
-type 基本条目 = { id: number; notes: string | null }
+type 基本条目 = { id: number; notes: string | null; decision?: string | null }
 type 调用条目主体 = 基本条目 & { kind: 'call'; tool: string; arguments: JSON对象; start: string }
 type 完成字段 = 调用结论 & { end: string; artifacts: 证据文件[]; evidenceErrors: string[] }
 export type 操作调用条目 = 调用条目主体 & ({ status: 'pending' } | 完成字段)
@@ -27,7 +27,7 @@ export type 操作断言条目 = 基本条目 & {
 }
 export type 操作记录条目 = 操作调用条目 | 操作断言条目
 export type 操作记录摘要 =
-  | (Pick<操作调用条目, 'id' | 'kind' | 'tool' | 'status' | 'start' | 'notes'> & { end?: string })
+  | (Pick<操作调用条目, 'id' | 'kind' | 'tool' | 'status' | 'start' | 'notes' | 'decision'> & { end?: string })
   | Omit<操作断言条目, 'expected'>
 
 type 操作记录文档 = { version: 1; nextId: number; entries: readonly 操作记录条目[] }
@@ -42,8 +42,17 @@ function 复制JSON<T extends JSON值>(值: T): T {
 function 生成摘要(条目: 操作记录条目): 操作记录摘要 {
   switch (条目.kind) {
     case 'call': {
-      let { id, kind, notes, tool, status, start } = 条目
-      return { id, kind, notes, tool, status, start, ...(条目.status === 'pending' ? {} : { end: 条目.end }) }
+      let { id, kind, notes, decision, tool, status, start } = 条目
+      return {
+        id,
+        kind,
+        notes,
+        ...(decision === undefined ? {} : { decision }),
+        tool,
+        status,
+        start,
+        ...(条目.status === 'pending' ? {} : { end: 条目.end }),
+      }
     }
     case 'assertion': {
       let { expected: _期望, path: 路径, ...摘要 } = 条目
@@ -138,12 +147,16 @@ export class 测试操作记录 {
     return this.排队(() => structuredClone(this.查找条目(this.获得文档(), id)))
   }
 
-  public 更新说明(id: number, 说明: string | null): Promise<void> {
+  public 更新说明(id: number, 说明: string | null | undefined, 决策说明?: string | null): Promise<void> {
     return this.排队(async (): Promise<void> => {
       let 文档 = this.获得文档()
       let 当前 = this.查找条目(文档, id)
-      if (当前.notes === 说明) return
-      let entries = 文档.entries.map((条目) => (条目 === 当前 ? { ...当前, notes: 说明 } : 条目))
+      let notes = 说明 === undefined ? 当前.notes : 说明
+      let decision = 决策说明 === undefined ? 当前.decision : 决策说明
+      if (当前.notes === notes && 当前.decision === decision) return
+      let entries = 文档.entries.map((条目) =>
+        条目 === 当前 ? { ...当前, notes, ...(decision === undefined ? {} : { decision }) } : 条目,
+      )
       await this.提交({ ...文档, entries })
     })
   }

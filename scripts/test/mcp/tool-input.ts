@@ -96,7 +96,7 @@ let 目标模型 = z.discriminatedUnion('by', [
   z.strictObject({ by: z.literal('label'), label: z.string().min(1), exact: 精确, index: 索引 }),
   z.strictObject({ by: z.literal('selector'), selector: z.string().trim().min(1), index: 索引 }),
 ])
-type 目标描述 = z.infer<typeof 目标模型>
+export type 目标描述 = z.infer<typeof 目标模型>
 
 export let 无参数模型 = z.strictObject({})
 export let 会话模型 = z.strictObject({ name: z.string().trim().min(1).max(100).describe('Named browser session.') })

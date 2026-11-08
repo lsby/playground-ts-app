@@ -2,10 +2,15 @@ import type { McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod-mcp'
 
 import type { 测试操作记录 } from '../../../src/test-tools/operation-record'
+import { 项目根目录 } from '../../task/model/task-common'
 import { 创建工具注册器, 直接返回 } from './register-tool'
 import { 无参数模型 } from './tool-input'
 
-export function 注册操作记录工具(server: McpServer, 记录: 测试操作记录): void {
+export function 注册操作记录工具(
+  server: McpServer,
+  记录: 测试操作记录,
+  获得测试地址: () => { 前端: string; 后端: string },
+): void {
   let 注册 = 创建工具注册器(server)
   let 编号模型 = z.int().positive()
   let 只读 = { readOnlyHint: true, openWorldHint: false }
@@ -26,10 +31,22 @@ export function 注册操作记录工具(server: McpServer, 记录: 测试操作
   )
   注册(
     'record_note',
-    'Set an explanatory note on a record. Use null to remove it.',
-    z.strictObject({ id: 编号模型, note: z.string().nullable() }),
-    async ({ id, note }) => {
-      await 记录.更新说明(id, note)
+    'Add a step title or a short decision note to a selected operation or assertion. When useful, say what you observed, what you chose to do or check, and why the check matters. Export shows decision notes on the relevant report step. Pass null to clear either field.',
+    z
+      .strictObject({
+        id: 编号模型,
+        note: z.string().nullable().optional().describe('Optional title for the exported step.'),
+        decision: z
+          .string()
+          .trim()
+          .min(1)
+          .nullable()
+          .optional()
+          .describe('Optional evidence-based explanation for the report.'),
+      })
+      .refine(({ note, decision }) => note !== undefined || decision !== undefined, 'Provide note or decision.'),
+    async ({ id, note, decision }) => {
+      await 记录.更新说明(id, note, decision)
       return 直接返回({ id })
     },
   )
@@ -70,5 +87,34 @@ export function 注册操作记录工具(server: McpServer, 记录: 测试操作
       note: z.string().optional(),
     }),
     async ({ sourceId, path, expected, note }) => 直接返回({ id: await 记录.添加断言(sourceId, path, expected, note) }),
+  )
+  注册(
+    'record_export',
+    'Generate a new TypeScript requirement test under test/requirement from the selected record IDs, in the supplied order. Include the earlier tool call for every assertion. Use a new requirement name, scenario name and file name.',
+    z.strictObject({
+      ids: z.array(编号模型).min(1).describe('Operation and assertion IDs in the order to run.'),
+      fileName: z
+        .string()
+        .regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.ts$/u)
+        .describe('A lowercase kebab-case .ts file name.'),
+      requirementName: z.string().trim().min(1),
+      requirementDescription: z.string().trim().min(1).optional(),
+      acceptanceCriterion: z.string().trim().min(1).describe('What this test must prove.'),
+      scenarioName: z.string().trim().min(1),
+    }),
+    async ({ ids, fileName, requirementName, requirementDescription, acceptanceCriterion, scenarioName }) => {
+      let 条目们 = await Promise.all(ids.map((id) => 记录.获得(id)))
+      let { 写出需求测试 } = await import('../requirement/export-file')
+      let 路径 = await 写出需求测试(项目根目录, {
+        文件名: fileName,
+        需求名称: requirementName,
+        ...(requirementDescription === undefined ? {} : { 需求描述: requirementDescription }),
+        验收点描述: acceptanceCriterion,
+        流程名称: scenarioName,
+        条目们,
+        测试地址: 获得测试地址(),
+      })
+      return 直接返回({ path: 路径, scenarioName })
+    },
   )
 }
