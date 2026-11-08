@@ -75,6 +75,7 @@ export let 流程步骤附件列表模型 = z
         类型: z.literal('图片'),
         内容类型: z.enum(['image/png', 'image/jpeg', 'image/webp']),
         内容: z.string().min(1).base64(),
+        说明: z.string().trim().min(1).optional(),
       })
       .strict(),
   ])

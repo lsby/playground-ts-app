@@ -14,6 +14,52 @@ type 步骤证据记录 = {
   最近结果原图: Buffer | undefined
 }
 
+/** 一次测试步骤可使用多个会话，也可在执行期间打开新会话。 */
+export class 浏览器步骤取证作用域 {
+  private 当前 = new AsyncLocalStorage<{
+    已结束: boolean
+    获得配置: (会话名称: string) => 浏览器步骤证据配置
+    记录们: Map<浏览器步骤证据记录器, 步骤证据记录>
+  }>()
+
+  public 获得记录(记录器: 浏览器步骤证据记录器, 会话名称: string): 步骤证据记录 | undefined {
+    let 当前 = this.当前.getStore()
+    if (当前 === undefined || 当前.已结束) return undefined
+    let 记录 = 当前.记录们.get(记录器)
+    if (记录 === undefined) {
+      记录 = {
+        配置: 当前.获得配置(会话名称),
+        已结束: false,
+        已访问页面: false,
+        待用说明: undefined,
+        最近结果原图: undefined,
+      }
+      当前.记录们.set(记录器, 记录)
+    }
+    return 记录
+  }
+
+  public async 运行<T>(获得配置: (会话名称: string) => 浏览器步骤证据配置, 执行: () => Promise<T>): Promise<T> {
+    let 记录们 = new Map<浏览器步骤证据记录器, 步骤证据记录>()
+    let 当前 = { 已结束: false, 获得配置, 记录们 }
+    return await this.当前.run(当前, async (): Promise<T> => {
+      try {
+        let 结果 = await 执行()
+        for (let 记录器 of 记录们.keys()) await 记录器.采集('步骤结束', '步骤结束时的页面')
+        return 结果
+      } catch (错误) {
+        for (let 记录器 of 记录们.keys()) await 记录器.采集('失败现场', '步骤失败时的页面')
+        throw 错误
+      } finally {
+        当前.已结束 = true
+        for (let 记录 of 记录们.values()) 记录.已结束 = true
+      }
+    })
+  }
+}
+
+export type 浏览器会话取证 = { 作用域: 浏览器步骤取证作用域; 会话名称: string }
+
 async function 限制标注用时<T>(任务: Promise<T>): Promise<T> {
   let 定时器: ReturnType<typeof setTimeout> | undefined
   try {
@@ -28,16 +74,24 @@ async function 限制标注用时<T>(任务: Promise<T>): Promise<T> {
 
 /** 将绑定页面的实际画面记录到发起操作的测试步骤。 */
 export class 浏览器步骤证据记录器 {
-  private 作用域 = new AsyncLocalStorage<步骤证据记录>()
   private 已导航 = false
 
   public constructor(
     private 页面: Page,
     private 取消信号?: AbortSignal,
+    private 取证?: 浏览器会话取证,
   ) {}
 
+  private 获得记录(): 步骤证据记录 | undefined {
+    return this.取证?.作用域.获得记录(this, this.取证.会话名称)
+  }
+
+  public 登记当前步骤(): void {
+    this.获得记录()
+  }
+
   public get 启用(): boolean {
-    return this.作用域.getStore()?.已结束 === false && this.取消信号?.aborted !== true
+    return this.获得记录()?.已结束 === false && this.取消信号?.aborted !== true
   }
 
   public 标记已导航(): void {
@@ -45,25 +99,9 @@ export class 浏览器步骤证据记录器 {
   }
 
   public 记录说明(文字: string, 目标: Locator | undefined, 作用域: 浏览器测试作用域配置 | undefined): void {
-    let 记录 = this.作用域.getStore()
+    let 记录 = this.获得记录()
     if (记录?.已结束 !== false) return
     记录.待用说明 = 目标 === undefined ? undefined : { 文字, 目标, 作用域 }
-  }
-
-  public async 运行<T>(配置: 浏览器步骤证据配置, 执行: () => Promise<T>): Promise<T> {
-    let 记录: 步骤证据记录 = { 配置, 已结束: false, 已访问页面: false, 待用说明: undefined, 最近结果原图: undefined }
-    return await this.作用域.run(记录, async (): Promise<T> => {
-      try {
-        let 结果 = await 执行()
-        await this.采集('步骤结束', '步骤结束时的页面')
-        return 结果
-      } catch (错误) {
-        await this.采集('失败现场', '步骤失败时的页面')
-        throw 错误
-      } finally {
-        记录.已结束 = true
-      }
-    })
   }
 
   public async 采集(
@@ -72,7 +110,7 @@ export class 浏览器步骤证据记录器 {
     目标?: Locator | 截图标注坐标,
     点击作用域?: { 作用域: 浏览器测试作用域配置 | undefined },
   ): Promise<void> {
-    let 记录 = this.作用域.getStore()
+    let 记录 = this.获得记录()
     if (记录 === undefined || this.可以采集(记录) === false) return
     if (
       (阶段 === '步骤结束' || 阶段 === '失败现场') &&

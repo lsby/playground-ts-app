@@ -4,19 +4,15 @@ import { cleanDB } from '../../../scripts/db/clean-db'
 import { 全局资源 } from '../../../src/global/global'
 import { init } from '../../../src/init/init'
 import { 浏览器测试引擎 } from '../../../src/model/browser-test'
-import type { 提交步骤附件, 需求测试会话, 需求测试运行参数 } from '../../../src/model/test-requirement'
+import type { 提交步骤附件, 需求测试工具 } from '../../../src/model/test-requirement'
 
-export type 演示需求系统上下文 = { 引擎: 浏览器测试引擎; 新用户名后缀: string }
+export type 演示需求系统上下文 = { 工具: 需求测试工具; 引擎: 浏览器测试引擎; 新用户名后缀: string }
 
-export async function 准备演示需求上下文(参数: 需求测试运行参数): Promise<需求测试会话<演示需求系统上下文>> {
+export async function 准备演示需求上下文(工具: 需求测试工具): Promise<Omit<演示需求系统上下文, '工具'>> {
   await cleanDB(全局资源.获得数据库().获得句柄())
   await init()
-  let { 引擎, 收集附件, 关闭 } = await 浏览器测试引擎.打开会话({
-    服务地址: 参数.服务地址,
-    初始地址: '/demo/login.html',
-    附件目录: 参数.附件目录,
-  })
-  return { 上下文: { 引擎, 新用户名后缀: `${String(Date.now())}-${String(参数.流程序号)}` }, 收集附件, 关闭 }
+  let 引擎 = await 工具.浏览器.打开('管理员', '/demo/login.html')
+  return { 引擎, 新用户名后缀: crypto.randomUUID() }
 }
 
 export async function 记录浏览器画面(

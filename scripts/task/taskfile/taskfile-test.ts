@@ -1,6 +1,5 @@
 import { 测试环境文件, 测试调试环境 } from '../model/task-common'
 import { 命令, 定义任务 } from '../model/task-runner'
-import { 准备端到端测试参数 } from '../prepare/test-e2e'
 import { 准备集成测试参数 } from '../prepare/test-integration'
 import { 准备需求测试参数 } from '../prepare/test-requirement'
 import { 准备单元测试参数 } from '../prepare/test-unit'
@@ -28,23 +27,6 @@ export let 测试任务表 = 定义任务({
     传递参数: true,
   },
 
-  // 端到端测试
-  'test:e2e:server': {
-    说明: '构建并启动端到端测试服务',
-    环境文件: 测试环境文件,
-    依赖: ['db:ensure:test:web', 'build:web:test'],
-    运行: 命令('tsx', './src/server.ts'),
-    公开: false,
-  },
-  'test:e2e': {
-    说明: '运行端到端测试',
-    环境文件: 测试环境文件,
-    环境变量: 测试调试环境,
-    准备运行: 准备端到端测试参数,
-    运行: 命令('tsx', 'scripts/test/e2e/run-e2e.ts'),
-    传递参数: true,
-  },
-
   // 业务需求测试
   'test:requirement:server': {
     说明: '构建并启动需求测试服务',
@@ -54,7 +36,7 @@ export let 测试任务表 = 定义任务({
     公开: false,
   },
   'test:requirement': {
-    说明: '运行业务需求流程测试',
+    说明: '运行需求测试（含浏览器端到端流程）',
     环境文件: 测试环境文件,
     环境变量: 测试调试环境,
     准备运行: 准备需求测试参数,

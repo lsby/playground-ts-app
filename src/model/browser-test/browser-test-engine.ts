@@ -7,12 +7,12 @@ import { z } from 'zod'
 
 import { 测试提示卡片 } from './prompt-card'
 import { 标注截图 } from './screenshot'
-import { 浏览器步骤证据记录器, type 浏览器步骤证据配置 } from './step-evidence'
+import { 浏览器步骤证据记录器, type 浏览器会话取证 } from './step-evidence'
 import type { 人工核验结果, 浏览器测试作用域配置, 浏览器测试参数, 浏览器测试模式 } from './types'
 
 type 浏览器测试会话 = {
   引擎: 浏览器测试引擎
-  收集附件: () => Promise<readonly { 名称: string; 路径: string; 内容类型: string }[]>
+  收集附件: (记录错误: (错误: unknown) => void) => Promise<readonly { 名称: string; 路径: string; 内容类型: string }[]>
   关闭: () => Promise<void>
 }
 
@@ -23,11 +23,12 @@ type 浏览器测试会话 = {
  */
 export class 浏览器测试引擎 {
   public static async 打开会话(参数: {
-    服务地址: string
+    服务地址?: string
     初始地址?: string
     附件目录: string
     模式?: 浏览器测试模式
     取消信号?: AbortSignal
+    取证?: 浏览器会话取证
   }): Promise<浏览器测试会话> {
     let 模式 = z.enum(['自动', '演示']).parse(参数.模式 ?? '自动')
     let 取消信号 = 参数.取消信号
@@ -48,7 +49,7 @@ export class 浏览器测试引擎 {
     let 关闭 = (): Promise<void> => (关闭任务 ??= 释放资源())
     try {
       取消信号?.throwIfAborted()
-      let 上下文 = await 浏览器.newContext({ baseURL: 参数.服务地址 })
+      let 上下文 = await 浏览器.newContext(参数.服务地址 === undefined ? {} : { baseURL: 参数.服务地址 })
       浏览器上下文 = 上下文
       取消信号?.throwIfAborted()
       if (取消信号 !== undefined) {
@@ -60,21 +61,29 @@ export class 浏览器测试引擎 {
       上下文.setDefaultTimeout(30_000)
       await 上下文.tracing.start({ screenshots: true, snapshots: true, sources: true })
       let 页面 = await 上下文.newPage()
-      let 引擎 = new 浏览器测试引擎({ 页面, 模式, ...(取消信号 === undefined ? {} : { 取消信号 }) })
+      let 引擎 = new 浏览器测试引擎({ 页面, 模式, ...(取消信号 === undefined ? {} : { 取消信号 }) }, 参数.取证)
       if (参数.初始地址 !== undefined) await 引擎.导航(参数.初始地址)
       取消信号?.throwIfAborted()
       return {
         引擎,
         关闭,
-        收集附件: async (): ReturnType<浏览器测试会话['收集附件']> => {
+        收集附件: async (记录错误): ReturnType<浏览器测试会话['收集附件']> => {
           let 截图路径 = join(参数.附件目录, 'final-page.png')
           let 追踪路径 = join(参数.附件目录, 'browser-trace.zip')
-          await 页面.screenshot({ path: 截图路径, fullPage: true, timeout: 5_000 })
-          await 上下文.tracing.stop({ path: 追踪路径 })
-          return [
-            { 名称: '最终页面截图', 路径: 截图路径, 内容类型: 'image/png' },
-            { 名称: '浏览器追踪', 路径: 追踪路径, 内容类型: 'application/zip' },
-          ]
+          let 附件们: { 名称: string; 路径: string; 内容类型: string }[] = []
+          try {
+            await 页面.screenshot({ path: 截图路径, fullPage: true, timeout: 5_000 })
+            附件们.push({ 名称: '最终页面截图', 路径: 截图路径, 内容类型: 'image/png' })
+          } catch (错误) {
+            记录错误(错误)
+          }
+          try {
+            await 上下文.tracing.stop({ path: 追踪路径 })
+            附件们.push({ 名称: '浏览器追踪', 路径: 追踪路径, 内容类型: 'application/zip' })
+          } catch (错误) {
+            记录错误(错误)
+          }
+          return 附件们
         },
       }
     } catch (错误) {
@@ -94,27 +103,29 @@ export class 浏览器测试引擎 {
   private 证据: 浏览器步骤证据记录器
   private 步骤作用域 = new AsyncLocalStorage<浏览器测试作用域配置>()
 
-  public constructor(参数: 浏览器测试参数) {
+  public constructor(参数: 浏览器测试参数, 取证?: 浏览器会话取证) {
     if (参数.页面.isClosed() === true) throw new Error('浏览器测试页面已关闭')
     this.页面 = 参数.页面
     this.模式 = z.enum(['自动', '演示']).parse(参数.模式)
     this.等待人工 = 参数.等待人工
     this.提示卡片 = new 测试提示卡片(参数.页面)
-    this.证据 = new 浏览器步骤证据记录器(参数.页面, 参数.取消信号)
+    this.证据 = new 浏览器步骤证据记录器(参数.页面, 参数.取消信号, 取证)
   }
 
   public get 断言(): typeof expect {
+    this.证据.登记当前步骤()
     return expect
   }
 
-  public async 记录步骤证据<T>(配置: 浏览器步骤证据配置, 执行: () => Promise<T>): Promise<T> {
-    return await this.证据.运行(配置, 执行)
+  public 登记当前步骤(): void {
+    this.证据.登记当前步骤()
   }
 
   public async 验证可见(
     目标: Locator,
     参数?: Parameters<ReturnType<typeof expect<Locator>>['toBeVisible']>[0],
   ): Promise<void> {
+    this.证据.登记当前步骤()
     await expect(目标).toBeVisible(参数)
     if (this.证据.启用 === true && 目标.page() === this.页面) await this.证据.采集('断言通过', '目标已可见', 目标)
   }
@@ -123,6 +134,7 @@ export class 浏览器测试引擎 {
     目标: Locator,
     参数?: Parameters<ReturnType<typeof expect<Locator>>['toBeHidden']>[0],
   ): Promise<void> {
+    this.证据.登记当前步骤()
     await expect(目标).toBeHidden(参数)
     if (this.证据.启用 === true && 目标.page() === this.页面) await this.证据.采集('断言通过', '目标已隐藏')
   }
@@ -194,6 +206,7 @@ export class 浏览器测试引擎 {
 
   public async 按键(键: string, 参数?: Parameters<Page['keyboard']['press']>[1]): Promise<void> {
     this.检查页面()
+    if (this.证据.启用 === true) await this.证据.采集('操作前', `按键 ${键} 前`)
     await this.页面.keyboard.press(键, 参数)
   }
 
@@ -297,6 +310,7 @@ export class 浏览器测试引擎 {
 
   private 检查页面(): void {
     if (this.页面.isClosed() === true) throw new Error('浏览器测试页面已关闭')
+    this.证据.登记当前步骤()
   }
 
   private 检查文本(文本: string, 名称: string): void {

@@ -8,10 +8,13 @@ import { setTimeout as 等待 } from 'node:timers/promises'
 import crossSpawn from 'cross-spawn'
 import { z } from 'zod'
 
-type 测试服务任务 = 'test:e2e:server' | 'test:requirement:server'
+import type { 测试服务日志内容 } from '../../src/model/test-requirement/tools'
+import { 测试日志缓冲 } from './service-log'
+
+export type 测试服务日志位置 = { 标准输出: number; 错误输出: number }
 
 /**
- * 测试服务是为一次浏览器测试运行提供后端的独立进程。
+ * 测试服务是为一次需求测试运行提供后端的独立进程。
  * 它关联项目中的启动任务和报告位置，记录本次启动和关闭状态。
  * 测试运行器通过它等待后端就绪、获取服务地址，并在结束时停止进程、保存日志。
  */
@@ -21,10 +24,11 @@ export class 测试服务 {
   private readonly 日志控制器 = new AbortController()
   private 日志任务: Promise<PromiseSettledResult<void>[]> | undefined
   private 关闭任务: Promise<void> | undefined
+  private 标准输出 = new 测试日志缓冲()
+  private 错误输出 = new 测试日志缓冲()
 
   public constructor(
     private readonly 根目录: string,
-    private readonly 服务任务: 测试服务任务,
     private readonly 报告目录: string,
   ) {
     if (path.isAbsolute(根目录) === false) throw new Error('测试服务项目根目录必须是绝对路径')
@@ -35,21 +39,29 @@ export class 测试服务 {
     return this.获得配置().服务地址
   }
 
+  public 获得日志位置(): 测试服务日志位置 {
+    return { 标准输出: this.标准输出.获得位置(), 错误输出: this.错误输出.获得位置() }
+  }
+
+  public 读取日志(起点: 测试服务日志位置): 测试服务日志内容 {
+    return { 标准输出: this.标准输出.读取(起点.标准输出), 错误输出: this.错误输出.读取(起点.错误输出) }
+  }
+
   public async 启动(): Promise<string> {
     if (this.已尝试启动) throw new Error('测试服务只能启动一次')
     this.检查未关闭()
     this.已尝试启动 = true
+    let 环境文件 = z.string().min(1).parse(process.env['ENV_FILE_PATH'])
     let { 端口, 服务地址 } = this.获得配置()
     if (await this.端口已开放(端口)) throw new Error(`测试服务端口 ${String(端口)} 已被占用，拒绝连接遗留服务`)
     this.检查未关闭()
 
     fs.mkdirSync(this.报告目录, { recursive: true })
-    let 进程 = crossSpawn(process.execPath, ['--import', 'tsx', 'scripts/task/index.ts', this.服务任务], {
-      cwd: this.根目录,
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: process.platform !== 'win32',
-    })
+    let 进程 = crossSpawn(
+      process.execPath,
+      ['--import', 'tsx', 'scripts/task/index.ts', 'test:requirement:server', '--env', 环境文件],
+      { cwd: this.根目录, env: process.env, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32' },
+    )
     this.进程 = 进程
     let 启动错误: Error | undefined
     进程.once('error', (错误): void => {
@@ -58,6 +70,8 @@ export class 测试服务 {
     try {
       let { stdout, stderr } = 进程
       if (stdout === null || stderr === null) throw new Error('无法读取测试服务输出')
+      stdout.on('data', (数据: Buffer): void => this.标准输出.追加(数据))
+      stderr.on('data', (数据: Buffer): void => this.错误输出.追加(数据))
       stdout.pipe(process.stdout, { end: false })
       stderr.pipe(process.stderr, { end: false })
       let 日志选项 = { signal: this.日志控制器.signal }

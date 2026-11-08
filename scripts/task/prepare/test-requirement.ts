@@ -5,6 +5,7 @@ import type { 任务准备上下文, 任务准备结果 } from '../model/task-ru
 
 export async function 准备需求测试参数(上下文: 任务准备上下文): Promise<任务准备结果> {
   let 参数们 = [...上下文.参数]
+  if (参数们.includes('--list')) return { 参数: 参数们 }
   let 已指定 = 参数们.some(
     (参数) =>
       参数 === '--all' ||
