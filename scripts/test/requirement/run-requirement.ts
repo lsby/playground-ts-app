@@ -197,8 +197,8 @@ export class 需求测试运行器 {
   }
 
   private async 执行尝试(测试: 需求测试入口, 尝试序号: number, 参数: 尝试参数): Promise<需求测试尝试记录> {
-    let { 需求测试运行工具 } = await import('./runtime')
-    let 工具 = new 需求测试运行工具(参数)
+    let { 测试运行工具 } = await import('../../../src/test-tools/runtime')
+    let 工具 = new 测试运行工具({ ...参数, 项目根目录: this.根目录 })
     let 格式化错误 = (错误: unknown): ReturnType<typeof 格式化需求测试错误> =>
       格式化需求测试错误(错误, path.join(this.需求目录, 测试.文件))
     let 附件们: 需求测试附件记录[] = []

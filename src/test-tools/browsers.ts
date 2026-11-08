@@ -1,9 +1,9 @@
 import { join } from 'node:path'
 import { z } from 'zod'
 
-import { 浏览器测试引擎, type 浏览器测试模式 } from '../../../src/model/browser-test'
-import { 浏览器步骤取证作用域 } from '../../../src/model/browser-test/step-evidence'
-import type { 提交步骤附件, 需求测试附件 } from '../../../src/model/test-requirement'
+import { 浏览器测试引擎, type 浏览器测试模式 } from '../model/browser-test'
+import { 浏览器步骤取证作用域 } from '../model/browser-test/step-evidence'
+import type { 提交步骤附件, 需求测试附件 } from '../model/test-requirement'
 
 type 会话 = Awaited<ReturnType<typeof 浏览器测试引擎.打开会话>>
 type 会话记录 = { 打开任务: Promise<会话>; 会话?: 会话; 归档任务?: Promise<void> }

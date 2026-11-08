@@ -147,9 +147,35 @@ export class 浏览器测试引擎 {
     return 结果
   }
 
+  public async 重新加载(参数?: Parameters<Page['reload']>[0]): ReturnType<Page['reload']> {
+    this.检查页面()
+    let 结果 = await this.页面.reload(参数)
+    this.证据.标记已导航()
+    if (this.证据.启用 === true) await this.证据.采集('导航完成', '重新加载后的页面')
+    return 结果
+  }
+
   public 获得地址(): string {
     this.检查页面()
     return this.页面.url()
+  }
+
+  public async 观察页面(参数?: { timeout?: number }): Promise<{ 地址: string; 标题: string; 页面结构: string }> {
+    this.检查页面()
+    let 页面结构 = await this.页面.locator('body').ariaSnapshot(参数)
+    return { 地址: this.页面.url(), 标题: await this.页面.title(), 页面结构 }
+  }
+
+  public async 检查目标(
+    目标: Locator,
+    参数?: { timeout?: number },
+  ): Promise<{ 匹配数量: number; 可见?: boolean; 可用?: boolean }> {
+    this.检查操作目标(目标)
+    let 匹配数量 = await 目标.count()
+    if (匹配数量 !== 1) return { 匹配数量 }
+    let 可见 = await 目标.isVisible()
+    let 可用 = await 目标.isEnabled({ timeout: 参数?.timeout ?? 1_000 })
+    return { 匹配数量, 可见, 可用 }
   }
 
   public async 等待地址(
@@ -187,16 +213,16 @@ export class 浏览器测试引擎 {
   }
 
   /** 截取当前视口，可标注视口坐标或目标元素可见区域的中心。 */
-  public async 截图(标注?: Locator | { x: number; y: number }): Promise<Buffer> {
+  public async 截图(标注?: Locator | { x: number; y: number }, 参数?: { timeout?: number }): Promise<Buffer> {
     this.检查页面()
-    if (标注 === undefined) return await this.页面.screenshot({ scale: 'css' })
-    if ('x' in 标注) return await 标注截图(this.页面, await this.页面.screenshot({ scale: 'css' }), 标注)
+    if (标注 === undefined) return await this.页面.screenshot({ scale: 'css', ...参数 })
+    if ('x' in 标注) return await 标注截图(this.页面, await this.页面.screenshot({ scale: 'css', ...参数 }), 标注)
 
     this.检查操作目标(标注)
-    await this.滚动到目标(标注)
-    let 区域 = await 标注.boundingBox()
+    await this.滚动到目标(标注, 参数?.timeout)
+    let 区域 = await 标注.boundingBox(参数)
     if (区域 === null) throw new Error('截图标注目标不可见')
-    return await 标注截图(this.页面, await this.页面.screenshot({ scale: 'css' }), 区域)
+    return await 标注截图(this.页面, await this.页面.screenshot({ scale: 'css', ...参数 }), 区域)
   }
 
   public async 添加初始化脚本(脚本: () => void): Promise<void> {

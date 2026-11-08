@@ -4,6 +4,18 @@ import { getRawEnv } from './env-provider'
 let 非空字符串 = z.string().refine((值): boolean => 值.trim() !== '', '不能为空')
 let 端口 = z.coerce.number().int().min(1).max(65535)
 
+let 测试MCP环境模型 = z.object({
+  TEST_MCP_ENABLED: z.enum(['true', 'false']),
+  TEST_MCP_PORT: z.union([z.literal(''), 端口]),
+})
+
+export function 获得测试MCP配置(): { 启用: false } | { 启用: true; 端口: number } {
+  let 配置 = getRawEnv(测试MCP环境模型)
+  if (配置.TEST_MCP_ENABLED === 'false') return { 启用: false }
+  if (配置.TEST_MCP_PORT === '') throw new Error('启用测试 MCP 时必须设置 TEST_MCP_PORT')
+  return { 启用: true, 端口: 配置.TEST_MCP_PORT }
+}
+
 let 环境变量模式 = z
   .object({
     CONFIG_ENCRYPTION: z.enum(['true', 'false']).transform((值): boolean => 值 === 'true'),

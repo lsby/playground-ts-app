@@ -36,3 +36,11 @@
   - 由 `scripts/test/requirement/run-requirement.ts` 驱动。
   - 运行 `npm run test:requirement`。可交互选择，或指定 `--all`、`--scenario=<流程名>`、`--requirement=<需求名>`、`--list`、`--auto` 或 `--demo`。任务参数 `--prepare-only` 可预览计划。
   - 自动模式在 CI 中每条流程最多尝试三次。报告输出至 `test-outputs/requirement-report/`，可按验收点查覆盖，或打开对应的流程尝试查看步骤、附件、失败信息和浏览器 Trace。
+
+## 交互式测试 MCP
+
+AI 直接写浏览器测试时，一个按钮出现波动，就可能等到超时才发现问题，改完还得从头跑。交互式测试让 AI 留在同一个测试现场，自己决定下一步。比如点了「保存」没反应，可以先看页面、日志或数据库，判断是还在处理、已经保存，还是需要修改代码。前端热更新和后端自动重启让它改完可以接着验证。
+
+MCP 提供与需求测试共用的工具，并为调用保留截图、查询和日志。后续要让 AI 自己整理操作记录，把值得保留的操作和断言转成需求测试代码，供以后重复运行。
+
+在 VS Code 按 `F1`，选择「运行任务」→「启动测试环境开发套件」。在 `.env/.env.test.web` 中设置 `TEST_MCP_ENABLED=true` 后，AI 客户端连接终端打印的 MCP 地址即可。

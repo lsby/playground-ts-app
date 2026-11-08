@@ -1,7 +1,7 @@
 import type { ChildProcess } from 'child_process'
 import crossSpawn from 'cross-spawn'
 import dotenv from 'dotenv'
-import { readdirSync, writeFileSync } from 'fs'
+import { readdirSync } from 'fs'
 import path from 'path'
 import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
 import { ParcelWorker入口, ParcelWorker选项 } from '../task/model/task-common'
@@ -26,14 +26,8 @@ for (let [名称, 值] of Object.entries(已解密变量)) {
   if (process.env[名称] === undefined) process.env[名称] = 值
 }
 
-// 根据 APP_PORT 动态写入 .proxyrc.json 供 Parcel 代理使用
-let appPort = process.env['APP_PORT'] ?? '3000'
-let proxyConfig = {
-  '/api': { target: `http://127.0.0.1:${appPort}`, changeOrigin: true },
-  '/ws': { target: `ws://127.0.0.1:${appPort}`, ws: true, changeOrigin: true },
-  '/public': { target: `http://127.0.0.1:${appPort}`, changeOrigin: true },
-}
-writeFileSync('.proxyrc.json', JSON.stringify(proxyConfig, null, 2), 'utf-8')
+let 测试环境 = process.env['NODE_ENV'] === 'test'
+let Web产物目录 = 测试环境 ? 'test-outputs/web-test-dev' : 'dist/src/web'
 
 let Parcel进程列表: ChildProcess[] = []
 let 正在重启 = false
@@ -60,7 +54,7 @@ function 启动任务(): void {
         '--watch-for-stdin',
         ParcelWorker入口,
       ],
-      { stdio: ['ignore', 'inherit', 'inherit'] },
+      { stdio: ['pipe', 'inherit', 'inherit'] },
     )
     Parcel进程列表.push(Worker进程)
   }
@@ -69,8 +63,9 @@ function 启动任务(): void {
     [
       '--no-cache',
       '--no-autoinstall',
+      ...(测试环境 ? ['--cache-dir', 'test-outputs/parcel-cache-test-dev'] : []),
       '--dist-dir',
-      'dist/src/web',
+      Web产物目录,
       '--watch-for-stdin',
       '--port',
       webPort,
@@ -79,7 +74,8 @@ function 启动任务(): void {
       ...getHtmlEntries('src/web/page'),
       // '--lazy',
     ],
-    { stdio: ['ignore', 'inherit', 'inherit'] },
+    // --watch-for-stdin uses the pipe to stop Parcel when this wrapper exits.
+    { stdio: ['pipe', 'inherit', 'inherit'] },
   )
   Parcel进程列表.push(Web进程)
   for (let Parcel进程 of Parcel进程列表) Parcel进程.on('close', 处理Parcel进程关闭)
@@ -94,6 +90,10 @@ function 处理Parcel进程关闭(): void {
 }
 
 function 重启(): void {
+  if (测试环境 === true) {
+    启动任务()
+    return
+  }
   let 清理进程 = crossSpawn('tsx', ['scripts/clean/clean-web.ts'], { stdio: ['ignore', 'inherit', 'inherit'] })
   清理进程.on('close', (退出码) => {
     if (退出码 === 0) 启动任务()

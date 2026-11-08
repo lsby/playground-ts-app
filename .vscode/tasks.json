@@ -2,6 +2,16 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "启动测试环境开发套件",
+      "type": "shell",
+      "command": "npm run task -- dev:test",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always"
+      }
+    },
+    {
       "label": "_持续生成API接口列表",
       "type": "shell",
       "command": "npm run task -- watch:api-list",

@@ -46,11 +46,30 @@ export let 开发任务表 = 定义任务({
     环境变量: 完整调试环境,
     运行: 命令('tsx', './src/server.ts'),
   },
+  'run:service:test:watch': {
+    说明: '持续运行 Web 测试服务端',
+    环境文件: 测试环境文件,
+    环境变量: 完整调试环境,
+    运行: 命令('tsx', 'watch', '--exclude', './src/types/**/*', './src/server.ts'),
+    公开: false,
+  },
   'run:web:dev': {
     说明: '启动 Web 前端开发服务器',
     环境文件: Web开发环境文件,
     依赖: ['clean:web'],
     运行: 命令('tsx', 'scripts/web/web-run.ts'),
+  },
+  'run:web:test:dev': {
+    说明: '启动测试环境 Web 前端开发服务器',
+    环境文件: 测试环境文件,
+    运行: 命令('tsx', 'scripts/web/web-run.ts'),
+    公开: false,
+  },
+  'run:test:dev-suite': {
+    说明: '启动测试开发套件服务',
+    环境文件: 测试环境文件,
+    运行: 命令('tsx', 'scripts/test/dev-suite.ts'),
+    公开: false,
   },
   'run:pure-frontend:dev': {
     说明: '启动纯前端开发服务器',
@@ -175,6 +194,24 @@ export let 开发任务表 = 定义任务({
     公开: false,
   },
   'dev:web': { 说明: '生成派生文件后启动 Web 开发套件', 依赖: ['generate:all', 'dev:web:watch'] },
+  'dev:test:watch': {
+    说明: '并行运行测试开发套件与监听任务',
+    依赖方式: '并行',
+    依赖: [
+      'watch:type',
+      'watch:lint',
+      'watch:api-list',
+      'watch:api-type',
+      'watch:web-page-entry',
+      'run:web:test:dev',
+      'run:test:dev-suite',
+    ],
+    公开: false,
+  },
+  'dev:test': {
+    说明: '准备测试数据库和派生文件后启动测试开发套件',
+    依赖: ['db:ensure:test:web', 'generate:all', 'dev:test:watch'],
+  },
   'dev:electron:watch': {
     说明: '并行运行 Electron 开发服务与监听任务',
     依赖方式: '并行',

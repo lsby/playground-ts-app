@@ -72,6 +72,8 @@
     "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
     "@lsby/eslint-config": "^0.5.6",
     "@lsby/eslint-plugin": "^0.2.1",
+    "@modelcontextprotocol/node": "2.1.2",
+    "@modelcontextprotocol/server": "2.4.0",
     "@parcel/config-default": "^2.16.4",
     "@parcel/transformer-inline-string": "^2.16.4",
     "@playwright/test": "^1.40.0",
@@ -97,6 +99,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsdoc": "^62.0.0",
     "eslint-plugin-sort-class-members": "^1.21.0",
+    "http-proxy-middleware": "^3",
     "husky": "^9.1.7",
     "inquirer": "^12.9.4",
     "lint-staged": "^15.5.0",
@@ -118,7 +121,8 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.52.0",
     "util": "^0.12.5",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "zod-mcp": "npm:zod@^4.2.0"
   },
   "packageManager": "pnpm@9.5.0",
   "pnpm": {

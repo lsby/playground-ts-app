@@ -9,9 +9,8 @@ import crossSpawn from 'cross-spawn'
 import { z } from 'zod'
 
 import type { 测试服务日志内容 } from '../../src/model/test-requirement/tools'
+import type { 测试服务日志位置 } from '../../src/test-tools/runtime'
 import { 测试日志缓冲 } from './service-log'
-
-export type 测试服务日志位置 = { 标准输出: number; 错误输出: number }
 
 /**
  * 测试服务是为一次需求测试运行提供后端的独立进程。
@@ -30,6 +29,7 @@ export class 测试服务 {
   public constructor(
     private readonly 根目录: string,
     private readonly 报告目录: string,
+    private readonly 启动任务: 'test:requirement:server' | 'run:service:test:watch' = 'test:requirement:server',
   ) {
     if (path.isAbsolute(根目录) === false) throw new Error('测试服务项目根目录必须是绝对路径')
     if (path.isAbsolute(报告目录) === false) throw new Error('测试服务报告目录必须是绝对路径')
@@ -59,7 +59,7 @@ export class 测试服务 {
     fs.mkdirSync(this.报告目录, { recursive: true })
     let 进程 = crossSpawn(
       process.execPath,
-      ['--import', 'tsx', 'scripts/task/index.ts', 'test:requirement:server', '--env', 环境文件],
+      ['--import', 'tsx', 'scripts/task/index.ts', this.启动任务, '--env', 环境文件],
       { cwd: this.根目录, env: process.env, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32' },
     )
     this.进程 = 进程
@@ -104,6 +104,13 @@ export class 测试服务 {
   public 关闭(): Promise<void> {
     this.关闭任务 ??= this.结束服务进程()
     return this.关闭任务
+  }
+
+  public async 等待退出(): Promise<void> {
+    let 进程 = this.进程
+    if (进程 === undefined) throw new Error('测试服务尚未启动')
+    if (进程.exitCode !== null || 进程.signalCode !== null) return
+    await new Promise<void>((完成) => 进程.once('exit', (): void => 完成()))
   }
 
   private 获得配置(): { 端口: number; 服务地址: string } {
