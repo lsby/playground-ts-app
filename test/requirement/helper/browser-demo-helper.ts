@@ -1,12 +1,4 @@
-import { cleanDB } from '../../../scripts/db/clean-db'
-import { 全局资源 } from '../../../src/global/global'
-import { init } from '../../../src/init/init'
 import type { 浏览器测试引擎 } from '../../../src/model/browser-test'
-
-export async function 准备演示数据(): Promise<void> {
-  await cleanDB(全局资源.获得数据库().获得句柄())
-  await init()
-}
 
 export async function 登录演示页(引擎: 浏览器测试引擎): Promise<void> {
   if (引擎.获得地址().includes('/demo/login.html') === false) {

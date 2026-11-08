@@ -28,10 +28,15 @@ export let 测试任务表 = 定义任务({
   },
 
   // 业务需求测试
-  'test:requirement:server': {
-    说明: '构建并启动需求测试服务',
+  'test:requirement:reset': {
+    说明: '清空并初始化需求流程使用的测试数据库',
     环境文件: 测试环境文件,
-    依赖: ['db:ensure:test:web', 'build:web:test'],
+    运行: 命令('tsx', 'scripts/test/requirement/reset-database.ts'),
+    公开: false,
+  },
+  'test:requirement:server': {
+    说明: '启动需求测试服务',
+    环境文件: 测试环境文件,
     运行: 命令('tsx', './src/server.ts'),
     公开: false,
   },

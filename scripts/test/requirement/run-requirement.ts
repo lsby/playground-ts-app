@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process'
 import { mkdir, mkdtemp, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -7,6 +8,7 @@ import { z } from 'zod'
 
 import type { 浏览器测试模式 } from '../../../src/model/browser-test'
 import { 需求测试, type 需求, type 需求测试流程 } from '../../../src/model/test-requirement'
+import { 独占测试数据库 } from '../database-lock'
 import { 测试服务 } from '../test-server'
 import { 格式化需求测试错误 } from './format-error'
 import { 保存需求测试报告, type 需求测试尝试记录, type 需求测试附件记录 } from './report'
@@ -116,6 +118,8 @@ export class 需求测试运行器 {
     let 报告目录 = await mkdtemp(path.join(this.报告目录, `${String(开始时间)}-`))
     let 服务: 测试服务 | undefined
     let 服务地址: string | undefined
+    let 正在启动服务 = false
+    let 释放数据库: (() => Promise<void>) | undefined
     let 基础设施错误们: string[] = []
     let 记录们 = 自动流程们.map((测试) => ({ 测试, 尝试们: new Array<需求测试尝试记录>() }))
     let 取消控制器 = new AbortController()
@@ -123,45 +127,58 @@ export class 需求测试运行器 {
     let 已取消 = (): boolean => 取消信号.aborted
     let 中断码: number | undefined
     let 记录错误 = (错误: unknown): void => {
-      基础设施错误们.push(错误 instanceof Error ? (错误.stack ?? 错误.message) : String(错误))
+      let 消息 = 错误 instanceof Error ? 错误.message : String(错误)
+      基础设施错误们.push(错误 instanceof Error ? (错误.stack ?? 消息) : 消息)
+      console.error(消息)
     }
     let 处理中断 = (退出码: number): void => {
       if (中断码 !== undefined) return
       中断码 = 退出码
       取消控制器.abort(new Error('需求测试已中断'))
       // 启动中的服务需要提前关闭，关闭错误由 finally 中的同一个关闭任务处理。
-      if (服务地址 === undefined && 服务 !== undefined) void 服务.关闭().catch((): void => {})
+      if (正在启动服务 && 服务 !== undefined) void 服务.关闭().catch((): void => {})
     }
     let 处理SIGINT = (): void => 处理中断(130)
     let 处理SIGTERM = (): void => 处理中断(143)
     process.on('SIGINT', 处理SIGINT)
     process.on('SIGTERM', 处理SIGTERM)
     try {
+      if (自动流程们.length > 0) {
+        释放数据库 = await 独占测试数据库(this.根目录)
+        await new 测试服务(this.根目录, 报告目录).确认端口可用()
+        if (已取消() === false) await this.运行准备任务('db:ensure:test:web')
+        if (已取消() === false && 自动流程们.some(({ 实例 }) => 实例.需要测试服务()))
+          await this.运行准备任务('build:web:test')
+      }
       let 最大尝试次数 = 选项.模式 === '自动' && process.env['CI'] !== undefined && process.env['CI'] !== '' ? 3 : 1
       for (let [流程索引, { 测试, 尝试们 }] of 记录们.entries()) {
         if (已取消()) break
         let 需要服务 = 测试.实例.需要测试服务()
-        if (需要服务 && 服务 === undefined) {
-          服务 = new 测试服务(this.根目录, 报告目录)
-          try {
-            服务地址 = await 服务.启动()
-          } catch (错误) {
-            if (已取消() === false) 记录错误(错误)
-          }
-        }
-        if (需要服务 && 服务地址 === undefined) continue
         for (let 尝试序号 = 1; 尝试序号 <= 最大尝试次数 && 已取消() === false; 尝试序号 += 1) {
           let 附件目录 = path.join(报告目录, 'artifacts', String(流程索引 + 1), String(尝试序号))
           let 名称 = 测试.流程.获得名称()
           console.log(`\n开始需求流程：${名称}（第 ${String(尝试序号)} 次）`)
-          let 尝试 = await this.执行尝试(测试, 尝试序号, {
-            模式: 选项.模式,
-            服务: 需要服务 ? 服务 : undefined,
-            报告目录,
-            附件目录,
-            取消信号,
-          })
-          尝试们.push(尝试)
+          let 本次服务 = new 测试服务(this.根目录, 报告目录)
+          await 本次服务.确认端口可用()
+          if (已取消()) break
+          await this.运行准备任务('test:requirement:reset')
+          if (已取消()) break
+          let 尝试: 需求测试尝试记录
+          try {
+            if (需要服务) {
+              服务 = 本次服务
+              正在启动服务 = true
+              服务地址 = await 服务.启动()
+              正在启动服务 = false
+            }
+            尝试 = await this.执行尝试(测试, 尝试序号, { 模式: 选项.模式, 服务, 报告目录, 附件目录, 取消信号 })
+            尝试们.push(尝试)
+          } finally {
+            正在启动服务 = false
+            let 待关闭服务 = 服务
+            服务 = undefined
+            await 待关闭服务?.关闭()
+          }
           console.log(`${名称}：${尝试.结果.状态}（${String(尝试.结果.耗时毫秒)}ms）`)
           if (尝试.结果.错误 !== undefined) console.error(尝试.结果.错误.文本)
           for (let 错误 of 尝试.附件错误们) console.error(错误.文本)
@@ -170,10 +187,10 @@ export class 需求测试运行器 {
         }
       }
     } catch (错误) {
-      记录错误(错误)
+      if (已取消() === false) 记录错误(错误)
     } finally {
       try {
-        await 服务?.关闭()
+        await 释放数据库?.()
       } catch (错误) {
         记录错误(错误)
       } finally {
@@ -194,6 +211,22 @@ export class 需求测试运行器 {
     })
     console.log(`需求测试报告已生成：${pathToFileURL(产物.html路径).href}`)
     return 中断码 ?? (产物.全部通过 ? 0 : 1)
+  }
+
+  private async 运行准备任务(任务: 'db:ensure:test:web' | 'build:web:test' | 'test:requirement:reset'): Promise<void> {
+    let 环境文件 = z.string().min(1).parse(process.env['ENV_FILE_PATH'])
+    await new Promise<void>((完成, 失败) => {
+      let 进程 = spawn(process.execPath, ['--import', 'tsx', 'scripts/task/index.ts', 任务, '--env', 环境文件], {
+        cwd: this.根目录,
+        env: process.env,
+        stdio: ['ignore', 'inherit', 'inherit'],
+      })
+      进程.once('error', 失败)
+      进程.once('close', (退出码, 信号): void => {
+        if (退出码 === 0) 完成()
+        else 失败(new Error(`测试准备任务 ${任务} 执行失败，退出码：${String(退出码)}，信号：${String(信号)}`))
+      })
+    })
   }
 
   private async 执行尝试(测试: 需求测试入口, 尝试序号: number, 参数: 尝试参数): Promise<需求测试尝试记录> {

@@ -47,13 +47,18 @@ export class 测试服务 {
     return { 标准输出: this.标准输出.读取(起点.标准输出), 错误输出: this.错误输出.读取(起点.错误输出) }
   }
 
+  public async 确认端口可用(): Promise<void> {
+    let { 端口 } = this.获得配置()
+    if (await this.端口已开放(端口)) throw new Error(`测试服务端口 ${String(端口)} 已被占用，请先关闭已有测试服务`)
+  }
+
   public async 启动(): Promise<string> {
     if (this.已尝试启动) throw new Error('测试服务只能启动一次')
     this.检查未关闭()
     this.已尝试启动 = true
     let 环境文件 = z.string().min(1).parse(process.env['ENV_FILE_PATH'])
     let { 端口, 服务地址 } = this.获得配置()
-    if (await this.端口已开放(端口)) throw new Error(`测试服务端口 ${String(端口)} 已被占用，拒绝连接遗留服务`)
+    await this.确认端口可用()
     this.检查未关闭()
 
     fs.mkdirSync(this.报告目录, { recursive: true })
@@ -76,8 +81,8 @@ export class 测试服务 {
       stderr.pipe(process.stderr, { end: false })
       let 日志选项 = { signal: this.日志控制器.signal }
       this.日志任务 = Promise.allSettled([
-        pipeline(stdout, fs.createWriteStream(path.join(this.报告目录, 'server.stdout.log')), 日志选项),
-        pipeline(stderr, fs.createWriteStream(path.join(this.报告目录, 'server.stderr.log')), 日志选项),
+        pipeline(stdout, fs.createWriteStream(path.join(this.报告目录, 'server.stdout.log'), { flags: 'a' }), 日志选项),
+        pipeline(stderr, fs.createWriteStream(path.join(this.报告目录, 'server.stderr.log'), { flags: 'a' }), 日志选项),
       ])
 
       let 截止时间 = Date.now() + 120_000

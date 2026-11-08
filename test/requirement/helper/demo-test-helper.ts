@@ -1,16 +1,11 @@
 import type { Locator } from '@playwright/test'
 
-import { cleanDB } from '../../../scripts/db/clean-db'
-import { 全局资源 } from '../../../src/global/global'
-import { init } from '../../../src/init/init'
 import { 浏览器测试引擎 } from '../../../src/model/browser-test'
 import type { 提交步骤附件, 需求测试工具 } from '../../../src/model/test-requirement'
 
 export type 演示需求系统上下文 = { 工具: 需求测试工具; 引擎: 浏览器测试引擎; 新用户名后缀: string }
 
 export async function 准备演示需求上下文(工具: 需求测试工具): Promise<Omit<演示需求系统上下文, '工具'>> {
-  await cleanDB(全局资源.获得数据库().获得句柄())
-  await init()
   let 引擎 = await 工具.浏览器.打开('管理员', '/demo/login.html')
   return { 引擎, 新用户名后缀: crypto.randomUUID() }
 }

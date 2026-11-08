@@ -1,6 +1,6 @@
 import type { 浏览器测试引擎 } from '../../src/model/browser-test'
 import { 流程, 行为, 观察, 需求, 需求测试, 验收点, type 需求测试工具 } from '../../src/model/test-requirement'
-import { 准备演示数据, 切换演示标签, 登录演示页 } from './helper/browser-demo-helper'
+import { 切换演示标签, 登录演示页 } from './helper/browser-demo-helper'
 
 type 用户表格行 = { id: string; 名称: string }
 
@@ -266,7 +266,6 @@ class 浮层模态框与业务表格测试 extends 需求测试 {
   }
 
   protected override async 准备数据(工具: 需求测试工具): Promise<object> {
-    await 准备演示数据()
     await 工具.浏览器.打开('主会话')
     return {}
   }

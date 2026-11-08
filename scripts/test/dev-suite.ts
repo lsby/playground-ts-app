@@ -3,6 +3,7 @@ import path from 'node:path'
 
 import { 获得测试MCP配置, 获得环境变量 } from '../../src/global/env'
 import { 项目根目录 } from '../task/model/task-common'
+import { 独占测试数据库 } from './database-lock'
 import type { 启动测试MCP } from './mcp/http'
 import type { MCP测试会话 } from './mcp/session'
 import { 测试服务 } from './test-server'
@@ -22,6 +23,7 @@ async function 运行开发套件(): Promise<void> {
   let 会话: MCP测试会话 | undefined
   let 退出请求 = Promise.withResolvers<void>()
   let 请求退出 = (): void => 退出请求.resolve()
+  let 释放数据库 = await 独占测试数据库(项目根目录)
   process.once('SIGINT', 请求退出)
   process.once('SIGTERM', 请求退出)
   try {
@@ -47,11 +49,15 @@ async function 运行开发套件(): Promise<void> {
     process.off('SIGINT', 请求退出)
     process.off('SIGTERM', 请求退出)
     try {
-      await MCP?.关闭()
+      try {
+        await MCP?.关闭()
+      } finally {
+        let 结果们 = await Promise.allSettled([会话?.关闭(), 后端.关闭()])
+        let 错误们 = 结果们.filter((结果) => 结果.status === 'rejected').map((结果) => 结果.reason)
+        if (错误们.length > 0) throw new AggregateError(错误们, '关闭测试开发套件失败')
+      }
     } finally {
-      let 结果们 = await Promise.allSettled([会话?.关闭(), 后端.关闭()])
-      let 错误们 = 结果们.filter((结果) => 结果.status === 'rejected').map((结果) => 结果.reason)
-      if (错误们.length > 0) throw new AggregateError(错误们, '关闭测试开发套件失败')
+      await 释放数据库()
     }
   }
 }

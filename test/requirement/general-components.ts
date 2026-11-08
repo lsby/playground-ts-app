@@ -1,6 +1,5 @@
 import type { 浏览器测试引擎 } from '../../src/model/browser-test'
 import { 流程, 行为, 观察, 需求, 需求测试, 验收点, type 需求测试工具 } from '../../src/model/test-requirement'
-import { 准备演示数据 } from './helper/browser-demo-helper'
 
 /**
  * 验证通用扩展组件的页面交互。
@@ -114,7 +113,6 @@ class 通用扩展组件测试 extends 需求测试 {
   }
 
   protected override async 准备数据(工具: 需求测试工具): Promise<object> {
-    await 准备演示数据()
     await 工具.浏览器.打开('主会话')
     return {}
   }

@@ -1,5 +1,5 @@
 import { 流程, 行为, 观察, 需求, 需求测试, 验收点, type 需求测试工具 } from '../../src/model/test-requirement'
-import { 准备演示数据, 切换演示标签, 登录演示页 } from './helper/browser-demo-helper'
+import { 切换演示标签, 登录演示页 } from './helper/browser-demo-helper'
 
 /**
  * 验证强类型表单的填写与数据提交。
@@ -103,7 +103,6 @@ class 强类型表单测试 extends 需求测试 {
   }
 
   protected override async 准备数据(工具: 需求测试工具): Promise<object> {
-    await 准备演示数据()
     await 工具.浏览器.打开('主会话')
     return {}
   }
