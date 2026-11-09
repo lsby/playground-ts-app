@@ -12,7 +12,7 @@ import { CompiledQuery } from 'kysely'
 import { z } from 'zod'
 import { kysely插件 } from '../../../global/plugin'
 import { 检查管理员登录 } from '../../../interface-logic/check/check-login-jwt-admin'
-import { JSON对象模式 } from '../../../model/json-value'
+import { JSON对象模式 } from '../../../model/data/json-value'
 
 let 接口路径 = '/api/admin-sqlite/execute-query' as const
 let 接口方法 = 'post' as const

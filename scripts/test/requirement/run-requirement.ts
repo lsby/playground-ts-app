@@ -55,7 +55,7 @@ export class 需求测试运行器 {
     let 文件们 = (await readdir(this.需求目录, { recursive: true, withFileTypes: true }))
       .filter((项) => 项.isFile() && 项.name.endsWith('.ts'))
       .map((项) => path.relative(this.需求目录, path.join(项.parentPath, 项.name)).replaceAll('\\', '/'))
-      .filter((文件) => 文件.startsWith('helper/') === false)
+      .filter((文件) => 文件.split('/').includes('helper') === false)
       .sort()
     let 登记们: { 文件: string; 实例: 需求测试实例 }[] = []
     for (let 文件 of 文件们) {

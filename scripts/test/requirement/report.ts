@@ -37,12 +37,11 @@ type 报告参数 = {
   中断码: number | undefined
 }
 type 验收状态 = '已证明' | '待人工' | '未证明' | '未执行'
-type 目录流程 = { id: string; 测试: 需求测试登记 }
+type 目录流程 = { id: string; 测试: 需求测试登记; 状态: 需求测试结果['状态'] | '未执行' }
 type 验收目录项 = { id: string; 点: 验收点; 状态: 验收状态; 关联流程们: readonly 目录流程[] }
 type 步骤记录 = 需求测试结果['步骤们'][number]
 type 标记样式 = 'ok' | 'manual' | 'neutral' | 'fail'
 type 报告摘要 = { 通过数: number; 失败数: number; 中断数: number; 未执行数: number }
-type 图片附件 = Extract<流程步骤附件, { 类型: '图片' }>
 let 流程状态样式: Record<需求测试结果['状态'] | '未执行', 标记样式> = {
   通过: 'ok',
   失败: 'fail',
@@ -76,9 +75,21 @@ function 验收状态样式(状态: 验收状态): 标记样式 {
   }
 }
 
-function 目录状态标记(状态: 验收状态): string {
+function 目录状态标记(状态: 验收状态 | 需求测试结果['状态'], 样式: 标记样式): string {
   let 名称 = 状态 === '待人工' ? '需要人工' : 状态
-  return `<span class="directory-status ${验收状态样式(状态)}" role="img" aria-label="${名称}" title="${名称}"></span>`
+  return `<span class="directory-status ${样式}" role="img" aria-label="${名称}" title="${名称}"></span>`
+}
+
+function 生成关联流程链接(条目: 验收目录项, 目录中: boolean): string {
+  return 条目.关联流程们
+    .map(({ id, 测试, 状态 }) => {
+      let 名称 = 转义Html(测试.流程.获得名称())
+      let 样式 = 流程状态样式[状态]
+      let 色点 = 目录中 ? 目录状态标记(状态, 样式) : ''
+      let 标记 = 目录中 ? '' : 状态标记(状态, 样式)
+      return `<li><a class="${目录中 ? 'flow-link' : 'report-link'}" href="#${条目.id}/${id}" data-acceptance="${条目.id}" data-flow-target="${id}" title="${名称}"><span class="flow-name">${名称}</span>${色点}</a>${标记}</li>`
+    })
+    .join('')
 }
 
 function 格式化耗时(耗时毫秒: number): string {
@@ -100,43 +111,34 @@ function 生成切图控件(位置: string): string {
   </div>`
 }
 
-function 生成图片组Html(图片们: readonly 图片附件[]): string {
-  if (图片们.length === 0) return ''
-  let 控件 = 图片们.length === 1 ? '' : 生成切图控件(`1 / ${String(图片们.length)}`)
-  let 图片组 = 图片们
-    .map((附件, 索引) => {
-      let 说明 = 转义Html(附件.说明 ?? `步骤图片 ${String(索引 + 1)}`)
-      return `<figure class="gallery-frame" data-frame${索引 === 0 ? '' : ' hidden'}>
+function 生成步骤附件Html(附件组们: readonly (readonly 流程步骤附件[])[]): string {
+  if (附件组们.length === 0) return ''
+  let 控件 = 附件组们.length === 1 ? '' : 生成切图控件(`1 / ${String(附件组们.length)}`)
+  let 图片序号 = 0
+  let 页面们 = 附件组们
+    .map((附件们, 页索引) => {
+      let 内容 = 附件们
+        .map((附件) => {
+          switch (附件.类型) {
+            case '文本':
+              return 附件.日志流 === undefined
+                ? `<p>${转义Html(附件.内容)}</p>`
+                : `<details class="step-log"><summary>后端日志（${附件.日志流}）</summary><p>${转义Html(附件.内容)}</p></details>`
+            case '图片': {
+              图片序号 += 1
+              let 说明 = 转义Html(附件.说明 ?? `步骤图片 ${String(图片序号)}`)
+              return `<figure class="gallery-frame">
         <button type="button" class="step-image" data-zoom aria-haspopup="dialog" aria-label="查看大图">
           <img src="data:${转义Html(附件.内容类型)};base64,${转义Html(附件.内容)}" alt="${说明}" loading="lazy">
         </button><figcaption>${说明}</figcaption></figure>`
+            }
+          }
+        })
+        .join('')
+      return `<div class="gallery-page" data-frame${页索引 === 0 ? '' : ' hidden'}>${内容}</div>`
     })
     .join('')
-  return `<div data-gallery>${控件}${图片组}</div>`
-}
-
-function 生成步骤附件Html(附件们: readonly 流程步骤附件[]): string {
-  if (附件们.length === 0) return ''
-  let 内容们: string[] = []
-  let 图片们: 图片附件[] = []
-  for (let 附件 of 附件们) {
-    switch (附件.类型) {
-      case '文本':
-        内容们.push(
-          生成图片组Html(图片们),
-          附件.日志流 === undefined
-            ? `<p>${转义Html(附件.内容)}</p>`
-            : `<details class="step-log"><summary>后端日志（${附件.日志流}）</summary><p>${转义Html(附件.内容)}</p></details>`,
-        )
-        图片们 = []
-        break
-      case '图片':
-        图片们.push(附件)
-        break
-    }
-  }
-  内容们.push(生成图片组Html(图片们))
-  return `<div class="step-attachments">${内容们.join('')}</div>`
+  return `<div class="step-attachments" data-gallery>${控件}${页面们}</div>`
 }
 
 function 生成步骤Html(id: string, 步骤们: readonly 步骤记录[]): string {
@@ -155,14 +157,14 @@ function 生成步骤Html(id: string, 步骤们: readonly 步骤记录[]): strin
         : `<details class="problems"><summary>取证错误</summary>${步骤.取证错误们.map(生成错误Html).join('')}</details>`
     let 步骤id = `${id}-step-${String(序号 + 1)}`
     let 名称 = 转义Html(步骤.名称)
-    目录.push(`<li class="step${观察 ? ' observe' : ''}">
+    目录.push(`<li class="step">
         <button type="button" data-step-select aria-controls="${步骤id}"${序号 === 0 ? ' aria-current="step"' : ''}>
           <span class="num">${String(序号 + 1).padStart(2, '0')}</span>
           <span><span class="type">${步骤.类型}</span><strong>${名称}</strong></span>
         </button></li>`)
     详情.push(`<section id="${步骤id}" data-step-panel${序号 === 0 ? '' : ' hidden'}>
         <div class="stepmeta"><h4>${名称}</h4><span class="timing${样式}">${状态}${耗时}</span></div>
-        ${步骤.状态 === '未执行' ? '' : 生成步骤附件Html(步骤.附件们)}${错误}${取证错误们}</section>`)
+        ${步骤.状态 === '未执行' ? '' : 生成步骤附件Html(步骤.附件组们)}${错误}${取证错误们}</section>`)
   }
   return `<div class="step-workspace" data-step-workspace>
     <ol class="timeline" aria-label="流程步骤">${目录.join('')}</ol>
@@ -257,10 +259,11 @@ function 生成流程Html(id: string, { 流程, 文件 }: 需求测试登记, �
         .获得步骤们()
         .map((步骤) => ({ 名称: 步骤.获得描述(), 类型: 步骤 instanceof 行为 ? '行为' : '观察', 状态: '未执行' })),
     )}`
-  return `<section id="${id}" class="surface flow" data-flow>
+  return `<section id="${id}" class="surface flow" data-flow hidden>
     <div class="flowhead">
-    <h3>流程名称：${转义Html(流程.获得名称())}</h3>
-    <p><strong>用例文件：</strong><code>test/requirement/${转义Html(文件)}</code></p>
+    <div class="label">流程</div>
+    <h3>${转义Html(流程.获得名称())}</h3>
+    <p><strong>对应文件：</strong><code>test/requirement/${转义Html(文件)}</code></p>
     <p><strong>状态：</strong>${标记}</p>
     ${测试思路 === undefined ? '' : `<p class="flow-approach flow-text"><strong>测试思路：</strong>${转义Html(测试思路)}</p>`}
     </div>${记录}${计划}${生成执行结论Html(id, 结论, 结论补充)}</section>`
@@ -275,7 +278,13 @@ function 获得验收目录项(索引: ReadonlyMap<验收点, 验收目录项>, 
 function 生成报告Html(报告目录: string, 参数: 报告参数, 摘要: 报告摘要): string {
   let 需求们 = [...new Set(参数.流程们.flatMap((测试) => 测试.需求们))]
   let 记录索引 = new Map(参数.记录们.map(({ 测试, 尝试们 }) => [测试.流程, 尝试们]))
-  let 流程编号们 = 参数.流程们.map((测试, 索引) => ({ 测试, id: `flow-${String(索引 + 1)}` }))
+  let 流程编号们 = 参数.流程们.map(
+    (测试, 索引): 目录流程 => ({
+      测试,
+      id: `flow-${String(索引 + 1)}`,
+      状态: 记录索引.get(测试.流程)?.at(-1)?.结果.状态 ?? '未执行',
+    }),
+  )
   let 点索引 = new Map<验收点, 验收目录项>()
   for (let 需求 of 需求们) {
     for (let 点 of 需求.获得验收点们()) {
@@ -303,20 +312,14 @@ function 生成报告Html(报告目录: string, 参数: 报告参数, 摘要: �
     let 条目们 = 需求.获得验收点们().map((点) => 获得验收目录项(点索引, 点))
     let 导航验收点 = 条目们
       .map((条目) => {
-        let 流程链接 = 条目.关联流程们
-          .map(({ id, 测试 }) => {
-            let 流程名称 = 转义Html(测试.流程.获得名称())
-            return `<li><a class="flow-link" href="#${条目.id}/${id}" data-acceptance="${条目.id}" data-flow-target="${id}" title="${流程名称}">${流程名称}</a></li>`
-          })
-          .join('')
         let 描述 = 转义Html(条目.点.获得描述())
         return `<div class="point-group" data-acceptance-group="${条目.id}">
           <div class="point-row">
             <button type="button" class="point-toggle" aria-label="${描述}的流程" aria-expanded="false" aria-controls="${条目.id}-flows"></button>
             <a class="point" href="#${条目.id}" data-acceptance="${条目.id}"><span class="point-name" title="${描述}">${描述}</span>
-            ${目录状态标记(条目.状态)}</a>
+            ${目录状态标记(条目.状态, 验收状态样式(条目.状态))}</a>
           </div>
-          <ul class="flow-links" id="${条目.id}-flows" hidden>${流程链接}</ul></div>`
+          <ul class="flow-links" id="${条目.id}-flows" hidden>${生成关联流程链接(条目, true)}</ul></div>`
       })
       .join('')
     let 状态计数: Record<验收状态, number> = { 已证明: 0, 未证明: 0, 待人工: 0, 未执行: 0 }
@@ -329,24 +332,31 @@ function 生成报告Html(报告目录: string, 参数: 报告参数, 摘要: �
       .join('')
     let 需求状态 = 目录优先级.find((状态) => 状态计数[状态] > 0) ?? '已证明'
     导航.push(`<details class="requirement-group" name="requirement-directory" data-requirement-group="${id}">
-      <summary class="requirement"><span class="requirement-name" title="${名称}">${名称}</span><span class="requirement-meta">
-      <span class="point-count">${String(条目们.length)} 项验收点</span>${目录状态标记(需求状态)}</span></summary>
+      <summary class="requirement"><a class="requirement-name" href="#${id}" data-requirement-target="${id}" title="${名称}">${名称}</a><span class="requirement-meta">
+      <span class="point-count">${String(条目们.length)} 项验收点</span>${目录状态标记(需求状态, 验收状态样式(需求状态))}</span></summary>
       <div class="points">${导航验收点}</div></details>`)
-    需求卡片.push(`<section id="${id}" class="surface hero" data-requirement>
-      <h1>需求名称：${名称}</h1>
-      <p><strong>需求描述：</strong>${转义Html(需求.获得描述())}</p><div class="stats">${状态汇总}</div></section>`)
+    let 验收点链接 = 条目们
+      .map(
+        ({ id, 点, 状态 }) =>
+          `<li><a class="report-link" href="#${id}" data-acceptance="${id}">${转义Html(点.获得描述())}</a>${状态标记(状态, 验收状态样式(状态))}</li>`,
+      )
+      .join('')
+    需求卡片.push(`<section id="${id}" class="surface hero" data-requirement hidden>
+      <div class="label">需求</div><h1>${名称}</h1>
+      <p class="report-description">${转义Html(需求.获得描述())}</p><div class="stats">${状态汇总}</div>
+      <div class="report-related"><h2>验收点</h2><ul>${验收点链接}</ul></div></section>`)
     for (let 条目 of 条目们) {
       let 边框 = 条目.状态 === '已证明' ? '' : 条目.状态 === '未证明' ? ' failurebar' : ' pendingbar'
-      验收卡片.push(`<section id="${条目.id}" class="surface pointcard${边框}" data-point data-requirement-id="${id}" data-flow-ids="${条目.关联流程们.map(({ id }) => id).join(' ')}">
-        <h2>验收点：${转义Html(条目.点.获得描述())}</h2>
+      验收卡片.push(`<section id="${条目.id}" class="surface pointcard${边框}" data-point data-requirement-id="${id}" data-flow-ids="${条目.关联流程们.map(({ id }) => id).join(' ')}" hidden>
+        <div class="label">验收点</div><h2>${转义Html(条目.点.获得描述())}</h2>
         <p><strong>验收手段：</strong>${条目.点.获得验收手段()}</p>
-        <p><strong>状态：</strong>${状态标记(条目.状态, 验收状态样式(条目.状态))}</p></section>`)
+        <p><strong>状态：</strong>${状态标记(条目.状态, 验收状态样式(条目.状态))}</p>
+        <div class="report-related"><h3>关联流程</h3><ul>${生成关联流程链接(条目, false)}</ul></div></section>`)
     }
   }
 
   let 流程卡片 = 流程编号们.map(({ 测试, id }) => 生成流程Html(id, 测试, 记录索引.get(测试.流程) ?? [])).join('')
-  let 验收项们 = [...点索引.values()]
-  let 初始项 = 验收项们.find((项) => 项.状态 === '未证明') ?? 验收项们.find((项) => 项.状态 === '已证明') ?? 验收项们[0]
+  let 空状态说明 = 点索引.size === 0 ? '没有已登记的需求测试。' : '请选择左侧目录中的需求、验收点或流程。'
   let 日志链接 = [
     { 文件: 'server.stdout.log', 名称: '服务日志（stdout）' },
     { 文件: 'server.stderr.log', 名称: '服务日志（stderr）' },
@@ -369,12 +379,12 @@ function 生成报告Html(报告目录: string, 参数: 报告参数, 摘要: �
     <div class="bar-meta"><span class="sample">${转义Html(new Date(参数.开始时间).toLocaleString())} · ${参数.模式}${服务地址}</span>${日志链接}
     <label class="theme-control">主题 <select aria-label="主题" data-report-theme><option value="system">跟随系统</option>
     <option value="light">浅色</option><option value="dark">深色</option></select></label></div></div></header>
-    <div class="layout" data-initial-point="${初始项?.id ?? ''}">
+    <div class="layout">
       <nav id="report-directory" class="surface nav" aria-label="需求和验收点"><div class="navhead"><span class="label">需求目录</span></div>${导航.join('')}
         <div class="navfoot">通过 ${String(摘要.通过数)} · 失败 ${String(摘要.失败数)} · 中断 ${String(摘要.中断数)} · 未执行 ${String(摘要.未执行数)}</div></nav>
       <div class="directory-resizer" role="separator" aria-orientation="vertical" aria-label="调整需求目录宽度" aria-controls="report-directory" tabindex="0"></div>
       <main>${中断提示}${基础设施错误}${需求卡片.join('')}${验收卡片.join('')}${流程卡片}
-        ${验收项们.length === 0 ? '<p class="surface hero">没有已登记的需求测试。</p>' : '<p class="foot">按流程执行顺序展示步骤，附件随对应步骤呈现。</p>'}</main>
+        <p class="surface hero" data-no-selection>${空状态说明}</p></main>
     </div>
     <dialog class="image-dialog" aria-labelledby="report-image-title" data-image-dialog>
       <div class="image-dialog-head"><h2 id="report-image-title" data-image-title></h2>

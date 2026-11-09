@@ -87,7 +87,7 @@ export let 流程步骤附件列表模型 = z
   ])
   .array()
 export type 流程步骤附件 = z.infer<typeof 流程步骤附件列表模型>[number]
-export type 提交步骤附件 = (附件们: readonly 流程步骤附件[]) => void
+export type 提交步骤附件 = (附件们: readonly 流程步骤附件[], 选项?: { 并入上一组?: boolean }) => void
 
 /**
  * 流程步骤是行为和观察共同具有的一般概念。

@@ -1,6 +1,6 @@
 import type { Locator } from '@playwright/test'
 
-import { 浏览器测试引擎 } from '../../../src/model/browser-test'
+import type { 浏览器测试引擎 } from '../../../src/model/browser-test'
 import type { 提交步骤附件, 需求测试工具 } from '../../../src/model/test-requirement'
 
 export type 演示需求系统上下文 = { 工具: 需求测试工具; 引擎: 浏览器测试引擎; 新用户名后缀: string }

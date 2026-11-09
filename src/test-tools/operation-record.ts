@@ -4,9 +4,9 @@ import path from 'node:path'
 
 import { z } from 'zod'
 
-import { JSON值模式, type JSON值 } from '../model/json-value'
+import { JSON值模式, type JSON值 } from '../model/data/json-value'
 
-export type { JSON值 } from '../model/json-value'
+export type { JSON值 } from '../model/data/json-value'
 export type JSON对象 = { [键: string]: JSON值 }
 
 type 证据文件 = { path: string; description?: string }
@@ -23,6 +23,7 @@ export type 操作断言条目 = 基本条目 & {
   path: Array<string | number>
   operator: 'deepEqual'
   expected: JSON值
+  mergeWithPreviousAttachmentGroup?: boolean
   createdAt: string
 }
 export type 操作记录条目 = 操作调用条目 | 操作断言条目
@@ -196,7 +197,7 @@ export class 测试操作记录 {
     来源ID: number,
     结果路径: readonly (string | number)[],
     期望: JSON值,
-    说明?: string,
+    选项?: { 说明?: string | undefined; 并入上一组?: boolean | undefined },
   ): Promise<number> {
     let createdAt = new Date().toISOString()
     let 期望副本 = 复制JSON(期望)
@@ -213,7 +214,8 @@ export class 测试操作记录 {
         path: 路径副本,
         operator: 'deepEqual',
         expected: 期望副本,
-        notes: 说明 ?? null,
+        notes: 选项?.说明 ?? null,
+        ...(选项?.并入上一组 === undefined ? {} : { mergeWithPreviousAttachmentGroup: 选项.并入上一组 }),
         createdAt,
       }
       let entries = [...文档.entries]

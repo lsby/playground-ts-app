@@ -1,4 +1,4 @@
-import { JSON值 } from '../../../model/json-value'
+import { JSON值 } from '../../../model/data/json-value'
 import { 组件基类 } from '../../base/base'
 import { API管理器 } from '../../global/manager/api-manager'
 import { 创建元素 } from '../../global/tools/create-element'

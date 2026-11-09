@@ -86,35 +86,61 @@ export function 注册操作记录工具(
       path: z.array(z.union([z.string(), z.int().nonnegative()])),
       expected: z.json(),
       note: z.string().optional(),
+      mergeWithPreviousAttachmentGroup: z
+        .boolean()
+        .optional()
+        .describe(
+          'In the replay report, append the expected/actual text to the previous attachment page in the same step. Use true when the text explains the preceding evidence, such as a screenshot from a browser wait in the same exported step. By default, the assertion text gets its own page.',
+        ),
     }),
-    async ({ sourceId, path, expected, note }) => 直接返回({ id: await 记录.添加断言(sourceId, path, expected, note) }),
+    async ({ sourceId, path, expected, note, mergeWithPreviousAttachmentGroup }) =>
+      直接返回({
+        id: await 记录.添加断言(sourceId, path, expected, { 说明: note, 并入上一组: mergeWithPreviousAttachmentGroup }),
+      }),
   )
   注册(
     'record_export',
-    'Generate a new TypeScript requirement test under test/requirement from the selected record IDs, in the supplied order. Include the earlier tool call for every assertion. Describe how the selected steps prove the acceptance criterion in scenarioApproach. Use a new requirement name, scenario name and file name.',
-    z.strictObject({
-      ids: z.array(编号模型).min(1).describe('Operation and assertion IDs in the order to run.'),
-      fileName: z
-        .string()
-        .regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.ts$/u)
-        .describe('A lowercase kebab-case .ts file name.'),
-      requirementName: z.string().trim().min(1),
-      requirementDescription: z.string().trim().min(1).optional(),
-      acceptanceCriterion: z.string().trim().min(1).describe('What this test must prove.'),
-      scenarioName: z.string().trim().min(1),
-      scenarioApproach: z
-        .string()
-        .optional()
-        .describe('A brief overview of what you will do, what you will check, and what counts as passing.'),
-      conclusionNotes: z
-        .string()
-        .optional()
-        .describe(
-          'Coverage limits, setup choices, or other notes for the reader. The runner reports the actual result.',
-        ),
-    }),
+    'Generate a requirement test. Use steps for new exports and write concise Chinese business titles for the requirement, scenario, and every step. Combine consecutive calls that serve the same business action into one step. For example, opening the login page, filling credentials, submitting and waiting for navigation can be grouped as “管理员登录”. Keep distinct verification outcomes as separate observations, such as “确认重名提示” and “核对新账号权限”. Do not use tool names such as browser_fill as step titles. For asynchronous UI outcomes, record and replay a targeted browser_wait or browser_wait_url for the expected result. Use whole-page snapshots to explore the UI. Keep actions and checks in replay order, include the earlier tool call for each assertion, and omit exploratory calls unnecessary for replay. Describe how the steps prove the acceptance criterion in scenarioApproach.',
+    z
+      .strictObject({
+        steps: z
+          .array(
+            z.strictObject({
+              title: z.string().trim().min(1).describe('A concise Chinese title for the business action or check.'),
+              ids: z.array(编号模型).min(1).describe('Operation and assertion IDs for this step, in replay order.'),
+            }),
+          )
+          .min(1)
+          .optional()
+          .describe('Business steps in replay order. Include at least one observation group containing only checks.'),
+        ids: z
+          .array(编号模型)
+          .min(1)
+          .optional()
+          .describe('Legacy ungrouped export, with one step per record. Use steps for new exports.'),
+        fileName: z
+          .string()
+          .regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.ts$/u)
+          .describe('A lowercase kebab-case .ts file name.'),
+        requirementName: z.string().trim().min(1).describe('The requirement title in Chinese.'),
+        requirementDescription: z.string().trim().min(1).optional(),
+        acceptanceCriterion: z.string().trim().min(1).describe('What this test must prove.'),
+        scenarioName: z.string().trim().min(1).describe('The scenario title in Chinese.'),
+        scenarioApproach: z
+          .string()
+          .optional()
+          .describe('A brief overview of what you will do, what you will check, and what counts as passing.'),
+        conclusionNotes: z
+          .string()
+          .optional()
+          .describe(
+            'Coverage limits, setup choices, or other notes for the reader. The runner reports the actual result.',
+          ),
+      })
+      .refine(({ ids, steps }) => (ids === undefined) !== (steps === undefined), 'Provide either steps or ids.'),
     async ({
       ids,
+      steps,
       fileName,
       requirementName,
       requirementDescription,
@@ -124,7 +150,14 @@ export function 注册操作记录工具(
       conclusionNotes,
     }) => {
       let 说明 = { 测试思路: scenarioApproach, 结论补充: conclusionNotes } satisfies Required<流程说明>
-      let 条目们 = await Promise.all(ids.map((id) => 记录.获得(id)))
+      let 分组们 = steps ?? ids?.map((id) => ({ title: undefined, ids: [id] }))
+      if (分组们 === undefined) throw new Error('缺少导出步骤')
+      let 步骤组 = await Promise.all(
+        分组们.map(async ({ title, ids: 条目编号们 }) => ({
+          名称: title,
+          条目们: await Promise.all(条目编号们.map((id) => 记录.获得(id))),
+        })),
+      )
       let { 写出需求测试 } = await import('../requirement/export-file')
       let 路径 = await 写出需求测试(项目根目录, {
         文件名: fileName,
@@ -133,7 +166,7 @@ export function 注册操作记录工具(
         验收点描述: acceptanceCriterion,
         流程名称: scenarioName,
         ...说明,
-        条目们,
+        步骤组,
         测试地址: 获得测试地址(),
       })
       return 直接返回({ path: 路径, scenarioName })

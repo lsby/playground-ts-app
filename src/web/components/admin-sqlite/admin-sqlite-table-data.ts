@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { JSON值 } from '../../../model/json-value'
+import { JSON值 } from '../../../model/data/json-value'
 import { 组件基类 } from '../../base/base'
 import { API管理器 } from '../../global/manager/api-manager'
 import { 显示确认对话框 } from '../../global/manager/dialog-manager'

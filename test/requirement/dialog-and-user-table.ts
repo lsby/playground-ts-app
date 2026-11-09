@@ -16,28 +16,26 @@ function 比较文本(左值: string, 右值: string): number {
  */
 type 测试上下文 = { 工具: 需求测试工具 }
 
-let 验收 = new 验收点({ 描述: '用户可调整模态框尺寸并对用户表格排序和选择', 验收手段: '自动' })
+let 模态框尺寸 = new 验收点({ 描述: '模态框可最大化并恢复原尺寸，未指定尺寸时能自适应内容。', 验收手段: '自动' })
+let 表格排序 = new 验收点({ 描述: '用户表格支持名称和 ID 多列排序，实际行顺序符合排序设置。', 验收手段: '自动' })
+let 表格选择 = new 验收点({ 描述: '重新排序后，Shift 范围选择仍以原选中行为锚点。', 验收手段: '自动' })
 let 业务需求 = new 需求({
-  名称: '浮层与业务表格交互',
-  描述: '用户可调整模态框尺寸并对用户表格排序和选择。',
-  验收点们: [验收],
+  名称: '模态框尺寸与用户表格操作',
+  描述: '演示页的模态框可以调整尺寸，用户列表可以排序、选择和打开编辑操作。',
+  验收点们: [模态框尺寸, 表格排序, 表格选择],
 })
 
 class 浮层模态框与业务表格测试 extends 需求测试 {
   private static 获得主流程步骤(): (行为<测试上下文> | 观察<测试上下文>)[] {
     let 预期名称升序 = ['admin', 'sort-user-a', 'sort-user-b', 'sort-user-c']
     return [
-      new 行为<测试上下文>('打开登录页', async (当前状态): Promise<测试上下文> => {
+      new 行为<测试上下文>('登录并打开浮层示例', async (当前状态): Promise<测试上下文> => {
         let 引擎 = 当前状态.工具.浏览器.获得('主会话')
         await 引擎.导航('/demo/login.html')
         // 1. 核心原则：开场在测试第一秒立刻居中出现
         await 引擎.开场(
           '【测试用例】浮层模态框响应式布局与业务表格多维排序\n展示模态框的全屏最大化、还原与自适应尺寸，以及高交互业务表格的表头多列多重排序（方向与优先级）能力。',
         )
-        return 当前状态
-      }),
-      new 行为<测试上下文>('登录并进入浮层反馈', async (当前状态): Promise<测试上下文> => {
-        let 引擎 = 当前状态.工具.浏览器.获得('主会话')
         // 2. 前置准备：仅显示一次进入说明，随后快速就绪现场
         await 引擎.作用域(
           {
@@ -139,7 +137,7 @@ class 浮层模态框与业务表格测试 extends 需求测试 {
         await 引擎.点击(引擎.按角色('button', { name: '取消', exact: true }))
         return 当前状态
       }),
-      new 行为<测试上下文>('按名称升序排列', async (当前状态): Promise<测试上下文> => {
+      new 行为<测试上下文>('设置名称和 ID 多列排序', async (当前状态): Promise<测试上下文> => {
         let 引擎 = 当前状态.工具.浏览器.获得('主会话')
         let 名称表头 = 引擎.按角色('button', { name: '名称', exact: true })
         let 名称升序表头 = 引擎.按角色('button', { name: '名称 ▲1', exact: true })
@@ -147,19 +145,15 @@ class 浮层模态框与业务表格测试 extends 需求测试 {
         await 引擎.点击(名称表头)
         await 引擎.验证可见(名称升序表头)
         引擎.断言((await 浮层模态框与业务表格测试.读取用户表格行(引擎)).map((行) => 行.名称)).toEqual(预期名称升序)
-        return 当前状态
-      }),
-      new 行为<测试上下文>('添加 ID 二级排序', async (当前状态): Promise<测试上下文> => {
-        let 引擎 = 当前状态.工具.浏览器.获得('主会话')
         let ID表头 = 引擎.按角色('button', { name: 'ID', exact: true })
         await 引擎.说明('点击“ID”表头列，添加 ID 二级排序并保持名称为首要排序条件', ID表头)
         await 引擎.点击(ID表头)
-        await 引擎.验证可见(引擎.按角色('button', { name: '名称 ▲1', exact: true }))
+        await 引擎.验证可见(名称升序表头)
         await 引擎.验证可见(引擎.按角色('button', { name: 'ID ▲2', exact: true }))
         引擎.断言((await 浮层模态框与业务表格测试.读取用户表格行(引擎)).map((行) => 行.名称)).toEqual(预期名称升序)
         return 当前状态
       }),
-      new 行为<测试上下文>('切换名称降序', async (当前状态): Promise<测试上下文> => {
+      new 行为<测试上下文>('切换排序方向与首要列', async (当前状态): Promise<测试上下文> => {
         let 引擎 = 当前状态.工具.浏览器.获得('主会话')
         let 名称升序表头 = 引擎.按角色('button', { name: '名称 ▲1', exact: true })
         let 名称降序表头 = 引擎.按角色('button', { name: '名称 ▼1', exact: true })
@@ -172,22 +166,12 @@ class 浮层模态框与业务表格测试 extends 需求测试 {
           'sort-user-a',
           'admin',
         ])
-        return 当前状态
-      }),
-      new 行为<测试上下文>('移除名称排序并检查 ID 升序', async (当前状态): Promise<测试上下文> => {
-        let 引擎 = 当前状态.工具.浏览器.获得('主会话')
-        let 名称降序表头 = 引擎.按角色('button', { name: '名称 ▼1', exact: true })
         let ID升序表头 = 引擎.按角色('button', { name: 'ID ▲1', exact: true })
         await 引擎.说明('第三次点击名称表头移除该排序，使 ID 成为首要升序条件', 名称降序表头)
         await 引擎.点击(名称降序表头)
         await 引擎.验证可见(ID升序表头)
         let ID升序行 = await 浮层模态框与业务表格测试.读取用户表格行(引擎)
         引擎.断言(ID升序行.map((行) => 行.id)).toEqual([...ID升序行.map((行) => 行.id)].sort(比较文本))
-        return 当前状态
-      }),
-      new 行为<测试上下文>('切换 ID 降序', async (当前状态): Promise<测试上下文> => {
-        let 引擎 = 当前状态.工具.浏览器.获得('主会话')
-        let ID升序表头 = 引擎.按角色('button', { name: 'ID ▲1', exact: true })
         let ID降序表头 = 引擎.按角色('button', { name: 'ID ▼1', exact: true })
         await 引擎.说明('再次点击“ID ▲1”，验证数据行按 ID 降序重新排列', ID升序表头)
         await 引擎.点击(ID升序表头)
@@ -196,7 +180,7 @@ class 浮层模态框与业务表格测试 extends 需求测试 {
         引擎.断言(ID降序行.map((行) => 行.id)).toEqual([...ID降序行.map((行) => 行.id)].sort(比较文本).reverse())
         return 当前状态
       }),
-      new 行为<测试上下文>('检查排序后的范围选择', async (当前状态): Promise<测试上下文> => {
+      new 行为<测试上下文>('重新排序后用 Shift 选择范围', async (当前状态): Promise<测试上下文> => {
         let 引擎 = 当前状态.工具.浏览器.获得('主会话')
         let ID降序表头 = 引擎.按角色('button', { name: 'ID ▼1', exact: true })
         let 名称表头 = 引擎.按角色('button', { name: '名称', exact: true })
@@ -211,10 +195,14 @@ class 浮层模态框与业务表格测试 extends 需求测试 {
         await 引擎.点击(管理员行, { modifiers: ['Shift'] })
         return 当前状态
       }),
-      new 观察<测试上下文>('核验排序后的范围选择', async (当前状态): Promise<void> => {
+      new 观察<测试上下文>('核对选中的用户行', async (当前状态): Promise<void> => {
         let 引擎 = 当前状态.工具.浏览器.获得('主会话')
         let 用户表格 = 引擎.定位('lsby-table')
-        await 引擎.断言(引擎.定位('lsby-table tbody tr[aria-selected="true"]')).toHaveCount(3)
+        let 选中行 = 用户表格.getByRole('row', { selected: true })
+        await 引擎.断言(选中行).toHaveCount(3)
+        for (let 名称 of ['sort-user-b', 'sort-user-a', 'admin']) {
+          await 引擎.断言(选中行.getByRole('cell', { name: 名称, exact: true })).toBeVisible()
+        }
         let 选中数量 = await 用户表格.evaluate((元素): number => {
           if ('获得选中行键' in 元素 === false || typeof 元素.获得选中行键 !== 'function')
             throw new Error('表格未提供获得选中行键方法')
@@ -256,9 +244,11 @@ class 浮层模态框与业务表格测试 extends 需求测试 {
       [业务需求],
       [
         new 流程({
-          名称: '浮层与业务表格交互',
+          名称: '检查弹窗尺寸、表格排序与范围选择',
+          测试思路:
+            '先比较弹窗与视口的实际尺寸，再用固定账号检查表格排序。选择一行后重新排序，用 Shift 扩展范围并检查选中结果。',
           步骤们: 浮层模态框与业务表格测试.获得主流程步骤(),
-          覆盖验收点们: [验收],
+          覆盖验收点们: [模态框尺寸, 表格排序, 表格选择],
         }),
       ],
       { 使用测试服务: true },

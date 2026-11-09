@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { JSON值, JSON值模式 } from '../../../model/json-value'
+import { JSON值, JSON值模式 } from '../../../model/data/json-value'
 
 let 接口响应模式 = z.object({ status: z.enum(['success', 'fail', 'unexpected']), data: JSON值模式 }).strict()
 export type 标准接口响应 = { status: 'success' | 'fail' | 'unexpected'; data: JSON值 }

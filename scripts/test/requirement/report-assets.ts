@@ -20,7 +20,7 @@ export let 交互脚本 = `
     } catch { /* 当前页面仍可切换主题。 */ }
   })
 
-  let layout = document.querySelector('[data-initial-point]')
+  let layout = document.querySelector('.layout')
   let main = layout.querySelector('main')
   let directory = layout.querySelector('nav')
   let resizer = layout.querySelector('.directory-resizer')
@@ -65,7 +65,12 @@ export let 交互脚本 = `
   let requirementGroups = [...document.querySelectorAll('[data-requirement-group]')]
   let pointGroups = [...document.querySelectorAll('[data-acceptance-group]')]
   let flows = [...document.querySelectorAll('[data-flow]')]
-  let links = [...document.querySelectorAll('[data-acceptance]')]
+  let panels = [...requirements, ...points, ...flows]
+  let noSelection = main.querySelector('[data-no-selection]')
+  let currentPanel = null
+  let stepResets = new Map()
+  let links = [...document.querySelectorAll('[data-requirement-target], [data-acceptance]')]
+  let directoryLinks = links.filter(link => directory.contains(link))
   function setPointOpen(group, open) {
     for (let item of open ? pointGroups : [group]) {
       let expanded = open && item === group
@@ -77,39 +82,44 @@ export let 交互脚本 = `
     let toggle = group.querySelector('.point-toggle')
     toggle.onclick = () => setPointOpen(group, toggle.getAttribute('aria-expanded') === 'false')
   }
-  function showPoint(id, flowId) {
-    let selected = points.find(point => point.id === id)
-    if (!selected) return null
-    let flowIds = selected.dataset.flowIds.split(' ')
-    if (flowId !== undefined && !flowIds.includes(flowId)) return null
-    let group = requirementGroups.find(group => group.dataset.requirementGroup === selected.dataset.requirementId)
+  function showPanel(selected, path) {
+    for (let panel of panels) panel.hidden = panel !== selected
+    noSelection.hidden = selected !== null
+    for (let link of directoryLinks) {
+      if (link.hash === '#' + path) link.setAttribute('aria-current', 'true')
+      else link.removeAttribute('aria-current')
+    }
+    if (selected !== currentPanel) {
+      for (let workspace of selected?.querySelectorAll('[data-step-workspace]') ?? []) stepResets.get(workspace)()
+      currentPanel = selected
+    }
+    main.scrollTop = 0
+  }
+  function showSelection(path) {
+    let [id, flowId, extra] = path.split('/')
+    if (extra !== undefined) return false
+    let point = points.find(point => point.id === id)
+    let requirementId = point?.dataset.requirementId ?? id
+    if (!requirements.some(requirement => requirement.id === requirementId)) return false
+    if (flowId !== undefined && !point?.dataset.flowIds.split(' ').includes(flowId)) return false
+    let selected = panels.find(panel => panel.id === (flowId ?? id))
+    if (selected === undefined) return false
+    let group = requirementGroups.find(group => group.dataset.requirementGroup === requirementId)
     if (group) group.open = true
     let pointGroup = pointGroups.find(group => group.dataset.acceptanceGroup === id)
     if (pointGroup) setPointOpen(pointGroup, true)
-    for (let point of points) point.hidden = flowId !== undefined || point !== selected
-    for (let requirement of requirements) requirement.hidden = flowId !== undefined || requirement.id !== selected.dataset.requirementId
-    for (let flow of flows) flow.hidden = flow.id !== flowId
-    for (let link of links) {
-      if (link.dataset.acceptance === id && link.dataset.flowTarget === flowId)
-        link.setAttribute('aria-current', 'true')
-      else link.removeAttribute('aria-current')
-    }
-    main.scrollTop = 0
-    return selected
+    showPanel(selected, path)
+    return true
   }
   function showFromHash() {
-    let [id, flowId] = location.hash.slice(1).split('/')
-    let selected = showPoint(id, flowId)
-    if (!selected) showPoint(layout.dataset.initialPoint)
+    if (!showSelection(location.hash.slice(1))) showPanel(null, '')
   }
   for (let link of links) {
     link.addEventListener('click', event => {
       if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
       event.preventDefault()
-      let { acceptance, flowTarget } = link.dataset
-      if (!showPoint(acceptance, flowTarget)) return
-      let hash = '#' + acceptance + (flowTarget === undefined ? '' : '/' + flowTarget)
-      if (location.hash !== hash) history.pushState(null, '', hash)
+      if (!showSelection(link.hash.slice(1))) return
+      if (location.hash !== link.hash) history.pushState(null, '', link.hash)
     })
   }
   for (let workspace of document.querySelectorAll('[data-step-workspace]')) {
@@ -141,12 +151,18 @@ export let 交互脚本 = `
     for (let [index, button] of buttons.entries()) button.onclick = () => selectStep(index)
     previous.onclick = () => selectStep(current - 1)
     next.onclick = () => selectStep(current + 1)
+    stepResets.set(workspace, () => {
+      selectStep(0)
+      timeline.scrollTop = 0
+      panels.scrollTop = 0
+    })
   }
   let dialog = document.querySelector('[data-image-dialog]')
   let fullImage = dialog.querySelector('[data-full-image]')
   let imageTitle = dialog.querySelector('[data-image-title]')
   let dialogControls = dialog.querySelector('[data-gallery-controls]')
   let dialogGallery = null
+  let dialogImageButton = null
   let backdropPointer = null
 
   function onBackdrop(event) {
@@ -172,58 +188,71 @@ export let 交互脚本 = `
     root.querySelector('[data-prev]').setAttribute('aria-disabled', String(index === 0))
     root.querySelector('[data-next]').setAttribute('aria-disabled', String(index === count - 1))
   }
-  function showFullImage(frame, index, count) {
-    let image = frame.querySelector('img')
+  function showFullImage(button, index, count) {
+    dialogImageButton = button
+    let image = button.querySelector('img')
     imageTitle.textContent = image.alt
     fullImage.alt = image.alt
     fullImage.src = image.src
     dialogControls.hidden = count === 1
     updateControls(dialogControls, index, count)
   }
+  function showGalleryPage(gallery, frames, index) {
+    for (let [position, frame] of frames.entries()) frame.hidden = position !== index
+    if (frames.length > 1) updateControls(gallery, index, frames.length)
+  }
   function moveGallery(gallery, direction) {
-    if (gallery === null) return
     let frames = [...gallery.querySelectorAll('[data-frame]')]
     let index = frames.findIndex(frame => !frame.hidden)
     let nextIndex = index + direction
     if (nextIndex < 0 || nextIndex >= frames.length) return
-    let current = frames[index]
-    let next = frames[nextIndex]
-    let focusOnImage = current.contains(document.activeElement)
-    current.hidden = true
-    next.hidden = false
-    updateControls(gallery, nextIndex, frames.length)
-    if (focusOnImage) next.querySelector('[data-zoom]').focus({ preventScroll: true })
-    if (dialogGallery === gallery) showFullImage(next, nextIndex, frames.length)
+    let focusInPage = frames[index].contains(document.activeElement)
+    showGalleryPage(gallery, frames, nextIndex)
+    if (focusInPage) {
+      let target = frames[nextIndex].querySelector('[data-zoom]') ?? gallery.querySelector('[data-next]')
+      target.focus({ preventScroll: true })
+    }
   }
-  function connectGalleryControls(root, getGallery) {
+  function moveFullImage(direction) {
+    if (dialogGallery === null) return
+    let buttons = [...dialogGallery.querySelectorAll('[data-zoom]')]
+    let index = buttons.indexOf(dialogImageButton) + direction
+    if (index < 0 || index >= buttons.length) return
+    let button = buttons[index]
+    let frames = [...dialogGallery.querySelectorAll('[data-frame]')]
+    showGalleryPage(dialogGallery, frames, frames.indexOf(button.closest('[data-frame]')))
+    showFullImage(button, index, buttons.length)
+  }
+  function connectGalleryControls(root, move) {
     let controls = root.querySelector('[data-gallery-controls]')
     if (!controls) return
-    controls.querySelector('[data-prev]').onclick = () => moveGallery(getGallery(), -1)
-    controls.querySelector('[data-next]').onclick = () => moveGallery(getGallery(), 1)
+    controls.querySelector('[data-prev]').onclick = () => move(-1)
+    controls.querySelector('[data-next]').onclick = () => move(1)
     root.onkeydown = event => {
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
       event.preventDefault()
       if (root === dialog) fullImage.focus({ preventScroll: true })
-      moveGallery(getGallery(), event.key === 'ArrowLeft' ? -1 : 1)
+      move(event.key === 'ArrowLeft' ? -1 : 1)
     }
   }
   for (let gallery of document.querySelectorAll('[data-gallery]')) {
-    let frames = [...gallery.querySelectorAll('[data-frame]')]
-    connectGalleryControls(gallery, () => gallery)
-    for (let [index, frame] of frames.entries()) {
-      frame.querySelector('[data-zoom]').onclick = () => {
+    let buttons = [...gallery.querySelectorAll('[data-zoom]')]
+    connectGalleryControls(gallery, direction => moveGallery(gallery, direction))
+    for (let [index, button] of buttons.entries()) {
+      button.onclick = () => {
         dialogGallery = gallery
-        showFullImage(frame, index, frames.length)
+        showFullImage(button, index, buttons.length)
         dialog.showModal()
       }
     }
   }
-  connectGalleryControls(dialog, () => dialogGallery)
+  connectGalleryControls(dialog, moveFullImage)
   dialog.onclose = () => {
     backdropPointer = null
     fullImage.removeAttribute('src')
-    dialogGallery?.querySelector('[data-frame]:not([hidden]) [data-zoom]').focus({ preventScroll: true })
+    dialogImageButton?.focus({ preventScroll: true })
+    dialogImageButton = null
     dialogGallery = null
   }
   addEventListener('hashchange', showFromHash)
@@ -246,40 +275,44 @@ header{background:light-dark(#183d34,#122c23);color:light-dark(#fff,#e5f0ea)}
 .layout{--directory-width:310px;flex:1;min-height:0;width:min(100%,1440px);margin:0 auto;padding:28px 36px 24px;display:grid;grid-template-columns:var(--directory-width) 16px minmax(0,1fr);gap:4px}
 .surface{background:light-dark(#fff,#1a2621);border:1px solid light-dark(#dbe4df,#35483f);border-radius:12px}
 .nav,.layout main{min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
-.nav{--directory-line:light-dark(#aebfb7,#587265)}
+.nav{--directory-line:light-dark(#aebfb7,#587265);--directory-row-mid:14px;--point-toggle-width:22px;--point-toggle-center:calc(var(--point-toggle-width) / 2);font-size:13px;font-weight:400}
 .directory-resizer{display:grid;place-items:center;cursor:col-resize;touch-action:none;border-radius:5px}
 .directory-resizer::before{content:"";width:2px;height:100%;background:light-dark(#cbd8d1,#40564c);border-radius:2px}
 .directory-resizer:hover::before,.directory-resizer:focus-visible::before{background:light-dark(#367b68,#7bc7a8)}
 .directory-resizer:focus-visible{outline:2px solid light-dark(#367b68,#7bc7a8);outline-offset:-2px}
-.navhead{padding:21px 19px 13px}
+.navhead{padding:14px 19px 8px}
 .label{font-size:12px;letter-spacing:.1em;font-weight:700;color:light-dark(#526d63,#a8c6b8)}
-.requirement-group{margin:0 12px 8px}
-.requirement{position:relative;padding:8px 10px;display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;gap:9px;font-size:15px;font-weight:700;cursor:pointer;list-style:none}
+.requirement-group{margin:0 12px 2px}
+.requirement{position:relative;min-height:28px;padding:4px 10px;display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;gap:9px;cursor:pointer;list-style:none}
 .requirement::-webkit-details-marker{display:none}
+.requirement-name{color:inherit;text-decoration:none}
+.requirement:has(.requirement-name[aria-current=true]){border-radius:5px;background:light-dark(#e8f4ed,#254838)}
 .requirement::before{content:"";width:6px;height:6px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(-45deg)}
 .requirement-group[open]>.requirement::before{transform:rotate(45deg)}
 .requirement-group[open]>.requirement::after,.point-row:has(.point-toggle[aria-expanded=true])::after{content:"";position:absolute;left:13px;top:calc(50% + 6px);bottom:0;border-left:1px solid var(--directory-line);pointer-events:none}
+.point-row:has(.point-toggle[aria-expanded=true])::after{left:var(--point-toggle-center)}
 .point-count{color:light-dark(#60736b,#a6bfb4);font-size:12px;font-weight:400;white-space:nowrap}
 .requirement-meta{display:flex;align-items:center;gap:7px}
 .nav .directory-status{display:block;width:8px;height:8px;border-radius:50%;background:currentColor}
-.points,.flow-links{--branch-indent:16px;margin:0 0 0 13px;padding:0 0 0 var(--branch-indent)}
+.points,.flow-links{margin:0 0 0 13px;padding:0 0 0 var(--branch-indent)}
+.points{--branch-indent:10px}
+.flow-links{--branch-indent:23px;margin-left:var(--point-toggle-center)}
 .point-group,.flow-links>li{position:relative;min-width:0}
 :is(.point-group,.flow-links>li)::before,:is(.point-group,.flow-links>li)::after{content:"";position:absolute;left:calc(-1 * var(--branch-indent));pointer-events:none}
 :is(.point-group,.flow-links>li)::before{top:0;bottom:0;border-left:1px solid var(--directory-line)}
-:is(.point-group,.flow-links>li):last-child::before{bottom:auto;height:16px}
-:is(.point-group,.flow-links>li)::after{top:16px;width:var(--branch-indent);border-top:1px solid var(--directory-line)}
-.point-row{position:relative;display:grid;grid-template-columns:26px minmax(0,1fr);align-items:center;gap:2px;min-height:32px}
-.point-toggle{display:grid;place-items:center;width:26px;height:28px;border:0;border-radius:5px;background:transparent;color:inherit;cursor:pointer}
+:is(.point-group,.flow-links>li):last-child::before{bottom:auto;height:var(--directory-row-mid)}
+:is(.point-group,.flow-links>li)::after{top:var(--directory-row-mid);width:var(--branch-indent);border-top:1px solid var(--directory-line)}
+.point-row{position:relative;display:grid;grid-template-columns:var(--point-toggle-width) minmax(0,1fr);align-items:center;min-height:28px}
+.point-toggle{display:grid;place-items:center;width:var(--point-toggle-width);height:28px;border:0;border-radius:5px;background:transparent;color:inherit;cursor:pointer}
 .point-toggle::before{content:"";width:5px;height:5px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(-45deg)}
 .point-toggle[aria-expanded=true]::before{transform:rotate(45deg)}
-.point{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;text-align:left;border:1px solid transparent;border-radius:8px;background:light-dark(#fff,#1a2621);padding:4px 7px;color:light-dark(#263c33,#daece2);text-decoration:none}
+.point{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;text-align:left;border:1px solid transparent;border-radius:5px;background:light-dark(#fff,#1a2621);padding:3px 7px 3px 1px;color:light-dark(#263c33,#daece2);text-decoration:none}
 .point:hover{background:light-dark(#f4f8f5,#293b32)}
 .point[aria-current=true]{background:light-dark(#e8f4ed,#254838);border-color:light-dark(#a4c9b6,#527e69)}
 .flow-links{list-style:none}
-.flow-link{display:block;min-height:32px;padding:6px 7px;border-radius:5px;font-size:12px;color:inherit;text-decoration:none}
-.requirement-name,.point-name,.flow-link{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.flow-link{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-height:28px;padding:4px 7px;border-radius:5px;color:inherit;text-decoration:none}
+.requirement-name,.point-name,.flow-link .flow-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .flow-link:hover,.flow-link[aria-current=true]{background:light-dark(#e8f4ed,#254838)}
-.flow-link[aria-current=true]{font-weight:650}
 .muted{color:light-dark(#52665e,#b5c9bf)}
 .navfoot{border-top:1px solid light-dark(#e2e9e5,#35483f);padding:15px 18px;font-size:12px;color:light-dark(#52665e,#b5c9bf)}
 .layout main{min-width:0}
@@ -287,6 +320,12 @@ header{background:light-dark(#183d34,#122c23);color:light-dark(#fff,#e5f0ea)}
 h1{margin:4px 0 6px;font-size:29px;line-height:1.27;letter-spacing:-.015em}
 p{margin:0}
 .stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.report-description{color:light-dark(#52665e,#b5c9bf)}
+.report-related{margin-top:16px;padding-top:12px;border-top:1px solid light-dark(#dbe4df,#35483f)}
+.report-related h2,.report-related h3{margin:0 0 6px;font-size:15px}
+.report-related ul{list-style:none;margin:0;padding:0}
+.report-related li{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:5px 0}
+.report-link{color:light-dark(#17664a,#a9e7c9);text-underline-offset:3px;overflow-wrap:anywhere}
 .badge{display:inline-flex;align-items:center;gap:5px;border-radius:6px;padding:3px 8px;font-size:12px;line-height:1.35;font-weight:650;white-space:nowrap}
 .ok{color:light-dark(#155e43,#a9e7c9);background:light-dark(#e1f2e8,#234837)}
 .manual{color:light-dark(#765118,#f3d094);background:light-dark(#fff2d8,#463720)}
@@ -311,9 +350,7 @@ p{margin:0}
 .step button{display:grid;width:100%;grid-template-columns:28px minmax(0,1fr);align-items:start;gap:8px;padding:7px 5px;text-align:left;color:inherit;background:transparent;border:1px solid transparent;border-radius:6px;cursor:pointer;overflow-wrap:anywhere}
 .step button:hover,.step button[aria-current=step]{background:light-dark(#e8f4ed,#254838)}
 .step .type{display:block;font-size:12px;color:light-dark(#516d61,#a9c6b8)}
-.observe .type{color:light-dark(#216e51,#9ddcbd)}
 .num{display:grid;place-items:center;width:28px;height:28px;background:light-dark(#eff3f1,#25372e);border:1px solid light-dark(#dbe4df,#35483f);border-radius:50%;font-size:12px;color:light-dark(#4a675a,#b4cebf);font-variant-numeric:tabular-nums}
-.observe .num{background:light-dark(#e5f3eb,#254838);color:light-dark(#17664a,#a7e2c6);border-color:light-dark(#b9d9c9,#527e69)}
 .step-evidence{display:grid;grid-template-rows:minmax(0,1fr) auto;min-width:0;min-height:0;border:1px solid light-dark(#dbe4df,#35483f);border-radius:8px}
 .step-panels{overflow:auto;padding:12px;min-width:0}
 .stepmeta{display:flex;gap:8px;align-items:start;justify-content:space-between;margin-bottom:4px}
@@ -324,6 +361,7 @@ p{margin:0}
 .step-pagination button[aria-disabled=true]{opacity:.45;cursor:default}
 .step-attachments{display:grid;gap:8px;margin-top:9px;background:light-dark(#f4faf6,#1d3228);border:1px solid light-dark(#d4e7dc,#395e4d);border-radius:8px;padding:10px 12px}
 .step-attachments p{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.gallery-page:not([hidden]){display:grid;gap:8px}
 .step-log summary{cursor:pointer;font-weight:600}
 .step-log p{margin-top:6px;max-height:16rem;overflow:auto}
 .step-image{display:block;width:min(65%,420px);padding:0;border:0;background:none;border-radius:6px;cursor:zoom-in}
@@ -345,7 +383,6 @@ p{margin:0}
 .plan-steps{margin:14px 25px 0;font-size:14px}
 .attachments{border-top:1px solid light-dark(#e3ebe6,#35483f);padding:14px 25px;color:light-dark(#597165,#a8beb3);font-size:12px}
 .attachments p{margin-top:7px}
-.foot{margin:13px 2px 0;color:light-dark(#5c7166,#a8beb3);font-size:12px}
 @media(max-width:850px){.layout{--directory-width:220px;padding:16px}
 .bar{padding:0 16px}
 .flowhead,.hero,.pointcard,.flow-conclusion{padding-left:16px;padding-right:16px}

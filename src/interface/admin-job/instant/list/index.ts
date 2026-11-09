@@ -11,7 +11,7 @@ import { Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
 import { 全局资源 } from '../../../../global/global'
 import { 检查管理员登录 } from '../../../../interface-logic/check/check-login-jwt-admin'
-import { JSON值模式 } from '../../../../model/json-value'
+import { JSON值模式 } from '../../../../model/data/json-value'
 
 let 接口路径 = '/api/admin-job/instant/list' as const
 let 接口方法 = 'post' as const
