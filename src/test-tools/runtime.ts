@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import type { 浏览器测试模式 } from '../model/browser-test'
 import type {
   提交步骤附件,
+  流程步骤附件,
   测试数据库值,
   测试服务日志内容,
   需求测试工具,
@@ -73,10 +74,8 @@ export class 测试运行工具 {
         let 服务 = this.参数.服务
         if (服务 !== undefined && 日志起点 !== undefined) {
           let 日志 = 服务.读取日志(日志起点)
-          if (日志.标准输出.trim() !== '')
-            this.记录文本(步骤, () => `后端日志（stdout，步骤期间收到）\n${日志.标准输出}`)
-          if (日志.错误输出.trim() !== '')
-            this.记录文本(步骤, () => `后端日志（stderr，步骤期间收到）\n${日志.错误输出}`)
+          if (日志.标准输出.trim() !== '') this.记录文本(步骤, () => 日志.标准输出, 'stdout')
+          if (日志.错误输出.trim() !== '') this.记录文本(步骤, () => 日志.错误输出, 'stderr')
         }
         步骤.已结束 = true
       }
@@ -114,9 +113,18 @@ export class 测试运行工具 {
     return 服务.读取日志(日志起点)
   }
 
-  private 记录文本(步骤: 步骤取证, 生成文本: () => string): void {
+  private 记录文本(
+    步骤: 步骤取证,
+    生成文本: () => string,
+    日志流?: Extract<流程步骤附件, { 类型: '文本' }>['日志流'],
+  ): void {
     try {
-      步骤.提交([{ 类型: '文本', 内容: 生成文本() }])
+      let 文本 = 生成文本()
+      步骤.提交([
+        日志流 === undefined
+          ? { 类型: '文本', 内容: 文本 }
+          : { 类型: '文本', 日志流, 内容: `后端日志（${日志流}，步骤期间收到）\n${文本}` },
+      ])
     } catch (错误) {
       步骤.记录错误(错误)
     }

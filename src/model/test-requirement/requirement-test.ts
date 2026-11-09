@@ -6,7 +6,7 @@ export type 需求测试上下文<业务数据 extends object = object> = 业务
 export type 需求测试运行参数 = 流程运行配置 & { 工具: 需求测试工具 }
 export type 需求测试附件 = { 名称: string; 路径: string; 内容类型?: string | undefined }
 export type 需求测试结果 = Omit<流程运行描述<object>, '流程' | '最终状态'>
-export type 需求测试流程 = Pick<流程<object>, '获得名称' | '获得覆盖验收点们' | '包含人工验收'> & {
+export type 需求测试流程 = Pick<流程<object>, '获得名称' | '获得说明' | '获得覆盖验收点们' | '包含人工验收'> & {
   获得步骤们: () => readonly 流程步骤[]
 }
 

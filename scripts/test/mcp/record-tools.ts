@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod-mcp'
 
+import type { 流程说明 } from '../../../src/model/test-requirement'
 import type { 测试操作记录 } from '../../../src/test-tools/operation-record'
 import { 项目根目录 } from '../../task/model/task-common'
 import { 创建工具注册器, 直接返回 } from './register-tool'
@@ -90,7 +91,7 @@ export function 注册操作记录工具(
   )
   注册(
     'record_export',
-    'Generate a new TypeScript requirement test under test/requirement from the selected record IDs, in the supplied order. Include the earlier tool call for every assertion. Use a new requirement name, scenario name and file name.',
+    'Generate a new TypeScript requirement test under test/requirement from the selected record IDs, in the supplied order. Include the earlier tool call for every assertion. Describe how the selected steps prove the acceptance criterion in scenarioApproach. Use a new requirement name, scenario name and file name.',
     z.strictObject({
       ids: z.array(编号模型).min(1).describe('Operation and assertion IDs in the order to run.'),
       fileName: z
@@ -101,8 +102,28 @@ export function 注册操作记录工具(
       requirementDescription: z.string().trim().min(1).optional(),
       acceptanceCriterion: z.string().trim().min(1).describe('What this test must prove.'),
       scenarioName: z.string().trim().min(1),
+      scenarioApproach: z
+        .string()
+        .optional()
+        .describe('A brief overview of what you will do, what you will check, and what counts as passing.'),
+      conclusionNotes: z
+        .string()
+        .optional()
+        .describe(
+          'Coverage limits, setup choices, or other notes for the reader. The runner reports the actual result.',
+        ),
     }),
-    async ({ ids, fileName, requirementName, requirementDescription, acceptanceCriterion, scenarioName }) => {
+    async ({
+      ids,
+      fileName,
+      requirementName,
+      requirementDescription,
+      acceptanceCriterion,
+      scenarioName,
+      scenarioApproach,
+      conclusionNotes,
+    }) => {
+      let 说明 = { 测试思路: scenarioApproach, 结论补充: conclusionNotes } satisfies Required<流程说明>
       let 条目们 = await Promise.all(ids.map((id) => 记录.获得(id)))
       let { 写出需求测试 } = await import('../requirement/export-file')
       let 路径 = await 写出需求测试(项目根目录, {
@@ -111,6 +132,7 @@ export function 注册操作记录工具(
         ...(requirementDescription === undefined ? {} : { 需求描述: requirementDescription }),
         验收点描述: acceptanceCriterion,
         流程名称: scenarioName,
+        ...说明,
         条目们,
         测试地址: 获得测试地址(),
       })

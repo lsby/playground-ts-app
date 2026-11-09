@@ -69,7 +69,13 @@ export class 需求 {
 
 export let 流程步骤附件列表模型 = z
   .discriminatedUnion('类型', [
-    z.object({ 类型: z.literal('文本'), 内容: z.string().trim().min(1) }).strict(),
+    z
+      .object({
+        类型: z.literal('文本'),
+        内容: z.string().trim().min(1),
+        日志流: z.enum(['stdout', 'stderr']).optional(),
+      })
+      .strict(),
     z
       .object({
         类型: z.literal('图片'),
@@ -147,24 +153,32 @@ export class 状态<系统状态 extends object> {
   }
 }
 
+let 流程说明文本模型 = z.string().trim().min(1).optional()
+export let 流程说明模型 = z.object({ 测试思路: 流程说明文本模型, 结论补充: 流程说明文本模型 })
+export type 流程说明 = z.infer<typeof 流程说明模型>
+
 /**
  * 流程是为了证明一组验收点而声明的有序运行过程。
  * 它持有名称、行为或观察步骤以及目标验收点，并能识别自己是否需要人工验收。
  */
 export class 流程<系统状态 extends object> {
   private readonly 名称: string
+  private readonly 说明: 流程说明
   private readonly 步骤们: ReadonlyArray<行为<系统状态> | 观察<系统状态>>
   private readonly 覆盖验收点们: readonly 验收点[]
   private readonly 选择结果值: 选择结果 | undefined
   private readonly 选择条件们: readonly 选择条件[]
-  public constructor(参数: {
-    名称: string
-    步骤们: ReadonlyArray<行为<系统状态> | 观察<系统状态>>
-    覆盖验收点们: readonly 验收点[]
-    选择结果?: 选择结果 | undefined
-    选择条件们?: readonly 选择条件[] | undefined
-  }) {
+  public constructor(
+    参数: 流程说明 & {
+      名称: string
+      步骤们: ReadonlyArray<行为<系统状态> | 观察<系统状态>>
+      覆盖验收点们: readonly 验收点[]
+      选择结果?: 选择结果 | undefined
+      选择条件们?: readonly 选择条件[] | undefined
+    },
+  ) {
     this.名称 = 解析领域文本('流程名称', 参数.名称)
+    this.说明 = 流程说明模型.parse(参数)
     if (参数.步骤们.length === 0 || 参数.步骤们.some((步骤) => 步骤 instanceof 观察) === false)
       throw new Error(`流程“${this.名称}”至少需要一个观察`)
     if (参数.覆盖验收点们.length === 0 || new Set(参数.覆盖验收点们).size !== 参数.覆盖验收点们.length)
@@ -179,6 +193,9 @@ export class 流程<系统状态 extends object> {
   }
   public 获得名称(): string {
     return this.名称
+  }
+  public 获得说明(): 流程说明 {
+    return { ...this.说明 }
   }
   public 获得步骤们(): ReadonlyArray<行为<系统状态> | 观察<系统状态>> {
     return [...this.步骤们]

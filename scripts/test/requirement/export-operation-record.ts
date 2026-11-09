@@ -1,7 +1,8 @@
+import { 流程说明模型, type 流程说明 } from '../../../src/model/test-requirement'
 import type { JSON值, 操作断言条目, 操作记录条目, 操作调用条目 } from '../../../src/test-tools/operation-record'
 import { 生成调用代码, 生成重放地址, type 重放地址配置 } from './operation-code'
 
-type 导出参数 = {
+type 导出参数 = 流程说明 & {
   需求名称: string
   需求描述?: string
   验收点描述: string
@@ -93,6 +94,9 @@ export function 生成需求测试代码(参数: 导出参数): string {
   let 流程名称 = 参数.流程名称.trim()
   if (需求名称 === '' || 需求描述 === '' || 验收点描述 === '' || 流程名称 === '')
     throw new Error('需求名称、需求描述、验收点描述和流程名称均需非空')
+  let 流程说明代码 = Object.entries(流程说明模型.parse(参数)).flatMap(([字段, 值]) =>
+    值 === undefined ? [] : [`  ${代码字面量(字段)}: ${代码字面量(值)},`],
+  )
   if (参数.条目们.length === 0) throw new Error('没有选中可导出的操作记录')
   let 断言来源们 = 验证所选条目(参数.条目们)
   let 有断言 = 断言来源们.size > 0
@@ -162,6 +166,7 @@ export function 生成需求测试代码(参数: 导出参数): string {
     '',
     'let 业务流程 = new 流程<测试上下文>({',
     `  名称: ${代码字面量(流程名称)},`,
+    ...流程说明代码,
     '  步骤们: [',
     ...步骤们.map(生成步骤),
     '  ],',
