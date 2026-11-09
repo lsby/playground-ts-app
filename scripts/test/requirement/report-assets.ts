@@ -328,7 +328,7 @@ p{margin:0}
 .report-link{color:light-dark(#17664a,#a9e7c9);text-underline-offset:3px;overflow-wrap:anywhere}
 .badge{display:inline-flex;align-items:center;gap:5px;border-radius:6px;padding:3px 8px;font-size:12px;line-height:1.35;font-weight:650;white-space:nowrap}
 .ok{color:light-dark(#155e43,#a9e7c9);background:light-dark(#e1f2e8,#234837)}
-.manual{color:light-dark(#765118,#f3d094);background:light-dark(#fff2d8,#463720)}
+.interrupted{color:light-dark(#765118,#f3d094);background:light-dark(#fff2d8,#463720)}
 .neutral{color:light-dark(#475f55,#c2d6ca);background:light-dark(#edf2ef,#32443b)}
 .pointcard{padding:19px 25px;margin-bottom:16px;border-left:4px solid light-dark(#43886c,#6bba98)}
 .pointcard.pendingbar{border-left-color:light-dark(#be8a3d,#d0a65e)}

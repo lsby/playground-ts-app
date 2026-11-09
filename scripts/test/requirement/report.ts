@@ -36,16 +36,16 @@ type 报告参数 = {
   基础设施错误们: readonly string[]
   中断码: number | undefined
 }
-type 验收状态 = '已证明' | '待人工' | '未证明' | '未执行'
+type 验收状态 = '已证明' | '未证明' | '未执行'
 type 目录流程 = { id: string; 测试: 需求测试登记; 状态: 需求测试结果['状态'] | '未执行' }
 type 验收目录项 = { id: string; 点: 验收点; 状态: 验收状态; 关联流程们: readonly 目录流程[] }
 type 步骤记录 = 需求测试结果['步骤们'][number]
-type 标记样式 = 'ok' | 'manual' | 'neutral' | 'fail'
+type 标记样式 = 'ok' | 'interrupted' | 'neutral' | 'fail'
 type 报告摘要 = { 通过数: number; 失败数: number; 中断数: number; 未执行数: number }
 let 流程状态样式: Record<需求测试结果['状态'] | '未执行', 标记样式> = {
   通过: 'ok',
   失败: 'fail',
-  中断: 'manual',
+  中断: 'interrupted',
   未执行: 'neutral',
 }
 
@@ -66,8 +66,6 @@ function 验收状态样式(状态: 验收状态): 标记样式 {
   switch (状态) {
     case '已证明':
       return 'ok'
-    case '待人工':
-      return 'manual'
     case '未证明':
       return 'fail'
     case '未执行':
@@ -76,8 +74,7 @@ function 验收状态样式(状态: 验收状态): 标记样式 {
 }
 
 function 目录状态标记(状态: 验收状态 | 需求测试结果['状态'], 样式: 标记样式): string {
-  let 名称 = 状态 === '待人工' ? '需要人工' : 状态
-  return `<span class="directory-status ${样式}" role="img" aria-label="${名称}" title="${名称}"></span>`
+  return `<span class="directory-status ${样式}" role="img" aria-label="${状态}" title="${状态}"></span>`
 }
 
 function 生成关联流程链接(条目: 验收目录项, 目录中: boolean): string {
@@ -148,7 +145,7 @@ function 生成步骤Html(id: string, 步骤们: readonly 步骤记录[]): strin
   for (let [序号, 步骤] of 步骤们.entries()) {
     let 观察 = 步骤.类型 === '观察'
     let 状态 = 步骤.状态 === '通过' && 观察 === false ? '已执行' : 步骤.状态
-    let 样式 = 步骤.状态 === '失败' ? ' fail' : 步骤.状态 === '中断' ? ' manual' : ''
+    let 样式 = 步骤.状态 === '失败' ? ' fail' : 步骤.状态 === '中断' ? ' interrupted' : ''
     let 耗时 = 步骤.状态 === '未执行' ? '' : ` · ${格式化耗时(步骤.耗时毫秒)}`
     let 错误 = 步骤.状态 === '未执行' || 步骤.错误 === undefined ? '' : 生成错误Html(步骤.错误)
     let 取证错误们 =
@@ -295,7 +292,6 @@ function 生成报告Html(报告目录: string, 参数: 报告参数, 摘要: �
         .filter((结果) => 结果 !== undefined)
       let 状态: 验收状态 = '未执行'
       if (关联结果们.some((结果) => 结果.证明验收点们.includes(点))) 状态 = '已证明'
-      else if (点.需要人工验收()) 状态 = '待人工'
       else if (关联结果们.length > 0) 状态 = '未证明'
       点索引.set(点, { id: `acceptance-${String(索引)}`, 点, 状态, 关联流程们 })
     }
@@ -304,8 +300,8 @@ function 生成报告Html(报告目录: string, 参数: 报告参数, 摘要: �
   let 导航: string[] = []
   let 需求卡片: string[] = []
   let 验收卡片: string[] = []
-  let 状态组: readonly 验收状态[] = ['已证明', '未证明', '待人工', '未执行']
-  let 目录优先级: readonly 验收状态[] = ['未证明', '待人工', '未执行']
+  let 状态组: readonly 验收状态[] = ['已证明', '未证明', '未执行']
+  let 目录优先级: readonly 验收状态[] = ['未证明', '未执行']
   for (let [序号, 需求] of 需求们.entries()) {
     let id = `requirement-${String(序号 + 1)}`
     let 名称 = 转义Html(需求.获得名称())
@@ -322,14 +318,9 @@ function 生成报告Html(报告目录: string, 参数: 报告参数, 摘要: �
           <ul class="flow-links" id="${条目.id}-flows" hidden>${生成关联流程链接(条目, true)}</ul></div>`
       })
       .join('')
-    let 状态计数: Record<验收状态, number> = { 已证明: 0, 未证明: 0, 待人工: 0, 未执行: 0 }
+    let 状态计数: Record<验收状态, number> = { 已证明: 0, 未证明: 0, 未执行: 0 }
     for (let { 状态 } of 条目们) 状态计数[状态] += 1
-    let 状态汇总 = 状态组
-      .map((状态) => {
-        let 名称 = 状态 === '待人工' ? '需要人工' : 状态
-        return 状态标记(`${String(状态计数[状态])} 项${名称}`, 验收状态样式(状态))
-      })
-      .join('')
+    let 状态汇总 = 状态组.map((状态) => 状态标记(`${String(状态计数[状态])} 项${状态}`, 验收状态样式(状态))).join('')
     let 需求状态 = 目录优先级.find((状态) => 状态计数[状态] > 0) ?? '已证明'
     导航.push(`<details class="requirement-group" name="requirement-directory" data-requirement-group="${id}">
       <summary class="requirement"><a class="requirement-name" href="#${id}" data-requirement-target="${id}" title="${名称}">${名称}</a><span class="requirement-meta">
@@ -349,7 +340,6 @@ function 生成报告Html(报告目录: string, 参数: 报告参数, 摘要: �
       let 边框 = 条目.状态 === '已证明' ? '' : 条目.状态 === '未证明' ? ' failurebar' : ' pendingbar'
       验收卡片.push(`<section id="${条目.id}" class="surface pointcard${边框}" data-point data-requirement-id="${id}" data-flow-ids="${条目.关联流程们.map(({ id }) => id).join(' ')}" hidden>
         <div class="label">验收点</div><h2>${转义Html(条目.点.获得描述())}</h2>
-        <p><strong>验收手段：</strong>${条目.点.获得验收手段()}</p>
         <p><strong>状态：</strong>${状态标记(条目.状态, 验收状态样式(条目.状态))}</p>
         <div class="report-related"><h3>关联流程</h3><ul>${生成关联流程链接(条目, false)}</ul></div></section>`)
     }
@@ -440,7 +430,6 @@ export function 保存需求测试报告(报告目录: string, 参数: 报告参
         基础设施错误们: 参数.基础设施错误们,
         中断码: 参数.中断码,
         选中流程名称们: 参数.选中流程们.map(({ 流程 }) => 流程.获得名称()),
-        人工流程名称们: 参数.选中流程们.filter(({ 流程 }) => 流程.包含人工验收()).map(({ 流程 }) => 流程.获得名称()),
         流程记录们,
       },
       undefined,

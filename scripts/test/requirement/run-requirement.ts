@@ -97,20 +97,11 @@ export class 需求测试运行器 {
     let 流程们 = await this.发现测试()
     let 选中流程们 = this.选择流程(流程们, 选项)
     if (选项.仅列出) {
-      for (let { 文件, 流程 } of 选中流程们) {
-        let 类型 = 流程.包含人工验收() ? '人工验收' : '自动执行'
-        console.log(`${流程.获得名称()} · ${类型} · ${文件}`)
-      }
+      for (let { 文件, 流程 } of 选中流程们) console.log(`${流程.获得名称()} · ${文件}`)
       return 0
     }
-    let 自动流程们 = 选中流程们.filter(({ 流程 }) => 流程.包含人工验收() === false)
-    let 人工流程们 = 选中流程们.filter(({ 流程 }) => 流程.包含人工验收())
-    if (人工流程们.length > 0)
-      console.log(
-        `已跳过 ${String(人工流程们.length)} 个需人工验收的流程：${人工流程们.map(({ 流程 }) => 流程.获得名称()).join('、')}`,
-      )
     console.log(
-      `将执行 ${String(自动流程们.length)} 个需求流程：${自动流程们.map(({ 流程 }) => 流程.获得名称()).join('、')}`,
+      `将执行 ${String(选中流程们.length)} 个需求流程：${选中流程们.map(({ 流程 }) => 流程.获得名称()).join('、')}`,
     )
 
     let 开始时间 = Date.now()
@@ -121,7 +112,7 @@ export class 需求测试运行器 {
     let 正在启动服务 = false
     let 释放数据库: (() => Promise<void>) | undefined
     let 基础设施错误们: string[] = []
-    let 记录们 = 自动流程们.map((测试) => ({ 测试, 尝试们: new Array<需求测试尝试记录>() }))
+    let 记录们 = 选中流程们.map((测试) => ({ 测试, 尝试们: new Array<需求测试尝试记录>() }))
     let 取消控制器 = new AbortController()
     let 取消信号 = 取消控制器.signal
     let 已取消 = (): boolean => 取消信号.aborted
@@ -143,11 +134,11 @@ export class 需求测试运行器 {
     process.on('SIGINT', 处理SIGINT)
     process.on('SIGTERM', 处理SIGTERM)
     try {
-      if (自动流程们.length > 0) {
+      if (选中流程们.length > 0) {
         释放数据库 = await 独占测试数据库(this.根目录)
         await new 测试服务(this.根目录, 报告目录).确认端口可用()
         if (已取消() === false) await this.运行准备任务('db:ensure:test:web')
-        if (已取消() === false && 自动流程们.some(({ 实例 }) => 实例.需要测试服务()))
+        if (已取消() === false && 选中流程们.some(({ 实例 }) => 实例.需要测试服务()))
           await this.运行准备任务('build:web:test')
       }
       let 最大尝试次数 = 选项.模式 === '自动' && process.env['CI'] !== undefined && process.env['CI'] !== '' ? 3 : 1

@@ -1,11 +1,10 @@
 import type { Page } from '@playwright/test'
 
-import type { 人工核验结果, 提示卡片参数 } from './types'
+import type { 提示卡片参数 } from './types'
 
 /**
- * 测试提示卡片是浏览器测试中供观察者阅读、继续或作出核验决定的交互界面。
+ * 测试提示卡片供观察者阅读说明和继续演示。
  * 每张卡片归属于一个页面，记录自身是否正在展示，并承载阶段对应的视觉和拖动交互。
- * 它可以展示阶段说明或收集人工决定，结束后释放页面中的交互元素。
  */
 export class 测试提示卡片 {
   private 页面: Page
@@ -17,27 +16,19 @@ export class 测试提示卡片 {
   }
 
   public async 展示(参数: 提示卡片参数): Promise<void> {
-    await this.等待决定(参数)
-  }
-
-  public async 核验(说明: string): Promise<人工核验结果> {
-    return await this.等待决定({ 阶段: '确认', 说明 })
-  }
-
-  private async 等待决定(参数: 提示卡片参数): Promise<人工核验结果> {
     if (this.页面.isClosed() === true) throw new Error('测试提示卡片的页面已关闭')
-    if (this.正在展示 === true) throw new Error('当前浏览器测试已有提示卡片等待人工处理，请按顺序展示')
+    if (this.正在展示 === true) throw new Error('当前浏览器测试已有提示卡片，请按顺序展示')
     this.正在展示 = true
     try {
-      return await this.页面.evaluate(this.渲染提示卡片, 参数)
+      await this.页面.evaluate(this.渲染提示卡片, 参数)
     } finally {
       this.正在展示 = false
     }
   }
 
   /** 整个方法会被序列化到浏览器执行，内部不能依赖 this 或模块变量。 */
-  private 渲染提示卡片(参数: 提示卡片参数): Promise<人工核验结果> {
-    return new Promise<人工核验结果>((完成等待): void => {
+  private 渲染提示卡片(参数: 提示卡片参数): Promise<void> {
+    return new Promise<void>((完成等待): void => {
       let 主题: { 标题: string; 徽章?: string; 强调色: string; 背景: string; 按钮背景: string; 按钮文字: string }
       switch (参数.阶段) {
         case '开场':
@@ -67,16 +58,6 @@ export class 测试提示卡片 {
             背景: 'rgba(6, 78, 59, 0.82)',
             按钮背景: 'linear-gradient(135deg, #059669, #047857)',
             按钮文字: '完成并继续 (Enter)',
-          }
-          break
-        case '确认':
-          主题 = {
-            标题: '人工核验确认',
-            徽章: '需人工核准',
-            强调色: '#fbbf24',
-            背景: 'rgba(15, 23, 42, 0.88)',
-            按钮背景: 'linear-gradient(135deg, #059669, #047857)',
-            按钮文字: '是 / 通过 (Y)',
           }
           break
       }
@@ -160,54 +141,23 @@ export class 测试提示卡片 {
       内容.style.fontSize = 参数.阶段 === '步骤' ? '14px' : '15px'
       卡片.append(标题栏, 内容)
 
-      let 附加说明输入 = 卡片文档.createElement('textarea')
-      if (参数.阶段 === '确认') {
-        let 说明标签 = 卡片文档.createElement('label')
-        let 标签文本 = 卡片文档.createElement('span')
-        标签文本.textContent = '附加说明（选填）'
-        标签文本.style.display = 'block'
-        标签文本.style.marginBottom = '6px'
-        标签文本.style.color = '#fde68a'
-        标签文本.style.fontSize = '13px'
-        标签文本.style.fontWeight = '600'
-        附加说明输入.placeholder = '可记录异常、核验细节或通过依据'
-        附加说明输入.rows = 3
-        附加说明输入.style.boxSizing = 'border-box'
-        附加说明输入.style.width = '100%'
-        附加说明输入.style.marginBottom = '16px'
-        附加说明输入.style.padding = '9px 11px'
-        附加说明输入.style.border = '1px solid rgba(245, 158, 11, 0.45)'
-        附加说明输入.style.borderRadius = '8px'
-        附加说明输入.style.background = 'rgba(15, 23, 42, 0.7)'
-        附加说明输入.style.color = 'white'
-        附加说明输入.style.font = '14px/1.5 system-ui, "Microsoft YaHei", sans-serif'
-        附加说明输入.style.resize = 'vertical'
-        说明标签.append(标签文本, 附加说明输入)
-        卡片.append(说明标签)
-      }
-
       let 交互 = {
         更新卡片高度(): void {
           卡片框.style.height = `${String(Math.ceil(卡片.getBoundingClientRect().height))}px`
         },
-        结束(通过: boolean): void {
+        结束(): void {
           高度监听.disconnect()
           卡片框.remove()
           if (原焦点 instanceof HTMLElement && 原焦点.isConnected === true) 原焦点.focus({ preventScroll: true })
-          let 附加说明 = 附加说明输入.value.trim()
-          完成等待({ 通过, ...(附加说明 === '' ? {} : { 附加说明 }) })
+          完成等待()
         },
         处理按键(事件: KeyboardEvent): void {
-          if (事件.target === 附加说明输入) return
-          if (事件.key === 'Enter' || (参数.阶段 === '确认' && (事件.key === 'y' || 事件.key === 'Y'))) {
+          if (事件.key === 'Enter') {
             事件.preventDefault()
-            交互.结束(true)
-          } else if (参数.阶段 === '确认' && (事件.key === 'n' || 事件.key === 'N' || 事件.key === 'Escape')) {
-            事件.preventDefault()
-            交互.结束(false)
+            交互.结束()
           }
         },
-        创建按钮(文字: string, 背景: string, 通过: boolean): HTMLButtonElement {
+        创建按钮(文字: string, 背景: string): HTMLButtonElement {
           let 按钮 = 卡片文档.createElement('button')
           按钮.type = 'button'
           按钮.textContent = 文字
@@ -222,18 +172,15 @@ export class 测试提示卡片 {
           按钮.style.fontWeight = '600'
           按钮.style.fontSize = '14px'
           按钮.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.25)'
-          按钮.onclick = (): void => 交互.结束(通过)
+          按钮.onclick = 交互.结束
           return 按钮
         },
       }
       let 按钮栏 = 卡片文档.createElement('div')
       按钮栏.style.display = 'flex'
       按钮栏.style.gap = '12px'
-      let 继续按钮 = 交互.创建按钮(主题.按钮文字, 主题.按钮背景, true)
+      let 继续按钮 = 交互.创建按钮(主题.按钮文字, 主题.按钮背景)
       按钮栏.append(继续按钮)
-      if (参数.阶段 === '确认') {
-        按钮栏.append(交互.创建按钮('否 / 未通过 (N)', 'linear-gradient(135deg, #dc2626, #b91c1c)', false))
-      }
       卡片.append(按钮栏)
 
       let 活跃指针: number | undefined

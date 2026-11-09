@@ -8,28 +8,19 @@ function 解析领域文本(名称: string, 值: string): string {
   return 结果
 }
 
-export type 验收手段 = '自动' | '人工'
 export type 可等待结果<结果> = 结果 | Promise<结果>
 
 /**
  * 验收点是需求中可以被独立判定是否成立的最小承诺。
- * 它持有验收描述和验收手段，并供流程声明自己准备证明哪项承诺。
+ * 它持有验收描述，并供流程声明自己准备证明哪项承诺。
  */
 export class 验收点 {
   private readonly 描述: string
-  private readonly 验收手段: 验收手段
-  public constructor(参数: { 描述: string; 验收手段: 验收手段 }) {
+  public constructor(参数: { 描述: string }) {
     this.描述 = 解析领域文本('验收点描述', 参数.描述)
-    this.验收手段 = 参数.验收手段
   }
   public 获得描述(): string {
     return this.描述
-  }
-  public 获得验收手段(): 验收手段 {
-    return this.验收手段
-  }
-  public 需要人工验收(): boolean {
-    return this.验收手段 === '人工'
   }
 }
 
@@ -159,7 +150,7 @@ export type 流程说明 = z.infer<typeof 流程说明模型>
 
 /**
  * 流程是为了证明一组验收点而声明的有序运行过程。
- * 它持有名称、行为或观察步骤以及目标验收点，并能识别自己是否需要人工验收。
+ * 它持有名称、行为或观察步骤以及目标验收点。
  */
 export class 流程<系统状态 extends object> {
   private readonly 名称: string
@@ -208,8 +199,5 @@ export class 流程<系统状态 extends object> {
   }
   public 获得选择条件们(): readonly 选择条件[] {
     return [...this.选择条件们]
-  }
-  public 包含人工验收(): boolean {
-    return this.覆盖验收点们.some((验收点值) => 验收点值.需要人工验收())
   }
 }

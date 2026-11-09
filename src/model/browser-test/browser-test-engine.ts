@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { 测试提示卡片 } from './prompt-card'
 import { 标注截图 } from './screenshot'
 import { 浏览器步骤证据记录器, type 浏览器会话取证 } from './step-evidence'
-import type { 人工核验结果, 浏览器测试作用域配置, 浏览器测试参数, 浏览器测试模式 } from './types'
+import type { 浏览器测试作用域配置, 浏览器测试参数, 浏览器测试模式 } from './types'
 
 type 浏览器测试会话 = {
   引擎: 浏览器测试引擎
@@ -19,7 +19,7 @@ type 浏览器测试会话 = {
 /**
  * 浏览器测试引擎代表围绕一个页面开展的一次浏览器测试会话。
  * 会话包含固定的运行模式、独立的步骤作用域，以及向观察者展示的提示卡片。
- * 它执行页面操作和可复用步骤，并按模式提供说明、高亮与人工核验。
+ * 它执行页面操作和可复用步骤，并按模式提供说明与高亮。
  */
 export class 浏览器测试引擎 {
   public static async 打开会话(参数: {
@@ -98,7 +98,6 @@ export class 浏览器测试引擎 {
 
   private 页面: Page
   private 模式: 浏览器测试模式
-  private 等待人工: (() => void) | undefined
   private 提示卡片: 测试提示卡片
   private 证据: 浏览器步骤证据记录器
   private 步骤作用域 = new AsyncLocalStorage<浏览器测试作用域配置>()
@@ -107,7 +106,6 @@ export class 浏览器测试引擎 {
     if (参数.页面.isClosed() === true) throw new Error('浏览器测试页面已关闭')
     this.页面 = 参数.页面
     this.模式 = z.enum(['自动', '演示']).parse(参数.模式)
-    this.等待人工 = 参数.等待人工
     this.提示卡片 = new 测试提示卡片(参数.页面)
     this.证据 = new 浏览器步骤证据记录器(参数.页面, 参数.取消信号, 取证)
   }
@@ -251,7 +249,6 @@ export class 浏览器测试引擎 {
     this.检查文本(说明, '开场说明')
     if (标题 !== undefined) this.检查文本(标题, '开场标题')
     if (this.模式 === '自动') return
-    this.等待人工?.()
     await this.提示卡片.展示({ 阶段: '开场', 说明, ...(标题 === undefined ? {} : { 标题 }) })
   }
 
@@ -264,7 +261,6 @@ export class 浏览器测试引擎 {
       this.检查操作目标(目标)
       await this.滚动到目标(目标)
     }
-    this.等待人工?.()
     await this.提示卡片.展示({ 阶段: '步骤', 说明 })
   }
 
@@ -272,16 +268,7 @@ export class 浏览器测试引擎 {
     this.检查页面()
     this.检查文本(说明, '完成说明')
     if (this.模式 === '自动') return
-    this.等待人工?.()
     await this.提示卡片.展示({ 阶段: '完成', 说明 })
-  }
-
-  public async 确认(说明: string): Promise<人工核验结果> {
-    this.检查页面()
-    this.检查文本(说明, '人工核验说明')
-    if (this.模式 === '自动') throw new Error(`人工核验只能在演示模式下进行。\n提示内容: ${说明}`)
-    this.等待人工?.()
-    return await this.提示卡片.核验(说明)
   }
 
   public async 步骤<T>(描述: string, 执行: () => Promise<T>): Promise<T> {
