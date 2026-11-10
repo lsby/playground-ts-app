@@ -16,13 +16,18 @@ import { 读取需求描述文件, 需求描述文件名 } from './requirement-f
 
 type 需求测试实例 = Pick<需求测试, '获得需求们' | '获得流程们' | '需要测试服务' | '运行'>
 type 需求测试入口 = { 实例: 需求测试实例; 文件: string; 流程: 需求测试流程; 需求们: readonly 需求[] }
-type 需求测试登记 = { 流程们: readonly 需求测试入口[]; 需求们: readonly 需求[] }
+type 需求测试登记 = {
+  流程们: readonly 需求测试入口[]
+  需求们: readonly 需求[]
+  需求描述路径们: ReadonlyMap<需求, string>
+}
 type 需求测试运行选项 = {
   全部运行: boolean
   指定流程名称们: readonly string[]
   指定需求名称: string | undefined
   模式: 浏览器测试模式
   仅列出: boolean
+  显示未执行: boolean
 }
 type 尝试参数 = {
   模式: 浏览器测试模式
@@ -74,10 +79,12 @@ export class 需求测试运行器 {
       登记们.push({ 文件, 实例: new 入口.data.default() })
     }
     let 需求集合 = new Set(登记们.flatMap(({ 实例 }) => 实例.获得需求们()))
+    let 需求描述路径们 = new Map<需求, string>()
     let 测试们 = 登记们.flatMap((登记) => 登记.实例.获得流程们().map((流程) => ({ ...登记, 流程 })))
     for (let 文件 of 描述文件们) {
       let { 业务需求 } = await 读取需求描述文件(path.join(this.需求目录, 文件))
       需求集合.add(业务需求)
+      if (需求描述路径们.has(业务需求) === false) 需求描述路径们.set(业务需求, 文件)
     }
     let 需求们 = [...需求集合]
     if (new Set(需求们.map((值) => 值.获得名称())).size !== 需求们.length) throw new Error('需求测试包含重复需求名称')
@@ -92,7 +99,7 @@ export class 需求测试运行器 {
       ...测试,
       需求们: 需求们.filter((值) => 测试.流程.获得覆盖验收点们().some((点) => 值.包含(点))),
     }))
-    return { 流程们, 需求们 }
+    return { 流程们, 需求们, 需求描述路径们 }
   }
 
   public async 运行(参数们: readonly string[]): Promise<number> {
@@ -115,6 +122,10 @@ export class 需求测试运行器 {
       return 0
     }
     let 检查完整覆盖 = 选项.指定流程名称们.length === 0 && 选项.指定需求名称 === undefined
+    let 选中需求集合 = new Set(选中流程们.flatMap((测试) => 测试.需求们))
+    let 报告需求们 = 需求们.filter((需求) =>
+      选项.指定需求名称 === undefined ? 检查完整覆盖 || 选中需求集合.has(需求) : 需求.获得名称() === 选项.指定需求名称,
+    )
     let 待检查需求们 = 需求们.filter(
       (需求) => 检查完整覆盖 || (选中流程们.length === 0 && 需求.获得名称() === 选项.指定需求名称),
     )
@@ -223,7 +234,9 @@ export class 需求测试运行器 {
       服务地址,
       开始时间,
       结束时间: Date.now(),
-      需求们,
+      需求们: 报告需求们,
+      需求描述路径们: 登记.需求描述路径们,
+      显示未执行: 选项.显示未执行,
       流程们,
       选中流程们,
       记录们,
@@ -312,6 +325,7 @@ export class 需求测试运行器 {
         scenario: { type: 'string', multiple: true },
         requirement: { type: 'string' },
         list: { type: 'boolean' },
+        'show-unexecuted': { type: 'boolean' },
         auto: { type: 'boolean' },
         demo: { type: 'boolean' },
         mode: { type: 'string' },
@@ -329,7 +343,14 @@ export class 需求测试运行器 {
     let 全部运行 = values.all === true
     if ([全部运行, 指定流程名称们.length > 0, 指定需求名称 !== undefined].filter(Boolean).length > 1)
       throw new Error('--all、--scenario、--requirement 只能选择一种')
-    return { 全部运行, 指定流程名称们, 指定需求名称, 模式: 演示模式 ? '演示' : '自动', 仅列出: values.list === true }
+    return {
+      全部运行,
+      指定流程名称们,
+      指定需求名称,
+      模式: 演示模式 ? '演示' : '自动',
+      仅列出: values.list === true,
+      显示未执行: values['show-unexecuted'] === true,
+    }
   }
 
   private 选择流程({ 流程们, 需求们 }: 需求测试登记, 选项: 需求测试运行选项): readonly 需求测试入口[] {

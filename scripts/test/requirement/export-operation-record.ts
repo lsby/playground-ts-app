@@ -10,6 +10,7 @@ import { 生成调用代码, 生成重放地址, type 重放地址配置 } from 
 
 type 导出参数 = 流程说明 & {
   需求模块路径: string
+  源码目录路径: string
   覆盖验收点键们: readonly string[]
   流程名称: string
   步骤组: readonly 导出回放步骤[]
@@ -156,16 +157,16 @@ export function 生成需求测试代码(参数: 导出参数): string {
   if (有断言) 导入们.push("import { deepStrictEqual } from 'node:assert/strict'", '')
   let 行为导入 = 步骤们.some((步骤) => 步骤.类型 === '行为') ? '行为, ' : ''
   导入们.push(
-    `import { 流程, ${行为导入}观察, 需求测试, 验收点, type 需求测试上下文 } from '../../../src/model/test-requirement'`,
+    `import { 流程, ${行为导入}观察, 需求测试, 验收点, type 需求测试上下文 } from '${参数.源码目录路径}/model/test-requirement'`,
   )
   if (有断言) {
     导入们.push(
-      "import { 读取操作结果字段 } from '../../../src/test-tools/operation-assertion'",
-      "import type { JSON对象 } from '../../../src/test-tools/operation-record'",
+      `import { 读取操作结果字段 } from '${参数.源码目录路径}/test-tools/operation-assertion'`,
+      `import type { JSON对象 } from '${参数.源码目录路径}/test-tools/operation-record'`,
     )
   }
   if (步骤们.some((步骤) => 步骤.需要查询结果工具 === true))
-    导入们.push("import { 整理数据库查询结果 } from '../../../src/test-tools/operation-values'")
+    导入们.push(`import { 整理数据库查询结果 } from '${参数.源码目录路径}/test-tools/operation-values'`)
   导入们.push(`import { 业务需求, 验收点们 } from ${代码字面量(参数.需求模块路径)}`)
 
   let 数据泛型 = 有断言 ? '<测试数据>' : ''

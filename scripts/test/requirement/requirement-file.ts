@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { 需求, 验收点 } from '../../../src/model/test-requirement'
 
 export let 需求描述文件名 = 'index.requirement.ts'
-export let 需求目录名格式 = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u
+export let 需求目录路径格式 = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?:\/[a-z][a-z0-9]*(?:-[a-z0-9]+)*)*$/u
 export let 需求流程文件名格式 = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.ts$/u
 
 let 需求描述模块模型 = z.object({

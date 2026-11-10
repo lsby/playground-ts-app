@@ -31,8 +31,9 @@
   - 数据库查询使用测试数据库的只读连接，返回完整结果供断言使用。报告默认隐藏参数和查询结果值，显式列入 `报告列` 的公开字段最多预览 20 行。
 - **入口与命令**:
   - 由 `scripts/test/requirement/run-requirement.ts` 驱动。
-  - 运行 `npm run test:requirement`。可交互选择，或指定 `--all`、`--scenario=<流程名>`、`--requirement=<需求名>`、`--list`、`--auto` 或 `--demo`。任务参数 `--prepare-only` 可预览计划。
-  - 每个需求的定义和流程都放在 `test/requirement/<name>/`，描述文件统一命名为 `index.requirement.ts`。列出流程和选定流程回放时允许缺少覆盖。全量运行遇到未覆盖的验收点时，会生成报告并返回失败，数据库准备和流程执行都不会开始。
+  - 运行 `npm run test:requirement`。可交互选择，或指定 `--all`、`--scenario=<流程名>`、`--requirement=<需求名>`、`--list`、`--auto` 或 `--demo`。可重复传入 `--scenario` 选择多个流程。任务参数 `--prepare-only` 可预览计划。
+  - HTML 和 JSON 报告按运行范围生成：指定需求只列该需求；指定流程列出这些流程覆盖的验收点所属的所有需求；全量运行列出所有需求。默认隐藏没有执行的验收点和流程，仍汇总其状态及数量。加 `--show-unexecuted` 可以查看同一范围内的未执行流程，以及未执行或未实现的验收点。
+  - 每个需求的定义和流程放在独立目录，描述文件统一命名为 `index.requirement.ts`。可在 `test/requirement/` 下按多层文件夹分组，例如 `test/requirement/shopping/checkout/index.requirement.ts` 在报告中显示为 `shopping → 需求标题`。列出流程和选定流程回放时允许缺少覆盖。全量运行遇到未覆盖的验收点时，会生成报告并返回失败，数据库准备和流程执行都不会开始。
   - 自动模式在 CI 中每条流程最多尝试三次。报告输出至 `test-outputs/requirement-report/`。状态规则、步骤证据和建议可在 HTML 报告中查看。
 
 ## 交互式测试 MCP

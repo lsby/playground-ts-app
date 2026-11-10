@@ -3,7 +3,7 @@ import { z } from 'zod-mcp'
 import type { 流程说明 } from '../../../src/model/test-requirement'
 import type { 测试操作记录 } from '../../../src/test-tools/operation-record'
 import { 项目根目录 } from '../../task/model/task-common'
-import { 需求流程文件名格式, 需求目录名格式 } from '../requirement/requirement-file'
+import { 需求流程文件名格式, 需求目录路径格式 } from '../requirement/requirement-file'
 import { 直接返回, type 工具注册函数 } from './register-tool'
 import { 无参数模型 } from './tool-input'
 
@@ -221,9 +221,9 @@ export function 注册操作记录工具(
           .describe('A lowercase kebab-case .ts file name for the new scenario, written beside the requirement file.'),
         requirementDirectory: z
           .string()
-          .regex(需求目录名格式)
+          .regex(需求目录路径格式)
           .describe(
-            'An existing lowercase kebab-case directory name, e.g. checkout for test/requirement/checkout/index.requirement.ts.',
+            'An existing path under test/requirement, with lowercase kebab-case segments, e.g. shopping/checkout for test/requirement/shopping/checkout/index.requirement.ts.',
           ),
         acceptanceCriteriaKeys: z
           .array(z.string().min(1))

@@ -15,7 +15,7 @@
    - 你需要先把业务需求拆成具体、可观察的**验收点**。每个验收点用简短的名称概括结果，在描述中写清前置条件、谁做什么、预期看到什么（如「未登录的访客用已被占用的用户名注册后，页面显示用户名已存在，且数据库没有新增账号」）。
    - 与用户确认需要验证的条件和交付范围。如果有相似的需求或需求点，可以考虑修改已有的(但不要尝试复用需求点的测试逻辑-即流程，因为流程是自动生成的)，而不是每次都创建新的。
 2. **按需更新需求描述文件**
-   - 需求描述放在 `test/requirement/<name>/index.requirement.ts`，其中 `<name>` 使用英文小写短横线命名。
+   - 需求描述放在 `test/requirement/<name>/index.requirement.ts`，也可用多层目录分组，如 `test/requirement/shopping/checkout/index.requirement.ts`。各层使用英文小写短横线命名。导出时 `requirementDirectory` 传相对于 `test/requirement/` 的路径，如 `shopping/checkout`。
    - 此时**只写需求与验收点定义，不写任何具体测试步骤**。固定导出 `验收点们` 和 `业务需求`，例如：
 
 ```ts

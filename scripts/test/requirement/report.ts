@@ -5,17 +5,21 @@ import type { 浏览器测试模式 } from '../../../src/model/browser-test'
 import {
   行为,
   type 流程运行错误,
-  type 需求,
-  type 需求测试流程,
   type 需求测试结果,
   type 需求测试附件,
   type 验收点,
 } from '../../../src/model/test-requirement'
 import { 交互脚本, 样式 } from './report-assets'
+import {
+  生成导航目录Html,
+  生成报告目录,
+  type 报告范围,
+  type 目录流程,
+  type 需求测试登记,
+  type 验收目录项,
+} from './report-directory'
 import { 生成切图控件, 生成步骤证据Html, 转义Html } from './report-evidence'
 import {
-  汇总需求状态,
-  汇总验收点状态,
   流程状态样式,
   状态规则说明,
   验收状态展示顺序,
@@ -25,7 +29,6 @@ import {
   type 验收状态,
 } from './report-status'
 
-type 需求测试登记 = { 流程: 需求测试流程; 需求们: readonly 需求[]; 文件: string }
 export type 需求测试附件记录 = Omit<需求测试附件, '路径'> & { 相对路径: string }
 export type 需求测试尝试记录 = {
   尝试序号: number
@@ -36,21 +39,16 @@ export type 需求测试尝试记录 = {
 }
 type 需求测试记录 = { 测试: 需求测试登记; 尝试们: readonly 需求测试尝试记录[] }
 
-type 报告参数 = {
+type 报告参数 = 报告范围 & {
   模式: 浏览器测试模式
   服务地址: string | undefined
   开始时间: number
   结束时间: number
-  需求们: readonly 需求[]
-  流程们: readonly 需求测试登记[]
-  选中流程们: readonly 需求测试登记[]
   记录们: readonly 需求测试记录[]
   基础设施错误们: readonly string[]
   覆盖错误们: readonly string[]
   中断码: number | undefined
 }
-type 目录流程 = { id: string; 测试: 需求测试登记; 状态: 流程状态; 有建议: boolean }
-type 验收目录项 = { id: string; 点: 验收点; 状态: 验收状态; 有建议: boolean; 关联流程们: readonly 目录流程[] }
 type 步骤记录 = 需求测试结果['步骤们'][number]
 type 报告摘要 = { 通过数: number; 建议数: number; 失败数: number; 中断数: number; 未执行数: number }
 
@@ -155,7 +153,10 @@ function 生成流程附件Html(附件们: readonly 需求测试附件记录[]):
   return `<details class="attachments"><summary>流程附件 · ${String(附件们.length)} 项</summary><ul>${列表}</ul></details>`
 }
 
-function 归纳执行结论(尝试们: readonly 需求测试尝试记录[]): {
+function 归纳执行结论(
+  尝试们: readonly 需求测试尝试记录[],
+  可见验收点集合: ReadonlySet<验收点>,
+): {
   状态: 流程状态
   尝试次数: number
   已证明验收点名称们: string[]
@@ -165,6 +166,7 @@ function 归纳执行结论(尝试们: readonly 需求测试尝试记录[]): {
 } {
   let 最后尝试 = 尝试们.at(-1)
   let 结果 = 最后尝试?.结果
+  let 证明验收点们 = 结果?.证明验收点们.filter((点) => 可见验收点集合.has(点)) ?? []
   let 错误 = 结果?.错误 ?? 最后尝试?.清理错误们[0]
   let 消息 = 错误?.消息?.trim()
   let 原因 = (消息 === undefined || 消息 === '' ? 错误?.文本.trim() : 消息)?.split(/\r?\n/u)[0]
@@ -172,8 +174,8 @@ function 归纳执行结论(尝试们: readonly 需求测试尝试记录[]): {
   return {
     状态: 结果?.状态 ?? '未执行',
     尝试次数: 尝试们.length,
-    已证明验收点名称们: 结果?.证明验收点们.map((点) => 点.获得名称()) ?? [],
-    已证明验收点描述们: 结果?.证明验收点们.map((点) => 点.获得描述()) ?? [],
+    已证明验收点名称们: 证明验收点们.map((点) => 点.获得名称()),
+    已证明验收点描述们: 证明验收点们.map((点) => 点.获得描述()),
     未完成步骤: 结果?.步骤们.find(({ 状态 }) => 状态 === '失败' || 状态 === '中断')?.名称,
     原因,
   }
@@ -191,11 +193,15 @@ function 生成执行结论Html(id: string, 结论: ReturnType<typeof 归纳执�
     </section>`
 }
 
-function 生成流程Html({ id, 测试, 有建议 }: 目录流程, 尝试们: readonly 需求测试尝试记录[]): string {
+function 生成流程Html(
+  { id, 测试, 有建议 }: 目录流程,
+  尝试们: readonly 需求测试尝试记录[],
+  可见验收点集合: ReadonlySet<验收点>,
+): string {
   let { 流程, 文件 } = 测试
   let 已运行 = 尝试们.length > 0
   let { 测试思路, 结论补充 } = 流程.获得说明()
-  let 结论 = 归纳执行结论(尝试们)
+  let 结论 = 归纳执行结论(尝试们, 可见验收点集合)
   let 标记 = 状态标记(结论.状态, 流程状态样式[结论.状态])
   let 记录 = 尝试们
     .map(({ 尝试序号, 结果, 附件们, 附件错误们, 清理错误们 }, 索引) => {
@@ -236,50 +242,20 @@ function 生成流程Html({ id, 测试, 有建议 }: 目录流程, 尝试们: re
     </div>${记录}${计划}${生成执行结论Html(id, 结论, 结论补充)}</section>`
 }
 
-function 生成报告目录(参数: 报告参数): {
-  记录索引: ReadonlyMap<需求测试流程, readonly 需求测试尝试记录[]>
-  流程编号们: readonly 目录流程[]
-  需求条目们: readonly { 需求: 需求; 状态: 验收状态; 有建议: boolean; 条目们: readonly 验收目录项[] }[]
-} {
-  let 记录索引 = new Map(参数.记录们.map(({ 测试, 尝试们 }) => [测试.流程, 尝试们]))
-  let 流程编号们 = 参数.流程们.map(
-    (测试, 索引): 目录流程 => ({
-      测试,
-      id: `flow-${String(索引 + 1)}`,
-      状态: 记录索引.get(测试.流程)?.at(-1)?.结果.状态 ?? '未执行',
-      有建议: 测试.流程.获得步骤们().some((步骤) => 步骤.获得建议们().length > 0),
-    }),
-  )
-  let 点序号 = 0
-  let 需求条目们 = 参数.需求们.map((需求) => {
-    let 条目们 = 需求.获得验收点们().map((点): 验收目录项 => {
-      点序号 += 1
-      let 关联流程们 = 流程编号们.filter(({ 测试 }) => 测试.流程.获得覆盖验收点们().includes(点))
-      let 状态 = 汇总验收点状态(关联流程们.map((流程) => 流程.状态))
-      return {
-        id: `acceptance-${String(点序号)}`,
-        点,
-        状态,
-        有建议: 关联流程们.some((流程) => 流程.有建议),
-        关联流程们,
-      }
-    })
-    let 状态 = 汇总需求状态(条目们.map((条目) => 条目.状态))
-    return { 需求, 状态, 有建议: 条目们.some((条目) => 条目.有建议), 条目们 }
-  })
-  return { 记录索引, 流程编号们, 需求条目们 }
-}
-
 function 生成报告Html(
   报告目录: string,
   参数: 报告参数,
   摘要: 报告摘要,
-  { 记录索引, 流程编号们, 需求条目们 }: ReturnType<typeof 生成报告目录>,
+  { 流程编号们, 需求条目们, 可见验收点集合 }: ReturnType<typeof 生成报告目录>,
+  记录索引: ReadonlyMap<需求测试登记['流程'], readonly 需求测试尝试记录[]>,
 ): string {
-  let 导航: string[] = []
+  let 导航: { 目录层级: readonly string[]; 内容: string }[] = []
   let 需求卡片: string[] = []
   let 验收卡片: string[] = []
-  for (let [序号, { 需求, 状态: 需求状态, 有建议, 条目们 }] of 需求条目们.entries()) {
+  for (let [
+    序号,
+    { 需求, 目录层级, 状态: 需求状态, 有建议, 条目们, 验收点状态们, 隐藏验收点数 },
+  ] of 需求条目们.entries()) {
     let id = `requirement-${String(序号 + 1)}`
     let 名称 = 转义Html(需求.获得名称())
     let 导航验收点 = 条目们
@@ -302,14 +278,17 @@ function 生成报告Html(
       })
       .join('')
     let 状态计数: Record<验收状态, number> = { 已证明: 0, 部分通过: 0, 证明失败: 0, 未实现: 0, 未执行: 0 }
-    for (let { 状态 } of 条目们) 状态计数[状态] += 1
+    for (let 状态 of 验收点状态们) 状态计数[状态] += 1
     let 状态汇总 = 验收状态展示顺序
       .map((状态) => 状态标记(`${String(状态计数[状态])} 项${状态}`, 验收状态样式[状态]))
       .join('')
-    导航.push(`<details class="requirement-group" name="requirement-directory" data-requirement-group="${id}">
+    导航.push({
+      目录层级,
+      内容: `<details class="requirement-group" name="requirement-directory" data-requirement-group="${id}">
       <summary class="requirement"><a class="requirement-name" href="#${id}" data-requirement-target="${id}" title="${名称}"><span class="requirement-title">${名称}</span>${状态标记(需求状态, 验收状态样式[需求状态])}${建议标记(有建议)}</a>
       <span class="point-count">${String(条目们.length)} 项验收点</span></summary>
-      <div class="points">${导航验收点}</div></details>`)
+      <div class="points">${导航验收点}</div></details>`,
+    })
     let 验收点链接 = 条目们
       .map(
         ({ id, 点, 状态, 有建议 }) =>
@@ -321,7 +300,8 @@ function 生成报告Html(
       <div class="label">需求</div><h1 class="status-heading">${名称} ${状态标记(需求状态, 验收状态样式[需求状态])}${建议标记(有建议)}</h1>
       <p class="report-description">${转义Html(需求.获得描述())}</p><div class="stats">${状态汇总}</div>
       </div>${生成状态规则Html('需求')}</div>
-      <div class="report-related"><h2>验收点</h2><ul>${验收点链接}</ul></div></section>`)
+      <div class="report-related"><h2>验收点</h2><ul>${验收点链接}</ul>
+      ${隐藏验收点数 === 0 ? '' : `<p class="muted">另有 ${String(隐藏验收点数)} 项验收点未执行。</p>`}</div></section>`)
     for (let 条目 of 条目们) {
       let 边框 = 条目.状态 === '已证明' ? '' : 条目.状态 === '证明失败' ? ' failurebar' : ' pendingbar'
       验收卡片.push(`<section id="${条目.id}" class="surface pointcard${边框}" data-point data-requirement-id="${id}" data-flow-ids="${条目.关联流程们.map(({ id }) => id).join(' ')}" hidden>
@@ -329,12 +309,15 @@ function 生成报告Html(
         <div class="label">验收点</div><h2 class="status-heading">${转义Html(条目.点.获得名称())} ${状态标记(条目.状态, 验收状态样式[条目.状态])}${建议标记(条目.有建议)}</h2>
         <p class="report-description">${转义Html(条目.点.获得描述())}</p>
         </div>${生成状态规则Html('验收点')}</div>
-        <div class="report-related"><h3>关联流程</h3>${条目.关联流程们.length === 0 ? '<p class="muted">暂无关联流程。</p>' : `<ul>${生成关联流程链接(条目, false)}</ul>`}</div></section>`)
+        <div class="report-related"><h3>关联流程</h3>${条目.关联流程们.length === 0 ? '<p class="muted">暂无关联流程。</p>' : `<ul>${生成关联流程链接(条目, false)}</ul>`}
+        ${条目.隐藏流程数 === 0 ? '' : `<p class="muted">另有 ${String(条目.隐藏流程数)} 条流程未执行。</p>`}</div></section>`)
     }
   }
 
-  let 流程卡片 = 流程编号们.map((流程) => 生成流程Html(流程, 记录索引.get(流程.测试.流程) ?? [])).join('')
-  let 空状态说明 = 需求条目们.length === 0 ? '没有已登记的需求测试。' : '请选择左侧目录中的需求、验收点或流程。'
+  let 流程卡片 = 流程编号们
+    .map((流程) => 生成流程Html(流程, 记录索引.get(流程.测试.流程) ?? [], 可见验收点集合))
+    .join('')
+  let 空状态说明 = 需求条目们.length === 0 ? '当前选择没有关联需求。' : '请选择左侧目录中的需求、验收点或流程。'
   let 日志链接 = [
     { 文件: 'server.stdout.log', 名称: '服务日志（stdout）' },
     { 文件: 'server.stderr.log', 名称: '服务日志（stderr）' },
@@ -346,6 +329,10 @@ function 生成报告Html(
     参数.基础设施错误们.length === 0
       ? ''
       : `<section class="surface hero"><h2>运行环境错误</h2><pre class="problem">${转义Html(参数.基础设施错误们.join('\n'))}</pre></section>`
+  let 覆盖错误 =
+    参数.覆盖错误们.length === 0
+      ? ''
+      : `<section class="surface hero"><h2>验收点覆盖错误</h2><pre class="problem">${转义Html(参数.覆盖错误们.join('\n'))}</pre></section>`
   let 中断提示 =
     参数.中断码 === undefined
       ? ''
@@ -358,10 +345,10 @@ function 生成报告Html(
     <label class="theme-control">主题 <select aria-label="主题" data-report-theme><option value="system">跟随系统</option>
     <option value="light">浅色</option><option value="dark">深色</option></select></label></div></div></header>
     <div class="layout">
-      <nav id="report-directory" class="surface nav" aria-label="需求和验收点"><div class="navhead"><span class="label">需求目录</span></div>${导航.join('')}
+      <nav id="report-directory" class="surface nav" aria-label="需求和验收点"><div class="navhead"><span class="label">需求目录</span></div>${生成导航目录Html(导航)}
         <div class="navfoot">通过 ${String(摘要.通过数)} · 失败 ${String(摘要.失败数)} · 中断 ${String(摘要.中断数)} · 未执行 ${String(摘要.未执行数)}${摘要.建议数 === 0 ? '' : ` · 有建议 ${String(摘要.建议数)}`}</div></nav>
       <div class="directory-resizer" role="separator" aria-orientation="vertical" aria-label="调整需求目录宽度" aria-controls="report-directory" tabindex="0"></div>
-      <main>${中断提示}${基础设施错误}${需求卡片.join('')}${验收卡片.join('')}${流程卡片}
+      <main>${中断提示}${基础设施错误}${覆盖错误}${需求卡片.join('')}${验收卡片.join('')}${流程卡片}
         <p class="surface hero" data-no-selection>${空状态说明}</p></main>
     </div>
     <dialog class="image-dialog" aria-labelledby="report-image-title" data-image-dialog>
@@ -376,32 +363,42 @@ function 生成报告Html(
 }
 
 export function 保存需求测试报告(报告目录: string, 参数: 报告参数): { html路径: string; 全部通过: boolean } {
-  let 目录 = 生成报告目录(参数)
+  let 记录索引 = new Map(参数.记录们.map(({ 测试, 尝试们 }) => [测试.流程, 尝试们]))
+  let 流程状态们 = new Map<需求测试登记['流程'], 流程状态>(
+    参数.记录们.map(({ 测试, 尝试们 }) => [测试.流程, 尝试们.at(-1)?.结果.状态 ?? '未执行']),
+  )
+  let 目录 = 生成报告目录(参数, 流程状态们)
+  let 报告需求集合 = new Set(参数.需求们)
+  let { 可见验收点集合 } = 目录
+  let 报告流程集合 = new Set(目录.流程编号们.map(({ 测试 }) => 测试.流程))
   let 有建议流程 = new Set(目录.流程编号们.filter((条目) => 条目.有建议).map(({ 测试 }) => 测试.流程))
-  let 流程记录们 = 参数.记录们.map(({ 测试, 尝试们 }) => {
-    let 执行结论 = 归纳执行结论(尝试们)
-    let 目标验收点们 = 测试.流程.获得覆盖验收点们()
+  let 流程记录们 = 目录.流程编号们.map(({ 测试, 有建议 }) => {
+    let 尝试们 = 记录索引.get(测试.流程) ?? []
+    let 执行结论 = 归纳执行结论(尝试们, 可见验收点集合)
+    let 目标验收点们 = 测试.流程.获得覆盖验收点们().filter((点) => 可见验收点集合.has(点))
     return {
       流程名称: 测试.流程.获得名称(),
       文件: `test/requirement/${测试.文件}`,
-      需求名称们: 测试.需求们.map((值) => 值.获得名称()),
+      需求名称们: 测试.需求们.filter((需求) => 报告需求集合.has(需求)).map((需求) => 需求.获得名称()),
       目标验收点名称们: 目标验收点们.map((点) => 点.获得名称()),
       目标验收点描述们: 目标验收点们.map((点) => 点.获得描述()),
       ...测试.流程.获得说明(),
       执行结论,
       状态: 执行结论.状态,
-      有建议: 有建议流程.has(测试.流程),
+      有建议,
       尝试们: 尝试们.map(({ 结果, ...尝试 }) => {
         let { 证明验收点们, ...描述 } = 结果
+        let 报告证明验收点们 = 证明验收点们.filter((点) => 可见验收点集合.has(点))
         return {
           ...尝试,
           ...描述,
-          已证明验收点名称们: 证明验收点们.map((点) => 点.获得名称()),
-          已证明验收点描述们: 证明验收点们.map((点) => 点.获得描述()),
+          已证明验收点名称们: 报告证明验收点们.map((点) => 点.获得名称()),
+          已证明验收点描述们: 报告证明验收点们.map((点) => 点.获得描述()),
         }
       }),
     }
   })
+  let 选中流程状态们 = 参数.选中流程们.map(({ 流程 }) => 流程状态们.get(流程) ?? '未执行')
   let 摘要 = {
     开始时间: new Date(参数.开始时间).toISOString(),
     结束时间: new Date(参数.结束时间).toISOString(),
@@ -409,15 +406,15 @@ export function 保存需求测试报告(报告目录: string, 参数: 报告参
     服务地址: 参数.服务地址,
     Node版本: process.version,
     平台: process.platform,
-    总流程数: 流程记录们.length,
-    通过数: 流程记录们.filter((值) => 值.状态 === '通过').length,
-    建议数: 流程记录们.filter((值) => 值.有建议).length,
-    失败数: 流程记录们.filter((值) => 值.状态 === '失败').length,
-    中断数: 流程记录们.filter((值) => 值.状态 === '中断').length,
-    未执行数: 流程记录们.filter((值) => 值.状态 === '未执行').length,
+    总流程数: 选中流程状态们.length,
+    通过数: 选中流程状态们.filter((状态) => 状态 === '通过').length,
+    建议数: 参数.选中流程们.filter(({ 流程 }) => 有建议流程.has(流程)).length,
+    失败数: 选中流程状态们.filter((状态) => 状态 === '失败').length,
+    中断数: 选中流程状态们.filter((状态) => 状态 === '中断').length,
+    未执行数: 选中流程状态们.filter((状态) => 状态 === '未执行').length,
     总耗时毫秒: Math.max(0, 参数.结束时间 - 参数.开始时间),
   }
-  let html = 生成报告Html(报告目录, 参数, 摘要, 目录)
+  let html = 生成报告Html(报告目录, 参数, 摘要, 目录, 记录索引)
   mkdirSync(报告目录, { recursive: true })
   let html路径 = path.join(报告目录, 'index.html')
   writeFileSync(html路径, html, 'utf8')
@@ -429,17 +426,21 @@ export function 保存需求测试报告(报告目录: string, 参数: 报告参
         基础设施错误们: 参数.基础设施错误们,
         覆盖错误们: 参数.覆盖错误们,
         中断码: 参数.中断码,
-        选中流程名称们: 参数.选中流程们.map(({ 流程 }) => 流程.获得名称()),
-        需求们: 目录.需求条目们.map(({ 需求, 状态, 有建议, 条目们 }) => ({
+        显示未执行: 参数.显示未执行,
+        选中流程名称们: 参数.选中流程们.filter(({ 流程 }) => 报告流程集合.has(流程)).map(({ 流程 }) => 流程.获得名称()),
+        需求们: 目录.需求条目们.map(({ 需求, 目录层级, 状态, 有建议, 条目们, 隐藏验收点数 }) => ({
           名称: 需求.获得名称(),
           描述: 需求.获得描述(),
+          目录层级,
           状态,
           有建议,
-          验收点们: 条目们.map(({ 点, 状态, 有建议, 关联流程们 }) => ({
+          隐藏验收点数,
+          验收点们: 条目们.map(({ 点, 状态, 有建议, 关联流程们, 隐藏流程数 }) => ({
             名称: 点.获得名称(),
             描述: 点.获得描述(),
             状态,
             有建议,
+            隐藏流程数,
             关联流程名称们: 关联流程们.map(({ 测试 }) => 测试.流程.获得名称()),
           })),
         })),

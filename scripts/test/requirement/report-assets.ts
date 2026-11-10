@@ -107,7 +107,14 @@ export let 交互脚本 = `
     let selected = panels.find(panel => panel.id === (flowId ?? id))
     if (selected === undefined) return false
     let group = requirementGroups.find(group => group.dataset.requirementGroup === requirementId)
-    if (group) group.open = true
+    if (group) {
+      group.open = true
+      let folder = group.parentElement?.closest('[data-requirement-folder]')
+      while (folder) {
+        folder.open = true
+        folder = folder.parentElement?.closest('[data-requirement-folder]')
+      }
+    }
     let pointGroup = pointGroups.find(group => group.dataset.acceptanceGroup === id)
     if (pointGroup) setPointOpen(pointGroup, true)
     showPanel(selected, path)
@@ -311,6 +318,10 @@ header{background:light-dark(#183d34,#122c23);color:light-dark(#fff,#e5f0ea)}
 .navhead{padding:14px 19px 8px}
 .label{font-size:12px;letter-spacing:.1em;font-weight:700;color:light-dark(#526d63,#a8c6b8)}
 .requirement-group{margin:0 12px 2px}
+.requirement-folder{margin:0 12px 2px}
+.requirement-folder>summary{padding:5px 10px;cursor:pointer;font-weight:650;overflow-wrap:anywhere}
+.requirement-folder>div{margin-left:13px;border-left:1px solid var(--directory-line)}
+.requirement-folder>div>:is(.requirement-group,.requirement-folder){margin-right:0;margin-left:4px}
 .requirement{position:relative;min-height:28px;padding:4px 10px;display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;gap:9px;cursor:pointer;list-style:none}
 .requirement::-webkit-details-marker{display:none}
 .requirement-name{display:flex;min-width:0;align-items:center;gap:6px;color:inherit;text-decoration:none}
