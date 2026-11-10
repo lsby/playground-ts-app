@@ -68,7 +68,8 @@ export let 交互脚本 = `
   let panels = [...requirements, ...points, ...flows]
   let noSelection = main.querySelector('[data-no-selection]')
   let currentPanel = null
-  let stepResets = new Map()
+  let activeWorkspace = null
+  let stepWorkspaces = new Map()
   let links = [...document.querySelectorAll('[data-requirement-target], [data-acceptance]')]
   let directoryLinks = links.filter(link => directory.contains(link))
   function setPointOpen(group, open) {
@@ -90,8 +91,9 @@ export let 交互脚本 = `
       else link.removeAttribute('aria-current')
     }
     if (selected !== currentPanel) {
-      for (let workspace of selected?.querySelectorAll('[data-step-workspace]') ?? []) stepResets.get(workspace)()
+      for (let workspace of selected?.querySelectorAll('[data-step-workspace]') ?? []) stepWorkspaces.get(workspace).reset()
       currentPanel = selected
+      activeWorkspace = null
     }
     main.scrollTop = 0
   }
@@ -125,28 +127,26 @@ export let 交互脚本 = `
   for (let workspace of document.querySelectorAll('[data-step-workspace]')) {
     let timeline = workspace.querySelector('.timeline')
     let buttons = [...timeline.querySelectorAll('[data-step-select]')]
-    let panels = workspace.querySelector('[data-step-panels]')
-    let previous = workspace.querySelector('[data-step-prev]')
-    let next = workspace.querySelector('[data-step-next]')
-    let position = workspace.querySelector('[data-step-position]')
+    let attempt = workspace.closest('.run') ?? workspace.parentElement
+    let activate = () => { activeWorkspace = workspace }
+    attempt.addEventListener('pointerdown', activate)
+    attempt.addEventListener('focusin', activate)
     let current = 0
-    function selectStep(index) {
-      if (index < 0 || index >= buttons.length || index === current) return
+    function selectStep(index, focus = false) {
+      if (index < 0 || index >= buttons.length || index === current) return false
       let before = buttons[current]
       let selected = buttons[index]
       before.removeAttribute('aria-current')
       document.getElementById(before.getAttribute('aria-controls')).hidden = true
       selected.setAttribute('aria-current', 'step')
-      document.getElementById(selected.getAttribute('aria-controls')).hidden = false
+      let panel = document.getElementById(selected.getAttribute('aria-controls'))
+      panel.hidden = false
+      let gallery = panel.querySelector('[data-gallery]')
+      if (gallery !== null) showGalleryPage(gallery, gallery.querySelectorAll('[data-frame]'), 0)
       current = index
-      panels.scrollTop = 0
-      position.textContent = String(index + 1) + ' / ' + String(buttons.length)
-      previous.setAttribute('aria-disabled', String(index === 0))
-      next.setAttribute('aria-disabled', String(index === buttons.length - 1))
-      let buttonBounds = selected.getBoundingClientRect()
-      let listBounds = timeline.getBoundingClientRect()
-      if (buttonBounds.top < listBounds.top) timeline.scrollTop += buttonBounds.top - listBounds.top
-      else if (buttonBounds.bottom > listBounds.bottom) timeline.scrollTop += buttonBounds.bottom - listBounds.bottom
+      if (focus) selected.focus({ preventScroll: true })
+      if (panel.getBoundingClientRect().top < main.getBoundingClientRect().top) panel.scrollIntoView({ block: 'start' })
+      return true
     }
     for (let [index, button] of buttons.entries()) button.onclick = () => selectStep(index)
     for (let link of workspace.parentElement.querySelectorAll('[data-suggestion-step]')) {
@@ -165,12 +165,14 @@ export let 交互脚本 = `
         suggestion.scrollIntoView({ block: 'nearest' })
       }
     }
-    previous.onclick = () => selectStep(current - 1)
-    next.onclick = () => selectStep(current + 1)
-    stepResets.set(workspace, () => {
-      selectStep(0)
-      timeline.scrollTop = 0
-      panels.scrollTop = 0
+    stepWorkspaces.set(workspace, {
+      reset: () => selectStep(0),
+      navigate: key => {
+        if (key === 'ArrowUp' || key === 'ArrowDown') return selectStep(current + (key === 'ArrowUp' ? -1 : 1), true)
+        let panel = document.getElementById(buttons[current].getAttribute('aria-controls'))
+        let gallery = panel.querySelector('[data-gallery]')
+        return gallery !== null && moveGallery(gallery, key === 'ArrowLeft' ? -1 : 1)
+      },
     })
   }
   let dialog = document.querySelector('[data-image-dialog]')
@@ -221,13 +223,14 @@ export let 交互脚本 = `
     let frames = [...gallery.querySelectorAll('[data-frame]')]
     let index = frames.findIndex(frame => !frame.hidden)
     let nextIndex = index + direction
-    if (nextIndex < 0 || nextIndex >= frames.length) return
+    if (nextIndex < 0 || nextIndex >= frames.length) return false
     let focusInPage = frames[index].contains(document.activeElement)
     showGalleryPage(gallery, frames, nextIndex)
     if (focusInPage) {
       let target = frames[nextIndex].querySelector('[data-zoom]') ?? gallery.querySelector('[data-next]')
       target.focus({ preventScroll: true })
     }
+    return true
   }
   function moveFullImage(direction) {
     if (dialogGallery === null) return
@@ -271,6 +274,15 @@ export let 交互脚本 = `
     dialogImageButton = null
     dialogGallery = null
   }
+  document.addEventListener('keydown', event => {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || dialog.open) return
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return
+    if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable], .directory-resizer')) return
+    let workspaces = [...(currentPanel?.querySelectorAll('[data-step-workspace]') ?? [])]
+      .filter(workspace => workspace.closest('details:not([open])') === null)
+    let workspace = workspaces.includes(activeWorkspace) ? activeWorkspace : workspaces.at(-1)
+    if (stepWorkspaces.get(workspace)?.navigate(event.key)) event.preventDefault()
+  })
   addEventListener('hashchange', showFromHash)
   showFromHash()
 `
@@ -376,14 +388,13 @@ p{margin:0}
 .flow-conclusion{border-top:1px solid light-dark(#e3ebe6,#35483f);padding:14px 25px 18px}
 .flow-conclusion ul{margin:4px 0 0;padding-left:20px}
 .flow-conclusion h5{margin:10px 0 3px;font-size:13px}
-.step-workspace{display:grid;grid-template-columns:minmax(145px,1fr) minmax(0,2fr);height:clamp(18rem,55dvh,36rem);gap:12px;padding:10px 14px 14px}
-.timeline{list-style:none;margin:0;padding:4px;min-height:0;overflow:auto}
+.step-workspace{display:grid;grid-template-columns:minmax(145px,1fr) minmax(0,2fr);gap:20px;padding:10px 25px 18px}
+.timeline{list-style:none;margin:0;padding:0}
 .step button{display:grid;width:100%;grid-template-columns:28px minmax(0,1fr);align-items:start;gap:8px;padding:7px 5px;text-align:left;color:inherit;background:transparent;border:1px solid transparent;border-radius:6px;cursor:pointer;overflow-wrap:anywhere}
 .step button:hover,.step button[aria-current=step]{background:light-dark(#e8f4ed,#254838)}
 .step .type{display:block;font-size:12px;color:light-dark(#516d61,#a9c6b8)}
 .num{display:grid;place-items:center;width:28px;height:28px;background:light-dark(#eff3f1,#25372e);border:1px solid light-dark(#dbe4df,#35483f);border-radius:50%;font-size:12px;color:light-dark(#4a675a,#b4cebf);font-variant-numeric:tabular-nums}
-.step-evidence{display:grid;grid-template-rows:minmax(0,1fr) auto;min-width:0;min-height:0;border:1px solid light-dark(#dbe4df,#35483f);border-radius:8px}
-.step-panels{overflow:auto;padding:12px;min-width:0}
+.step-panels{min-width:0;padding-left:20px;border-left:1px solid light-dark(#dbe4df,#35483f)}
 .stepmeta{display:flex;gap:8px;align-items:start;justify-content:space-between;margin-bottom:4px}
 .timing{font-size:12px;color:light-dark(#576d62,#a8beb3);white-space:nowrap}
 .stepmeta h4{font-size:15px;margin:0;font-weight:670;overflow-wrap:anywhere}
@@ -393,16 +404,13 @@ p{margin:0}
 .suggestion-link{padding:3px 0;border:0;background:none;text-align:left;cursor:pointer;text-decoration:underline}
 .step-suggestion{margin-top:9px;padding:10px 12px;border-left:3px solid light-dark(#6b9b91,#87b9ad);background:light-dark(#edf6f4,#233e38);border-radius:6px}
 .step-suggestion p+p{margin-top:4px}
-.step-pagination{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid light-dark(#dbe4df,#35483f)}
-.step-pagination button{padding:3px 8px;border:1px solid light-dark(#d4e7dc,#395e4d);border-radius:5px;background:transparent;color:inherit;cursor:pointer}
-.step-pagination button[aria-disabled=true]{opacity:.45;cursor:default}
-.step-attachments{display:grid;gap:8px;margin-top:9px;background:light-dark(#f4faf6,#1d3228);border:1px solid light-dark(#d4e7dc,#395e4d);border-radius:8px;padding:10px 12px}
+.step-attachments{display:grid;gap:8px;margin-top:9px}
 .step-attachments p{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
 .gallery-page:not([hidden]){display:grid;gap:8px}
 .step-log summary{cursor:pointer;font-weight:600}
 .step-log p{margin-top:6px;max-height:16rem;overflow:auto}
-.step-image{display:block;width:min(65%,420px);padding:0;border:0;background:none;border-radius:6px;cursor:zoom-in}
-.step-image img{display:block;width:100%;height:auto;border-radius:6px}
+.step-image{display:block;width:fit-content;max-width:100%;padding:0;border:0;background:none;border-radius:6px;cursor:zoom-in}
+.step-image img{display:block;width:auto;height:auto;max-width:100%;max-height:70dvh;border-radius:6px}
 .gallery-frame{margin:0}
 .gallery-frame figcaption{margin-top:4px;color:light-dark(#52665e,#b5c9bf);font-size:12px}
 .gallery-controls{display:flex;align-items:center;gap:8px;margin-bottom:6px}
@@ -426,7 +434,8 @@ p{margin:0}
 .plan-steps{margin-left:16px;margin-right:16px}}
 @media(max-width:620px){.layout{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,34%) minmax(0,1fr);gap:12px}
 .directory-resizer{display:none}
-.step-workspace{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,10rem) minmax(0,22rem)}
+.step-workspace{grid-template-columns:minmax(0,1fr);gap:12px;padding-inline:16px}
+.step-panels{padding:12px 0 0;border-left:0;border-top:1px solid light-dark(#dbe4df,#35483f)}
 .hero h1{font-size:24px}
 .headline{flex-wrap:wrap}}
 [hidden]{display:none!important}

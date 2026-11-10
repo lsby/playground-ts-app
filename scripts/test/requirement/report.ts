@@ -134,14 +134,7 @@ function 生成步骤Html(id: string, 步骤们: readonly 步骤记录[]): strin
   }
   return `<div>${生成建议目录(步骤们)}<div class="step-workspace" data-step-workspace>
     <ol class="timeline" aria-label="流程步骤">${目录.join('')}</ol>
-    <div class="step-evidence">
-      <div class="step-panels" data-step-panels>${详情.join('')}</div>
-      <div class="step-pagination">
-        <button type="button" data-step-prev aria-disabled="true">上一步</button>
-        <span data-step-position aria-live="polite">1 / ${String(步骤们.length)}</span>
-        <button type="button" data-step-next aria-disabled="${String(步骤们.length === 1)}">下一步</button>
-      </div>
-    </div>
+    <div class="step-panels">${详情.join('')}</div>
   </div></div>`
 }
 
