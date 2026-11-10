@@ -393,6 +393,8 @@ p{margin:0}
 .status-heading .badge{margin-inline-start:6px;vertical-align:middle}
 .flowhead p+p,.pointcard p+p{margin-top:4px}
 .flowhead code{overflow-wrap:anywhere}
+.flowhead .source-link{color:inherit;text-decoration-color:light-dark(#789d8d,#6ca58d);text-underline-offset:3px}
+.flowhead .source-link:hover{color:light-dark(#176b4c,#8ed2b3)}
 .flowhead .flow-approach{margin-top:14px}
 .flow-conclusion h4{margin:0 0 4px;font-size:14px}
 .flow-text{white-space:pre-wrap;overflow-wrap:anywhere}

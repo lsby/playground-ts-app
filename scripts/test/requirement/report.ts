@@ -1,5 +1,6 @@
 import { mkdirSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import type { 浏览器测试模式 } from '../../../src/model/browser-test'
 import {
@@ -40,6 +41,7 @@ export type 需求测试尝试记录 = {
 type 需求测试记录 = { 测试: 需求测试登记; 尝试们: readonly 需求测试尝试记录[] }
 
 type 报告参数 = 报告范围 & {
+  项目根目录: string
   模式: 浏览器测试模式
   服务地址: string | undefined
   开始时间: number
@@ -197,8 +199,11 @@ function 生成流程Html(
   { id, 测试, 有建议 }: 目录流程,
   尝试们: readonly 需求测试尝试记录[],
   可见验收点集合: ReadonlySet<验收点>,
+  项目根目录: string,
 ): string {
   let { 流程, 文件 } = 测试
+  let 相对文件 = `test/requirement/${文件}`
+  let VSCode地址 = new URL(pathToFileURL(path.join(项目根目录, 相对文件)).pathname, 'vscode://file').href
   let 已运行 = 尝试们.length > 0
   let { 测试思路, 结论补充 } = 流程.获得说明()
   let 结论 = 归纳执行结论(尝试们, 可见验收点集合)
@@ -236,7 +241,7 @@ function 生成流程Html(
     <div class="flowhead report-overview"><div>
     <div class="label">流程</div>
     <h3 class="status-heading">${转义Html(流程.获得名称())} ${标记}${建议标记(有建议)}</h3>
-    <p><strong>对应文件：</strong><code>test/requirement/${转义Html(文件)}</code></p>
+    <p><strong>对应文件：</strong><a class="source-link" href="${转义Html(VSCode地址)}" title="在 VS Code 中打开"><code>${转义Html(相对文件)}</code></a></p>
     ${测试思路 === undefined ? '' : `<p class="flow-approach flow-text"><strong>测试思路：</strong>${转义Html(测试思路)}</p>`}
     </div>${生成状态规则Html('流程')}
     </div>${记录}${计划}${生成执行结论Html(id, 结论, 结论补充)}</section>`
@@ -315,7 +320,7 @@ function 生成报告Html(
   }
 
   let 流程卡片 = 流程编号们
-    .map((流程) => 生成流程Html(流程, 记录索引.get(流程.测试.流程) ?? [], 可见验收点集合))
+    .map((流程) => 生成流程Html(流程, 记录索引.get(流程.测试.流程) ?? [], 可见验收点集合, 参数.项目根目录))
     .join('')
   let 空状态说明 = 需求条目们.length === 0 ? '当前选择没有关联需求。' : '请选择左侧目录中的需求、验收点或流程。'
   let 日志链接 = [
