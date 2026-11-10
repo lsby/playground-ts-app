@@ -1,8 +1,19 @@
 import type { 浏览器测试引擎 } from '../browser-test'
+import type { JSON值 } from '../data/json-value'
 
 export type 测试数据库值 = string | number | bigint | Uint8Array | null
 
 export type 测试服务日志内容 = { 标准输出: string; 错误输出: string }
+
+export type 测试HTTP请求 = {
+  method: 'GET' | 'POST'
+  path: string
+  auth?: 'test-admin' | undefined
+  body?: JSON值 | undefined
+  timeoutMs?: number | undefined
+}
+
+export type 测试HTTP结果 = { status: number; ok: boolean; body: JSON值 }
 
 export type 需求测试工具 = {
   readonly 取消信号: AbortSignal
@@ -16,5 +27,6 @@ export type 需求测试工具 = {
   数据库: {
     查询: (语句: string, 参数?: readonly 测试数据库值[], 报告列?: readonly string[]) => Record<string, 测试数据库值>[]
   }
+  HTTP: { 请求: (参数: 测试HTTP请求, 请求取消信号?: AbortSignal) => Promise<测试HTTP结果> }
   后端日志: { 读取: () => 测试服务日志内容 }
 }

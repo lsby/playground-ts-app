@@ -110,7 +110,7 @@ function 删除活动进程(进程: ChildProcess): void {
 }
 
 function 请求进程优雅终止(进程: ChildProcess): void {
-  if (进程.pid === undefined || 进程.exitCode !== null) return
+  if (进程.pid === undefined || 进程.exitCode !== null || 进程.signalCode !== null) return
   try {
     process.kill(-进程.pid, 'SIGTERM')
   } catch (_错误) {
@@ -119,9 +119,9 @@ function 请求进程优雅终止(进程: ChildProcess): void {
 }
 
 function 强制终止进程(进程: ChildProcess): void {
-  if (进程.pid === undefined || 进程.exitCode !== null) return
+  if (进程.pid === undefined || 进程.exitCode !== null || 进程.signalCode !== null) return
   if (process.platform === 'win32') {
-    spawnSync('taskkill', ['/pid', String(进程.pid), '/T', '/F'], { stdio: 'ignore' })
+    spawnSync('taskkill', ['/pid', String(进程.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true })
     return
   }
   try {
@@ -177,6 +177,7 @@ async function 执行命令配置(
       env: { ...环境变量, TASK_EXECUTION_PHASE: 'execute' },
       stdio: 运行时终端输入 === true ? ['inherit', 'inherit', 'inherit'] : ['ignore', 'inherit', 'inherit'],
       detached: process.platform !== 'win32',
+      windowsHide: 运行时终端输入 === false,
     })
     活动进程组.add(进程)
     进程.once('error', (错误) => {

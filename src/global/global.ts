@@ -154,6 +154,11 @@ export let 全局资源 = new 全局资源集()
 
 export let syncLogCallBack = async (level: string, namespace: string, content: string): Promise<void> => {
   if (content.includes('WebSocket 未打开，无法发送消息')) return // 避免无限循环
+  if (level === 'trace') {
+    // net-core 的 trace 可能包含请求凭据、认证头和登录响应。
+    let { NODE_ENV, BUILD_TARGET } = 获得环境变量()
+    if (NODE_ENV === 'test' && BUILD_TARGET === 'web') return
+  }
   await 全局资源.获得日志模型().记录日志(`[${level}] [${namespace}] ${content}`)
 }
 

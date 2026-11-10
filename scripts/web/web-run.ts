@@ -54,7 +54,7 @@ function 启动任务(): void {
         '--watch-for-stdin',
         ParcelWorker入口,
       ],
-      { stdio: ['pipe', 'inherit', 'inherit'] },
+      { stdio: ['pipe', 'inherit', 'inherit'], windowsHide: true },
     )
     Parcel进程列表.push(Worker进程)
   }
@@ -75,7 +75,7 @@ function 启动任务(): void {
       // '--lazy',
     ],
     // --watch-for-stdin uses the pipe to stop Parcel when this wrapper exits.
-    { stdio: ['pipe', 'inherit', 'inherit'] },
+    { stdio: ['pipe', 'inherit', 'inherit'], windowsHide: true },
   )
   Parcel进程列表.push(Web进程)
   for (let Parcel进程 of Parcel进程列表) Parcel进程.on('close', 处理Parcel进程关闭)
@@ -94,7 +94,10 @@ function 重启(): void {
     启动任务()
     return
   }
-  let 清理进程 = crossSpawn('tsx', ['scripts/clean/clean-web.ts'], { stdio: ['ignore', 'inherit', 'inherit'] })
+  let 清理进程 = crossSpawn('tsx', ['scripts/clean/clean-web.ts'], {
+    stdio: ['ignore', 'inherit', 'inherit'],
+    windowsHide: true,
+  })
   清理进程.on('close', (退出码) => {
     if (退出码 === 0) 启动任务()
     else {

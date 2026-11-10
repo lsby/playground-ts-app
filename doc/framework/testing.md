@@ -37,10 +37,39 @@
 
 ## 交互式测试 MCP
 
-AI 直接写浏览器测试时，一个按钮出现波动，就可能等到超时才发现问题，改完还得从头跑。交互式测试让 AI 留在同一个测试现场，自己决定下一步。比如点了「保存」没反应，可以先看页面、日志或数据库，判断是还在处理、已经保存，还是需要修改代码。前端热更新和后端自动重启让它改完可以接着验证。
+测试开发套件把操作、结果和证据路径写入 `operations.json`。可以在保留浏览器和数据库现场的同时修剪记录，再导出为可回放的需求测试。
 
-MCP 提供与需求测试共用的工具。套件把调用参数、结果和证据路径写入本次的 `operations.json`。编辑记录时，浏览器和数据库仍保留现场。回放导出的用例时，断言会检查当次操作的结果，报告会显示预期值和实际值。
+### 启动和连接
 
-调用 `database_reset` 会关闭本次浏览器会话、停止测试后端、重置 Web 测试库并重新启动后端。MCP 地址保持可用，重置期间的其他工具调用会被拒绝。重置本身不进入回放记录，`clearRecord: true` 会在重置成功后清空操作记录。若清库或启动失败，测试后端保持停机，修复原因后可在同一地址重试。
+在 `.env/.env.test.web` 中设置 `TEST_MCP_ENABLED=true`，然后在仓库根目录运行：
 
-在 VS Code 按 `F1`，选择「运行任务」→「启动测试环境开发套件」。在 `.env/.env.test.web` 中设置 `TEST_MCP_ENABLED=true` 后，AI 客户端连接终端打印的 MCP 地址即可。
+```sh
+node --import tsx scripts/task/index.ts dev:test
+```
+
+也可以在 VS Code 按 `F1`，选择「运行任务」→「启动测试环境开发套件」。要使用与正式回放相同的前端构建，在上述启动命令后加 `-- --replay-build`。构建模式修改源码后需要重启套件，默认模式支持热更新。
+
+等终端输出 `TEST_DEV_READY`，再用本机 MCP 客户端连接同一行的 `mcpUrl`。使用默认端口时，Codex CLI 的添加命令如下。
+
+```sh
+codex mcp add playground-test --url http://127.0.0.1:30006/mcp
+```
+
+重新打开客户端会话后，用 `test_info` 查看测试地址和记录路径。命令语法见 [OpenAI Docs](https://developers.openai.com/learn/docs-mcp#quickstart)。
+
+### 工具与录制
+
+- `browser_*` 操作浏览器并检查页面，`database_query` 只读查询测试库，`backend_logs` 查看测试后端日志。
+- `http_request` 请求当前测试后端的接口。管理员请求可用 `auth: 'test-admin'`，测试密码字段使用 `$test-password:<标签>`。
+- `database_reset` 关闭浏览器会话、重置测试库并重启后端。默认保留操作记录，传入 `clearRecord: true` 可一并清空。
+- `record_add_assertion` 用 `expected` 核对固定值，用 `expectedFrom: { sourceId, path }` 比较两次操作的结果。导出时，把断言引用的操作都放在断言前。
+
+### 退出后再回放
+
+在另一个终端用 `TEST_DEV_READY` 中的 `stopId` 关闭同一实例。下面的命令会等待浏览器证据保存、服务停止和测试库锁释放。
+
+```sh
+node --import tsx scripts/test/dev-suite.ts --stop <stopId>
+```
+
+开发套件和回放共用 Web 测试库。等套件退出后再运行 `npm run test:requirement`。

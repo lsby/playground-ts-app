@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { lstat, open, rename, rm } from 'node:fs/promises'
 import path from 'node:path'
+import { setTimeout as 等待 } from 'node:timers/promises'
 
 import { z } from 'zod'
 
 import { JSON值模式, type JSON值 } from '../model/data/json-value'
+import { 读取操作结果字段 } from './operation-assertion'
 
 export type { JSON值 } from '../model/data/json-value'
 export type JSON对象 = { [键: string]: JSON值 }
@@ -17,15 +19,15 @@ type 基本条目 = { id: number; notes: string | null; decision?: string | null
 type 调用条目主体 = 基本条目 & { kind: 'call'; tool: string; arguments: JSON对象; start: string }
 type 完成字段 = 调用结论 & { end: string; artifacts: 证据文件[]; evidenceErrors: string[] }
 export type 操作调用条目 = 调用条目主体 & ({ status: 'pending' } | 完成字段)
+export type 断言期望来源 = { sourceId: number; path: Array<string | number> }
 export type 操作断言条目 = 基本条目 & {
   kind: 'assertion'
   sourceId: number
   path: Array<string | number>
   operator: 'deepEqual'
-  expected: JSON值
   mergeWithPreviousAttachmentGroup?: boolean
   createdAt: string
-}
+} & ({ expected: JSON值; expectedFrom?: never } | { expected?: never; expectedFrom: 断言期望来源 })
 export type 操作记录条目 = 操作调用条目 | 操作断言条目
 export type 操作记录摘要 =
   | (Pick<操作调用条目, 'id' | 'kind' | 'tool' | 'status' | 'start' | 'notes' | 'decision'> & { end?: string })
@@ -56,8 +58,14 @@ function 生成摘要(条目: 操作记录条目): 操作记录摘要 {
       }
     }
     case 'assertion': {
-      let { expected: _期望, path: 路径, ...摘要 } = 条目
-      return { ...摘要, path: [...路径] }
+      let { expected: _期望, expectedFrom, path: 路径, ...摘要 } = 条目
+      return {
+        ...摘要,
+        path: [...路径],
+        ...(expectedFrom === undefined
+          ? {}
+          : { expectedFrom: { sourceId: expectedFrom.sourceId, path: [...expectedFrom.path] } }),
+      }
     }
   }
 }
@@ -65,6 +73,26 @@ function 生成摘要(条目: 操作记录条目): 操作记录摘要 {
 function 检查索引(值: number, 名称: string, 最小值: number): void {
   if (Number.isSafeInteger(值) === false || 值 < 最小值)
     throw new Error(`${名称}必须是大于或等于 ${String(最小值)} 的安全整数`)
+}
+
+async function 替换记录文件(临时路径: string, 记录路径: string): Promise<void> {
+  for (let 间隔 of [25, 75]) {
+    try {
+      await rename(临时路径, 记录路径)
+      return
+    } catch (错误) {
+      // Windows 上短暂占用目标文件会阻止原子替换。重试期间保留原文件。
+      if (
+        process.platform !== 'win32' ||
+        错误 instanceof Error === false ||
+        'code' in 错误 === false ||
+        (错误.code !== 'EPERM' && 错误.code !== 'EBUSY')
+      )
+        throw 错误
+      await 等待(间隔)
+    }
+  }
+  await rename(临时路径, 记录路径)
 }
 
 /** 开发套件内的一份有序操作记录，证据文件由运行工具独立管理。 */
@@ -196,30 +224,45 @@ export class 测试操作记录 {
   public async 添加断言(
     来源ID: number,
     结果路径: readonly (string | number)[],
-    期望: JSON值,
-    选项?: { 说明?: string | undefined; 并入上一组?: boolean | undefined },
+    期望: JSON值 | undefined,
+    选项?: { 说明?: string | undefined; 并入上一组?: boolean | undefined; 期望来源?: 断言期望来源 | undefined },
   ): Promise<number> {
     let createdAt = new Date().toISOString()
-    let 期望副本 = 复制JSON(期望)
+    if ((期望 === undefined) === (选项?.期望来源 === undefined)) throw new Error('必须且只能指定一个断言期望')
+    let 期望副本 = 期望 === undefined ? undefined : 复制JSON(期望)
+    let 期望来源 =
+      选项?.期望来源 === undefined
+        ? undefined
+        : { sourceId: 选项.期望来源.sourceId, path: 结果路径模式.parse(选项.期望来源.path) }
     let 路径副本 = 结果路径模式.parse(结果路径)
     return await this.排队(async (): Promise<number> => {
       let 文档 = this.获得文档()
       let 来源 = this.查找条目(文档, 来源ID)
       if (来源.kind !== 'call' || 来源.status !== 'passed') throw new Error('断言必须引用已成功的工具调用')
+      let 结果们 = new Map<number, JSON对象>([[来源ID, 来源.result]])
+      let 期望条目 = 期望来源 === undefined ? undefined : this.查找条目(文档, 期望来源.sourceId)
+      if (期望条目 !== undefined) {
+        if (期望条目.kind !== 'call' || 期望条目.status !== 'passed')
+          throw new Error('断言期望必须引用已成功的工具调用')
+        结果们.set(期望条目.id, 期望条目.result)
+      }
+      读取操作结果字段(结果们, 来源ID, 路径副本)
+      if (期望来源 !== undefined) 读取操作结果字段(结果们, 期望来源.sourceId, 期望来源.path)
       let id = this.分配编号(文档)
+      let 期望字段 = 期望来源 === undefined ? { expected: JSON值模式.parse(期望副本) } : { expectedFrom: 期望来源 }
       let 条目: 操作断言条目 = {
         id,
         kind: 'assertion',
         sourceId: 来源ID,
         path: 路径副本,
         operator: 'deepEqual',
-        expected: 期望副本,
+        ...期望字段,
         notes: 选项?.说明 ?? null,
         ...(选项?.并入上一组 === undefined ? {} : { mergeWithPreviousAttachmentGroup: 选项.并入上一组 }),
         createdAt,
       }
       let entries = [...文档.entries]
-      let 插入索引 = entries.indexOf(来源) + 1
+      let 插入索引 = Math.max(entries.indexOf(来源), 期望条目 === undefined ? -1 : entries.indexOf(期望条目)) + 1
       for (
         let 后项 = entries[插入索引];
         后项?.kind === 'assertion' && 后项.sourceId === 来源ID;
@@ -270,7 +313,7 @@ export class 测试操作记录 {
       } finally {
         await 文件.close()
       }
-      await rename(临时路径, this.文件路径)
+      await 替换记录文件(临时路径, this.文件路径)
     } catch (错误) {
       try {
         await rm(临时路径, { force: true })

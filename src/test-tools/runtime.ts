@@ -11,11 +11,13 @@ import type {
 } from '../model/test-requirement'
 import { 需求测试浏览器组 } from './browsers'
 import { 需求测试数据库 } from './database'
+import { 请求测试后端 } from './http-request'
 
 export type 测试服务日志位置 = { 标准输出: number; 错误输出: number }
 
 type 测试工具后端 = {
   获得服务地址: () => string
+  获得后端地址?: () => string
   获得日志位置: () => 测试服务日志位置
   读取日志: (起点: 测试服务日志位置) => 测试服务日志内容
 }
@@ -58,6 +60,13 @@ export class 测试运行工具 {
         查询: (语句, 参数 = [], 报告列 = []): Record<string, 测试数据库值>[] => {
           let 步骤 = this.获得当前步骤()
           return this.数据库.查询(语句, 参数, 报告列, (生成文本): void => this.记录文本(步骤, 生成文本))
+        },
+      },
+      HTTP: {
+        请求: (请求参数, 请求取消信号): ReturnType<typeof 请求测试后端> => {
+          let 服务 = this.获得服务()
+          let 取消信号们 = 请求取消信号 === undefined ? [参数.取消信号] : [参数.取消信号, 请求取消信号]
+          return 请求测试后端(服务.获得后端地址?.() ?? 服务.获得服务地址(), 请求参数, 取消信号们)
         },
       },
       后端日志: { 读取: (): 测试服务日志内容 => this.读取日志() },

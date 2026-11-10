@@ -31,7 +31,7 @@ export let 业务需求 = new 需求({
 
 ## 阶段二：启动测试环境，通过 MCP 交互式验证与自主排障
 
-需求描述文件落盘后，启动或连接测试开发套件的 MCP（可通过 `test_info` 获取当前测试前端、后端地址与记录路径），使用 `browser_*`、`database_query`、`backend_logs` 等工具在真实系统中逐项操作并验证验收点。
+需求描述文件落盘后，按[启动和连接说明](testing.md#启动和连接)进入测试环境，用 [MCP 工具](testing.md#工具与录制)逐项验证验收点。
 
 在测试过程中发现实际表现与验收点不符时，按问题性质自主决策：
 
@@ -53,11 +53,12 @@ export let 业务需求 = new 需求({
 - 调用 `record_list` 和 `record_get` 查看刚才执行过程中的操作记录。
 - 调用 `record_remove` 删掉误点、报错重试前的废操作、重复查询以及仅用于定位控件的整页探索快照；必要时用 `record_move` 调整顺序，仅保留回放所需的准备、操作、等待和断言，并保持实际执行顺序。
 - 页面异步更新时，回放中应保留等待具体提示、目标元素或地址变化的 `browser_wait` / `browser_wait_url`；要证明数据已落库，应保留查询对应记录的 `database_query`。
+- 表单和全局提示可能显示同一段文案。用 `browser_inspect_target` 检查匹配数量，将等待目标限定在当前业务组件或表单内。
 
 2. **补充决策说明与结果断言**
 
 - 需要解释为什么做某个检查时，用 `record_note` 填写 `decision`（例如「保存后弹窗已关闭，再查一次数据库确认数据已落库」），导出后会在报告步骤中展示。
-- 用 `record_add_assertion` 断言工具结果中的具体字段（如数据库查询返回的行数或字段值），导出时必须把该断言的来源操作（`sourceId`）也一并选入。若断言文字用于解释同一步骤的上一份截图或证据，可设置 `mergeWithPreviousAttachmentGroup: true`。
+- 用 [`record_add_assertion`](testing.md#工具与录制) 核对验收点涉及的字段。若断言文字用于解释同一步骤的上一份截图或证据，可设置 `mergeWithPreviousAttachmentGroup: true`。
 
 3. **调用 `record_export` 机械转换落盘**
 
@@ -71,7 +72,7 @@ export let 业务需求 = new 需求({
 
 ## 阶段四：回放验证并交付体验命令
 
-生成流程实现文件后，**先关闭测试开发套件**（测试开发套件与需求测试共用同一个 Web 测试库，回放前必须释放数据库锁，并与使用同一数据库的其他测试串行执行），然后运行回放验证：
+生成流程实现文件后，按[退出说明](testing.md#退出后再回放)关闭测试开发套件，再运行回放验证：
 
 ```sh
 npm run test:requirement -- --scenario "流程名称" --auto
@@ -91,7 +92,7 @@ npm run test:requirement -- --scenario "流程名称" --auto
 
 ## 附：直接编写或手动维护流程代码时的约定
 
-若无需通过 MCP 录制、而是直接手写或微调 `test/requirement/<name>/<flow-name>.ts`（可参考强类型表单的[需求定义](../../test/requirement/typed-form/typed-form.requirement.ts)与[流程实现](../../test/requirement/typed-form/typed-form.ts)，以及[管理员用户管理测试](../../test/requirement/user-management/user-management.ts)）：
+若无需通过 MCP 录制、而是直接手写或微调 `test/requirement/<name>/<flow-name>.ts`（可参考已有需求测试）：
 
 - 流程文件从同目录的 `<name>.requirement.ts` 导入 `业务需求` 和 `验收点们`，默认导出无参构造的 `需求测试` 子类，构造时登记需求、流程和是否使用测试服务。`准备数据(工具)` 返回业务数据，框架会将其与工具一起放入流程上下文。
 - 调用 `工具.数据库.查询(SQL, 参数, 报告列)` 时，用参数传入业务值。需要在报告里展示查询结果时，只把可公开的字段列入 `报告列`。

@@ -28,6 +28,7 @@ async function 运行数据库重置任务(项目根目录: string, 取消信号
     env: { ...process.env, ENV_FILE_PATH: 环境文件 },
     stdio: ['ignore', 'inherit', 'inherit'],
     detached: process.platform !== 'win32',
+    windowsHide: true,
   })
   let 启动错误: Error | undefined
   进程.once('error', (错误): void => {
@@ -77,6 +78,7 @@ export class MCP测试会话 implements MCP测试工具宿主 {
       项目根目录,
       服务: {
         获得服务地址: (): string => 前端地址,
+        获得后端地址: (): string => 后端.获得服务地址(),
         获得日志位置: (): ReturnType<测试服务['获得日志位置']> => 后端.获得日志位置(),
         读取日志: (起点): 测试服务日志内容 => 后端.读取日志(起点),
       },

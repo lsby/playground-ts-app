@@ -1,9 +1,8 @@
 import type { ChildProcess } from 'node:child_process'
 import * as fs from 'node:fs'
-import * as net from 'node:net'
+import { devNull } from 'node:os'
 import * as path from 'node:path'
 import { pipeline } from 'node:stream/promises'
-import { setTimeout as 等待 } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
 import crossSpawn from 'cross-spawn'
@@ -11,9 +10,10 @@ import { z } from 'zod'
 
 import type { 测试服务日志内容 } from '../../src/model/test-requirement/tools'
 import type { 测试服务日志位置 } from '../../src/test-tools/runtime'
+import { 测试调试环境 } from '../task/model/task-common'
 import { 开发任务表 } from '../task/taskfile/taskfile-dev'
 import { 测试日志缓冲 } from './service-log'
-import { 停止测试进程 } from './test-process'
+import { 停止测试进程, 测试端口已开放, 等待测试进程输出 } from './test-process'
 
 type 后端进程 = {
   子进程: ChildProcess
@@ -41,7 +41,10 @@ export class 测试服务 {
   public constructor(
     private readonly 根目录: string,
     private readonly 报告目录: string,
-    private readonly 启动任务: 'test:requirement:server' | 'run:service:test:watch' = 'test:requirement:server',
+    private readonly 启动任务:
+      | 'test:requirement:server'
+      | 'run:service:test:watch'
+      | 'run:service:test' = 'test:requirement:server',
   ) {
     if (path.isAbsolute(根目录) === false) throw new Error('测试服务项目根目录必须是绝对路径')
     if (path.isAbsolute(报告目录) === false) throw new Error('测试服务报告目录必须是绝对路径')
@@ -65,7 +68,7 @@ export class 测试服务 {
 
   public async 确认端口可用(): Promise<void> {
     let { 端口 } = this.获得配置()
-    if (await this.端口已开放(端口)) throw new Error(`测试服务端口 ${String(端口)} 已被占用，请先关闭已有测试服务`)
+    if (await 测试端口已开放(端口)) throw new Error(`测试服务端口 ${String(端口)} 已被占用，请先关闭已有测试服务`)
   }
 
   public async 启动(): Promise<string> {
@@ -77,7 +80,7 @@ export class 测试服务 {
 
   public async 重启(停机期间操作: (取消信号: AbortSignal) => Promise<void>): Promise<string> {
     this.检查未关闭()
-    if (this.启动任务 !== 'run:service:test:watch' || this.已尝试启动 === false)
+    if (this.启动任务 === 'test:requirement:server' || this.已尝试启动 === false)
       throw new Error('仅允许重启已启动的测试开发服务')
     if (this.重启任务 !== undefined) throw new Error('测试服务正在重启')
     this.重启任务 = this.执行重启(停机期间操作)
@@ -89,9 +92,13 @@ export class 测试服务 {
   }
 
   public 关闭(): Promise<void> {
-    this.取消.abort(new Error('测试服务已关闭'))
+    this.取消启动或重启()
     this.关闭任务 ??= this.执行关闭()
     return this.关闭任务
+  }
+
+  public 取消启动或重启(): void {
+    this.取消.abort(new Error('测试服务正在关闭'))
   }
 
   public 等待退出(): Promise<void> {
@@ -123,18 +130,9 @@ export class 测试服务 {
 
     fs.mkdirSync(this.报告目录, { recursive: true })
     let { 参数, 环境变量 } = this.获得启动命令(环境文件)
-    let 进程 = crossSpawn(process.execPath, 参数, {
-      cwd: this.根目录,
-      env: 环境变量,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: process.platform !== 'win32',
-    })
+    let 进程 = this.创建服务进程(参数, 环境变量)
     let 当前: 后端进程 = { 子进程: 进程, 已就绪: false, 日志控制器: new AbortController() }
     this.进程 = 当前
-    let 启动错误: Error | undefined
-    进程.once('error', (错误): void => {
-      启动错误 = 错误
-    })
     进程.once('exit', (): void => {
       if (当前.已就绪 && this.取消.signal.aborted === false) this.意外退出.resolve()
       当前.已就绪 = false
@@ -152,20 +150,11 @@ export class 测试服务 {
         pipeline(stderr, fs.createWriteStream(path.join(this.报告目录, 'server.stderr.log'), { flags: 'a' }), 日志选项),
       ])
 
-      let 截止时间 = Date.now() + 120_000
-      while (Date.now() < 截止时间) {
-        let 开放 = await this.端口已开放(端口)
-        this.检查未关闭()
-        if (启动错误 !== undefined) throw 启动错误
-        if (进程.exitCode !== null || 进程.signalCode !== null)
-          throw new Error(`测试服务在就绪前退出，退出码：${String(进程.exitCode)}，信号：${String(进程.signalCode)}`)
-        if (开放) {
-          当前.已就绪 = true
-          return 服务地址
-        }
-        await 等待(250)
-      }
-      throw new Error(`等待测试服务端口 ${String(端口)} 就绪超时（120000ms）`)
+      await 等待测试进程输出(进程, 'TEST_SERVER_READY', this.取消.signal)
+      if ((await 测试端口已开放(端口)) === false) throw new Error(`测试服务端口 ${String(端口)} 未就绪`)
+      this.检查未关闭()
+      当前.已就绪 = true
+      return 服务地址
     } catch (错误) {
       try {
         await this.停止当前进程()
@@ -177,17 +166,38 @@ export class 测试服务 {
   }
 
   private 获得启动命令(环境文件: string): { 参数: string[]; 环境变量: NodeJS.ProcessEnv } {
-    if (this.启动任务 === 'run:service:test:watch') {
-      // 监听器和它派生的服务留在同一进程组，重置时可一起关闭。
+    if (this.启动任务 !== 'test:requirement:server') {
       let 任务 = 开发任务表[this.启动任务]
+      // 监听模式的 tsx 和它派生的服务留在同一进程组，重置时可一起关闭。
+      let 入口 =
+        this.启动任务 === 'run:service:test:watch'
+          ? [fileURLToPath(import.meta.resolve('tsx/cli'))]
+          : ['--import', 'tsx']
       return {
-        参数: [fileURLToPath(import.meta.resolve('tsx/cli')), ...任务.运行.参数],
+        参数: [...入口, ...任务.运行.参数],
         环境变量: { ...process.env, ...任务.环境变量, ENV_FILE_PATH: 环境文件 },
       }
     }
     return {
       参数: ['--import', 'tsx', 'scripts/task/index.ts', this.启动任务, '--env', 环境文件],
-      环境变量: process.env,
+      环境变量: { ...process.env, ...测试调试环境 },
+    }
+  }
+
+  private 创建服务进程(参数: string[], 环境变量: NodeJS.ProcessEnv): ChildProcess {
+    // NUL 提供空输入，并让 Windows 监听器保有隐藏控制台供 tsx 重启的子进程使用。
+    let 空输入 =
+      process.platform === 'win32' && this.启动任务 === 'run:service:test:watch' ? fs.openSync(devNull, 'r') : undefined
+    try {
+      return crossSpawn(process.execPath, 参数, {
+        cwd: this.根目录,
+        env: 环境变量,
+        stdio: [空输入 ?? 'ignore', 'pipe', 'pipe'],
+        detached: process.platform !== 'win32',
+        windowsHide: true,
+      })
+    } finally {
+      if (空输入 !== undefined) fs.closeSync(空输入)
     }
   }
 
@@ -198,20 +208,6 @@ export class 测试服务 {
 
   private 检查未关闭(): void {
     this.取消.signal.throwIfAborted()
-  }
-
-  private 端口已开放(端口: number): Promise<boolean> {
-    return new Promise<boolean>((完成) => {
-      let 连接 = net.createConnection({ host: '127.0.0.1', port: 端口 })
-      let 结束 = (开放: boolean): void => {
-        连接.destroy()
-        完成(开放)
-      }
-      连接.setTimeout(500)
-      连接.once('connect', (): void => 结束(true))
-      连接.once('timeout', (): void => 结束(false))
-      连接.once('error', (): void => 结束(false))
-    })
   }
 
   private async 停止当前进程(): Promise<void> {

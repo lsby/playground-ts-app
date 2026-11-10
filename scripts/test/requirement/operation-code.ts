@@ -1,5 +1,6 @@
 import { z } from 'zod-mcp'
 
+import { HTTP请求模型 } from '../../../src/test-tools/http-request'
 import type { 操作调用条目 } from '../../../src/test-tools/operation-record'
 import { 会话模型, 无参数模型, 查询模型, 目标操作模型, 页面地址模型, 页面模型, type 目标描述 } from '../mcp/tool-input'
 
@@ -269,6 +270,16 @@ export function 生成调用代码(条目: 操作调用条目, 选项: 生成选
   try {
     if (条目.status === 'pending') throw new Error('不能转换尚未完成的调用')
     if (条目.tool === 'database_query') return 生成数据库操作(条目, 选项)
+    if (条目.tool === 'http_request') {
+      let 参数 = HTTP请求模型.parse(条目.arguments)
+      let 请求 = `await 当前状态.工具.HTTP.请求(${JSON.stringify(参数)})`
+      return {
+        名称: 生成名称(条目),
+        类型: 参数.method === 'GET' ? '观察' : '行为',
+        语句们: 选项.需要结果 ? 保存结果(条目, 选项, 请求) : [请求],
+        异步: true,
+      }
+    }
     let 结果 = 生成页面操作(条目, 选项) ?? 生成目标操作(条目, 选项)
     if (结果 === undefined) throw new Error(`不支持转换工具 ${条目.tool}`)
     return 条目.tool === 'browser_list' ? 结果 : { ...结果, 异步: true }

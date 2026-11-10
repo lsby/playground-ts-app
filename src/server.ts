@@ -7,6 +7,7 @@ async function main(): Promise<void> {
   process.once('SIGINT', 请求关闭)
   process.once('SIGTERM', 请求关闭)
   await 应用单例.run()
+  if (process.env['NODE_ENV'] === 'test') console.log('TEST_SERVER_READY')
 }
 
 async function 关闭应用(): Promise<void> {

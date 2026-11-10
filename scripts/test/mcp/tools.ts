@@ -2,6 +2,7 @@ import type { McpServer, ToolAnnotations } from '@modelcontextprotocol/server'
 import { z } from 'zod-mcp'
 
 import type { 提交步骤附件, 测试服务日志内容, 需求测试工具 } from '../../../src/model/test-requirement'
+import { HTTP请求模型 } from '../../../src/test-tools/http-request'
 import type { 测试操作记录 } from '../../../src/test-tools/operation-record'
 import { 整理数据库查询结果 } from '../../../src/test-tools/operation-values'
 import { 注册操作记录工具 } from './record-tools'
@@ -245,6 +246,14 @@ export function 注册测试工具(server: McpServer, 宿主: MCP测试工具宿
         return { 数据: { url: 引擎.获得地址() } }
       }),
     页面只读,
+  )
+
+  注册(
+    'http_request',
+    'Send a recorded GET or JSON POST to the current local Web test backend. Returns HTTP status, ok, and the redacted JSON body (or null for an empty or non-JSON response). Redirects are never followed. Use only synthetic test data. For an administrator request pass auth: test-admin; for a test password use $test-password:<label> in the JSON field.',
+    HTTP请求模型,
+    (参数, 取消信号) => 宿主.执行(async (工具): Promise<工具输出> => ({ 数据: await 工具.HTTP.请求(参数, 取消信号) })),
+    { destructiveHint: true, openWorldHint: false },
   )
 
   注册(

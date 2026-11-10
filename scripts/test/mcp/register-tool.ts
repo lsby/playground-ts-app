@@ -21,7 +21,7 @@ export type 工具注册函数 = <参数类型>(
   名称: string,
   描述: string,
   参数模型: StandardSchemaWithJSON<unknown, 参数类型>,
-  执行: (参数: 参数类型) => Promise<MCP执行结果<工具输出>>,
+  执行: (参数: 参数类型, 取消信号: AbortSignal) => Promise<MCP执行结果<工具输出>>,
   注解?: ToolAnnotations,
 ) => void
 
@@ -42,14 +42,14 @@ export function 创建工具注册器(server: McpServer, 保护: 工具调用保
     server.registerTool(
       名称,
       { description: 描述, inputSchema: 参数模型, ...(注解 === undefined ? {} : { annotations: 注解 }) },
-      async (参数): Promise<CallToolResult> => {
+      async (参数, 上下文): Promise<CallToolResult> => {
         try {
           return await 保护(async (): Promise<CallToolResult> => {
             let recordId: number | undefined
             let 执行结果: MCP执行结果<工具输出>
             try {
               if (记录 !== undefined) recordId = await 记录.开始(名称, 操作参数模型.parse(参数))
-              执行结果 = await 执行(参数)
+              执行结果 = await 执行(参数, 上下文.mcpReq.signal)
             } catch (错误) {
               执行结果 = { 结果: { 成功: false, 错误: 错误文本(错误) }, 附件们: [], 取证错误们: [] }
             }

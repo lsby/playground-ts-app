@@ -1,4 +1,5 @@
 import { 流程说明模型, type 流程说明 } from '../../../src/model/test-requirement'
+import { 读取操作结果字段 } from '../../../src/test-tools/operation-assertion'
 import type { JSON值, 操作断言条目, 操作记录条目, 操作调用条目 } from '../../../src/test-tools/operation-record'
 import { 生成调用代码, 生成重放地址, type 重放地址配置 } from './operation-code'
 
@@ -69,17 +70,26 @@ function 验证所选条目(条目们: readonly 操作记录条目[]): ReadonlyM
   let 断言来源们 = new Map<number, 操作调用条目>()
   for (let [索引, 条目] of 条目们.entries()) {
     if (条目.kind !== 'assertion') continue
-    let 来源 = 条目索引.get(条目.sourceId)
-    let 说明 = `断言 #${String(条目.id)} 的来源操作 #${String(条目.sourceId)}`
-    if (来源 === undefined || 来源.条目.kind !== 'call') throw new Error(`${说明}未被选中`)
-    if (来源.索引 >= 索引) throw new Error(`${说明}必须排在该断言前面`)
-    if (来源.条目.status !== 'passed') throw new Error(`${说明}必须是成功完成的调用`)
-    断言来源们.set(条目.sourceId, 来源.条目)
+    let 引用们 = [
+      { sourceId: 条目.sourceId, path: 条目.path },
+      ...(条目.expectedFrom === undefined ? [] : [条目.expectedFrom]),
+    ]
+    for (let 引用 of 引用们) {
+      let 来源 = 条目索引.get(引用.sourceId)
+      let 说明 = `断言 #${String(条目.id)} 的来源操作 #${String(引用.sourceId)}`
+      if (来源 === undefined || 来源.条目.kind !== 'call') throw new Error(`${说明}未被选中`)
+      if (来源.索引 >= 索引) throw new Error(`${说明}必须排在该断言前面`)
+      if (来源.条目.status !== 'passed') throw new Error(`${说明}必须是成功完成的调用`)
+      读取操作结果字段(new Map([[引用.sourceId, 来源.条目.result]]), 引用.sourceId, 引用.path)
+      断言来源们.set(引用.sourceId, 来源.条目)
+    }
   }
   return 断言来源们
 }
 
 function 生成断言期望(断言: 操作断言条目, 来源: 操作调用条目, 测试地址: 重放地址配置): string {
+  if (断言.expectedFrom !== undefined)
+    return `读取操作结果字段(当前状态.结果们, ${String(断言.expectedFrom.sourceId)}, ${代码字面量(断言.expectedFrom.path)})`
   if (
     断言.path.length === 1 &&
     断言.path[0] === 'url' &&

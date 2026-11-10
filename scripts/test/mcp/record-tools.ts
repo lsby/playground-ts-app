@@ -79,22 +79,34 @@ export function 注册操作记录工具(
   )
   注册(
     'record_add_assertion',
-    'Declare a deep-equality assertion for a successful tool result. The path starts at the result object, e.g. ["rowCount"]. Use an empty path to compare the whole result.',
-    z.strictObject({
-      sourceId: 编号模型,
-      path: z.array(z.union([z.string(), z.int().nonnegative()])),
-      expected: z.json(),
-      note: z.string().optional(),
-      mergeWithPreviousAttachmentGroup: z
-        .boolean()
-        .optional()
-        .describe(
-          'In the replay report, append the expected/actual text to the previous attachment page in the same step. Use true when the text explains the preceding evidence, such as a screenshot from a browser wait in the same exported step. By default, the assertion text gets its own page.',
-        ),
-    }),
-    async ({ sourceId, path, expected, note, mergeWithPreviousAttachmentGroup }) =>
+    'Declare a deep-equality assertion for a successful tool result. Provide exactly one of expected (including null) or expectedFrom to compare with another successful result at replay time. Paths start at the result object; use [] for the whole result.',
+    z
+      .strictObject({
+        sourceId: 编号模型,
+        path: z.array(z.union([z.string(), z.int().nonnegative()])),
+        expected: z.json().optional(),
+        expectedFrom: z
+          .strictObject({ sourceId: 编号模型, path: z.array(z.union([z.string(), z.int().nonnegative()])) })
+          .optional(),
+        note: z.string().optional(),
+        mergeWithPreviousAttachmentGroup: z
+          .boolean()
+          .optional()
+          .describe(
+            'In the replay report, append the expected/actual text to the previous attachment page in the same step. Use true when the text explains the preceding evidence, such as a screenshot from a browser wait in the same exported step. By default, the assertion text gets its own page.',
+          ),
+      })
+      .refine(
+        ({ expected, expectedFrom }) => (expected === undefined) !== (expectedFrom === undefined),
+        'Provide exactly one of expected or expectedFrom.',
+      ),
+    async ({ sourceId, path, expected, expectedFrom, note, mergeWithPreviousAttachmentGroup }) =>
       直接返回({
-        id: await 记录.添加断言(sourceId, path, expected, { 说明: note, 并入上一组: mergeWithPreviousAttachmentGroup }),
+        id: await 记录.添加断言(sourceId, path, expected, {
+          说明: note,
+          并入上一组: mergeWithPreviousAttachmentGroup,
+          期望来源: expectedFrom,
+        }),
       }),
   )
   注册(

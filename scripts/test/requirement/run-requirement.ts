@@ -136,7 +136,7 @@ export class 需求测试运行器 {
     let 服务: 测试服务 | undefined
     let 服务地址: string | undefined
     let 正在启动服务 = false
-    let 释放数据库: (() => Promise<void>) | undefined
+    let 释放数据库: (() => void) | undefined
     let 基础设施错误们: string[] = []
     let 记录们 = 选中流程们.map((测试) => ({ 测试, 尝试们: new Array<需求测试尝试记录>() }))
     let 取消控制器 = new AbortController()
@@ -207,7 +207,7 @@ export class 需求测试运行器 {
       if (已取消() === false) 记录错误(错误)
     } finally {
       try {
-        await 释放数据库?.()
+        释放数据库?.()
       } catch (错误) {
         记录错误(错误)
       } finally {
@@ -239,6 +239,7 @@ export class 需求测试运行器 {
         cwd: this.根目录,
         env: process.env,
         stdio: ['ignore', 'inherit', 'inherit'],
+        windowsHide: true,
       })
       进程.once('error', 失败)
       进程.once('close', (退出码, 信号): void => {
