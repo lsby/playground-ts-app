@@ -78,7 +78,12 @@ export class 需求测试浏览器组 {
     }
   }
 
-  public async 执行步骤<T>(提交: 提交步骤附件, 记录错误: (错误: unknown) => void, 执行: () => Promise<T>): Promise<T> {
+  public async 执行步骤<T>(
+    提交: 提交步骤附件,
+    记录错误: (错误: unknown) => void,
+    执行: () => Promise<T>,
+    取证范围: '步骤' | '操作' = '步骤',
+  ): Promise<T> {
     return await this.取证.运行(
       (名称) => ({
         提交: async ({ 名称: 说明, 图片 }): Promise<void> => {
@@ -87,6 +92,7 @@ export class 需求测试浏览器组 {
         记录错误: (错误): void => 记录错误(new Error(`浏览器会话「${名称}」步骤取证失败`, { cause: 错误 })),
       }),
       执行,
+      取证范围,
     )
   }
 

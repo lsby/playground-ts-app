@@ -3,77 +3,28 @@ import { lstat, open, rename, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { setTimeout as 等待 } from 'node:timers/promises'
 
-import { z } from 'zod'
+import type { 测试建议 } from '../model/test-requirement'
+import {
+  测试录制,
+  type JSON值,
+  type JSON对象,
+  type 回放步骤选择,
+  type 导出回放步骤,
+  type 操作记录摘要,
+  type 操作记录条目,
+  type 操作调用结果,
+} from '../model/test-requirement/recording'
 
-import { JSON值模式, type JSON值 } from '../model/data/json-value'
-import { 读取操作结果字段 } from './operation-assertion'
-
-export type { JSON值 } from '../model/data/json-value'
-export type JSON对象 = { [键: string]: JSON值 }
-
-type 证据文件 = { path: string; description?: string }
-type 调用结论 = { status: 'passed'; result: JSON对象 } | { status: 'failed'; error: string }
-export type 操作调用结果 = 调用结论 & { artifacts: readonly 证据文件[]; evidenceErrors: readonly string[] }
-
-type 基本条目 = { id: number; notes: string | null; decision?: string | null }
-type 调用条目主体 = 基本条目 & { kind: 'call'; tool: string; arguments: JSON对象; start: string }
-type 完成字段 = 调用结论 & { end: string; artifacts: 证据文件[]; evidenceErrors: string[] }
-export type 操作调用条目 = 调用条目主体 & ({ status: 'pending' } | 完成字段)
-export type 断言期望来源 = { sourceId: number; path: Array<string | number> }
-export type 操作断言条目 = 基本条目 & {
-  kind: 'assertion'
-  sourceId: number
-  path: Array<string | number>
-  operator: 'deepEqual'
-  mergeWithPreviousAttachmentGroup?: boolean
-  createdAt: string
-} & ({ expected: JSON值; expectedFrom?: never } | { expected?: never; expectedFrom: 断言期望来源 })
-export type 操作记录条目 = 操作调用条目 | 操作断言条目
-export type 操作记录摘要 =
-  | (Pick<操作调用条目, 'id' | 'kind' | 'tool' | 'status' | 'start' | 'notes' | 'decision'> & { end?: string })
-  | Omit<操作断言条目, 'expected'>
-
-type 操作记录文档 = { version: 1; nextId: number; entries: readonly 操作记录条目[] }
-let 结果路径模式 = z.array(z.union([z.string(), z.number().int().nonnegative().safe()]))
-
-function 复制JSON<T extends JSON值>(值: T): T {
-  let 副本 = structuredClone(值)
-  JSON值模式.parse(副本)
-  return 副本
-}
-
-function 生成摘要(条目: 操作记录条目): 操作记录摘要 {
-  switch (条目.kind) {
-    case 'call': {
-      let { id, kind, notes, decision, tool, status, start } = 条目
-      return {
-        id,
-        kind,
-        notes,
-        ...(decision === undefined ? {} : { decision }),
-        tool,
-        status,
-        start,
-        ...(条目.status === 'pending' ? {} : { end: 条目.end }),
-      }
-    }
-    case 'assertion': {
-      let { expected: _期望, expectedFrom, path: 路径, ...摘要 } = 条目
-      return {
-        ...摘要,
-        path: [...路径],
-        ...(expectedFrom === undefined
-          ? {}
-          : { expectedFrom: { sourceId: expectedFrom.sourceId, path: [...expectedFrom.path] } }),
-      }
-    }
-  }
-}
-
-function 检查索引(值: number, 名称: string, 最小值: number): void {
-  if (Number.isSafeInteger(值) === false || 值 < 最小值)
-    throw new Error(`${名称}必须是大于或等于 ${String(最小值)} 的安全整数`)
-}
+export type {
+  JSON值,
+  JSON对象,
+  操作断言条目,
+  操作记录摘要,
+  操作记录条目,
+  操作调用条目,
+  操作调用结果,
+  断言期望来源,
+} from '../model/test-requirement/recording'
 
 async function 替换记录文件(临时路径: string, 记录路径: string): Promise<void> {
   for (let 间隔 of [25, 75]) {
@@ -95,10 +46,13 @@ async function 替换记录文件(临时路径: string, 记录路径: string): P
   await rename(临时路径, 记录路径)
 }
 
-/** 开发套件内的一份有序操作记录，证据文件由运行工具独立管理。 */
+type 断言选项 = Parameters<测试录制['添加断言']>[3]
+type 列出选项 = Parameters<测试录制['列出']>[2]
+
+/** 将一次测试录制的操作串行提交到开发套件的记录文件。 */
 export class 测试操作记录 {
   public readonly 文件路径: string
-  private 文档: 操作记录文档 | undefined
+  private 录制: 测试录制 | undefined
   private 队列 = Promise.resolve()
 
   public constructor(输出目录: string) {
@@ -108,176 +62,113 @@ export class 测试操作记录 {
 
   public 初始化(): Promise<void> {
     return this.排队(async (): Promise<void> => {
-      if (this.文档 !== undefined) return
+      if (this.录制 !== undefined) return
       try {
         await lstat(this.文件路径)
         throw new Error(`操作记录已存在：${this.文件路径}`)
       } catch (错误) {
         if (错误 instanceof Error === false || 'code' in 错误 === false || 错误.code !== 'ENOENT') throw 错误
       }
-      await this.提交({ version: 1, nextId: 1, entries: [] })
+      await this.提交(new 测试录制())
     })
   }
 
-  public async 开始(工具: string, 参数: JSON对象): Promise<number> {
-    let start = new Date().toISOString()
-    let 参数副本 = 复制JSON(参数)
-    if (工具.trim() === '') throw new Error('操作记录缺少工具名')
-    return await this.排队(async (): Promise<number> => {
-      let 文档 = this.获得文档()
-      let id = this.分配编号(文档)
-      let 条目: 操作调用条目 = {
-        id,
-        kind: 'call',
-        tool: 工具,
-        arguments: 参数副本,
-        start,
-        status: 'pending',
-        notes: null,
-      }
-      await this.提交({ ...文档, nextId: id + 1, entries: [...文档.entries, 条目] })
-      return id
-    })
+  public 开始(工具: string, 参数: JSON对象): Promise<number> {
+    let 时间 = new Date().toISOString()
+    return this.编辑((录制) => 录制.开始(工具, 参数, 时间))
   }
 
-  public async 完成(id: number, 结果: 操作调用结果): Promise<void> {
-    检查索引(id, '操作 ID', 1)
-    let end = new Date().toISOString()
-    let 证据 = { artifacts: 结果.artifacts.map((文件) => ({ ...文件 })), evidenceErrors: [...结果.evidenceErrors] }
-    let 完成内容: 完成字段
-    switch (结果.status) {
-      case 'passed':
-        完成内容 = { ...证据, end, status: 'passed', result: 复制JSON(结果.result) }
-        break
-      case 'failed':
-        完成内容 = { ...证据, end, status: 'failed', error: 结果.error }
-        break
-    }
-    await this.排队(async (): Promise<void> => {
-      let 文档 = this.获得文档()
-      let 当前 = 文档.entries.find((条目) => 条目.id === id)
-      if (当前 === undefined) return
-      if (当前.kind !== 'call' || 当前.status !== 'pending') throw new Error(`操作 ${String(id)} 不在运行中`)
-      let entries = 文档.entries.map((条目) => (条目 === 当前 ? { ...当前, ...完成内容 } : 条目))
-      await this.提交({ ...文档, entries })
-    })
+  public 完成(id: number, 结果: 操作调用结果): Promise<void> {
+    let 时间 = new Date().toISOString()
+    return this.编辑((录制) => 录制.完成(id, 结果, 时间))
   }
 
-  public 列出(偏移: number, 数量: number): Promise<{ total: number; entries: 操作记录摘要[] }> {
-    return this.排队(() => {
-      检查索引(偏移, '偏移量', 0)
-      检查索引(数量, '条目数', 1)
-      let { entries } = this.获得文档()
-      return { total: entries.length, entries: entries.slice(偏移, 偏移 + 数量).map(生成摘要) }
-    })
+  public 列出(偏移: number, 数量: number, 选项?: 列出选项): Promise<{ total: number; entries: 操作记录摘要[] }> {
+    return this.排队(() => this.获得录制().列出(偏移, 数量, 选项))
   }
 
   public 获得(id: number): Promise<操作记录条目> {
-    return this.排队(() => structuredClone(this.查找条目(this.获得文档(), id)))
+    return this.排队(() => this.获得录制().获得(id))
+  }
+
+  public 获得审阅(): Promise<{ 步骤们: 回放步骤选择[]; 备注们: ReturnType<测试录制['获得备注们']> }> {
+    return this.排队(() => {
+      let 录制 = this.获得录制()
+      return { 步骤们: 录制.获得回放草稿(), 备注们: 录制.获得备注们() }
+    })
   }
 
   public 更新说明(id: number, 说明: string | null | undefined, 决策说明?: string | null): Promise<void> {
-    return this.排队(async (): Promise<void> => {
-      let 文档 = this.获得文档()
-      let 当前 = this.查找条目(文档, id)
-      let notes = 说明 === undefined ? 当前.notes : 说明
-      let decision = 决策说明 === undefined ? 当前.decision : 决策说明
-      if (当前.notes === notes && 当前.decision === decision) return
-      let entries = 文档.entries.map((条目) =>
-        条目 === 当前 ? { ...当前, notes, ...(decision === undefined ? {} : { decision }) } : 条目,
-      )
-      await this.提交({ ...文档, entries })
-    })
+    return this.编辑((录制) => 录制.更新说明(id, 说明, 决策说明))
   }
 
-  public 删除(编号们: readonly number[]): Promise<void> {
-    let 编号集合 = new Set(编号们)
-    return this.排队(async (): Promise<void> => {
-      let 文档 = this.获得文档()
-      if (编号集合.size === 0) return
-      for (let id of 编号集合) this.查找条目(文档, id)
-      let entries = 文档.entries.filter((条目) => 编号集合.has(条目.id) === false)
-      await this.提交({ ...文档, entries })
-    })
+  public 添加建议(id: number, 建议: 测试建议): Promise<void> {
+    return this.编辑((录制) => 录制.添加建议(id, 建议))
+  }
+
+  public 补录(说明: string): Promise<number> {
+    let 时间 = new Date().toISOString()
+    return this.编辑((录制) => 录制.补录(说明, 时间))
+  }
+
+  public 添加备注(编号们: readonly number[], 文本: string): Promise<number> {
+    return this.编辑((录制) => 录制.添加备注(编号们, 文本))
+  }
+
+  public 更新备注(id: number, 文本: string | null): Promise<void> {
+    return this.编辑((录制) => 录制.更新备注(id, 文本))
+  }
+
+  public 排除(编号们: readonly number[]): Promise<void> {
+    return this.编辑((录制) => 录制.排除(编号们))
+  }
+
+  public 恢复(编号们: readonly number[]): Promise<void> {
+    return this.编辑((录制) => 录制.恢复(编号们))
   }
 
   public 移动(id: number, 放在此编号前: number | null): Promise<void> {
-    return this.排队(async (): Promise<void> => {
-      let 文档 = this.获得文档()
-      let 要移动 = this.查找条目(文档, id)
-      if (放在此编号前 === id) return
-      let 后项 = 放在此编号前 === null ? undefined : this.查找条目(文档, 放在此编号前)
-      let entries = 文档.entries.filter((条目) => 条目 !== 要移动)
-      entries.splice(后项 === undefined ? entries.length : entries.indexOf(后项), 0, 要移动)
-      await this.提交({ ...文档, entries })
-    })
+    return this.编辑((录制) => 录制.移动(id, 放在此编号前))
+  }
+
+  public 分组(名称: string, 编号们: readonly number[]): Promise<void> {
+    return this.编辑((录制) => 录制.分组(名称, 编号们))
+  }
+
+  public 拆组(id: number): Promise<void> {
+    return this.编辑((录制) => 录制.拆组(id))
   }
 
   public 清空(): Promise<void> {
-    return this.排队(async (): Promise<void> => {
-      let 文档 = this.获得文档()
-      if (文档.entries.length === 0) return
-      await this.提交({ ...文档, entries: [] })
-    })
+    return this.编辑((录制) => 录制.清空())
   }
 
-  public async 添加断言(
+  public 添加断言(
     来源ID: number,
     结果路径: readonly (string | number)[],
     期望: JSON值 | undefined,
-    选项?: { 说明?: string | undefined; 并入上一组?: boolean | undefined; 期望来源?: 断言期望来源 | undefined },
+    选项: 断言选项,
   ): Promise<number> {
-    let createdAt = new Date().toISOString()
-    if ((期望 === undefined) === (选项?.期望来源 === undefined)) throw new Error('必须且只能指定一个断言期望')
-    let 期望副本 = 期望 === undefined ? undefined : 复制JSON(期望)
-    let 期望来源 =
-      选项?.期望来源 === undefined
-        ? undefined
-        : { sourceId: 选项.期望来源.sourceId, path: 结果路径模式.parse(选项.期望来源.path) }
-    let 路径副本 = 结果路径模式.parse(结果路径)
-    return await this.排队(async (): Promise<number> => {
-      let 文档 = this.获得文档()
-      let 来源 = this.查找条目(文档, 来源ID)
-      if (来源.kind !== 'call' || 来源.status !== 'passed') throw new Error('断言必须引用已成功的工具调用')
-      let 结果们 = new Map<number, JSON对象>([[来源ID, 来源.result]])
-      let 期望条目 = 期望来源 === undefined ? undefined : this.查找条目(文档, 期望来源.sourceId)
-      if (期望条目 !== undefined) {
-        if (期望条目.kind !== 'call' || 期望条目.status !== 'passed')
-          throw new Error('断言期望必须引用已成功的工具调用')
-        结果们.set(期望条目.id, 期望条目.result)
-      }
-      读取操作结果字段(结果们, 来源ID, 路径副本)
-      if (期望来源 !== undefined) 读取操作结果字段(结果们, 期望来源.sourceId, 期望来源.path)
-      let id = this.分配编号(文档)
-      let 期望字段 = 期望来源 === undefined ? { expected: JSON值模式.parse(期望副本) } : { expectedFrom: 期望来源 }
-      let 条目: 操作断言条目 = {
-        id,
-        kind: 'assertion',
-        sourceId: 来源ID,
-        path: 路径副本,
-        operator: 'deepEqual',
-        ...期望字段,
-        notes: 选项?.说明 ?? null,
-        ...(选项?.并入上一组 === undefined ? {} : { mergeWithPreviousAttachmentGroup: 选项.并入上一组 }),
-        createdAt,
-      }
-      let entries = [...文档.entries]
-      let 插入索引 = Math.max(entries.indexOf(来源), 期望条目 === undefined ? -1 : entries.indexOf(期望条目)) + 1
-      for (
-        let 后项 = entries[插入索引];
-        后项?.kind === 'assertion' && 后项.sourceId === 来源ID;
-        后项 = entries[插入索引]
-      )
-        插入索引 += 1
-      entries.splice(插入索引, 0, 条目)
-      await this.提交({ ...文档, nextId: id + 1, entries })
-      return id
+    let 时间 = new Date().toISOString()
+    return this.编辑((录制) => 录制.添加断言(来源ID, 结果路径, 期望, 选项, 时间))
+  }
+
+  public 准备导出(步骤组?: readonly 回放步骤选择[]): Promise<导出回放步骤[]> {
+    return this.排队(() => this.获得录制().准备导出(步骤组))
+  }
+
+  private 编辑<T>(应用: (录制: 测试录制) => T): Promise<T> {
+    return this.排队(async (): Promise<T> => {
+      let 候选 = this.获得录制().复制()
+      let 结果 = 应用(候选)
+      await this.提交(候选)
+      return 结果
     })
   }
 
   private 排队<T>(操作: () => T | Promise<T>): Promise<T> {
     let 本次 = this.队列.then(操作)
-    // 错误由本次调用者处理，之后的操作仍从上次提交的文档开始。
+    // 错误由本次调用者处理，之后的操作仍从上次提交的录制开始。
     this.队列 = 本次.then(
       (): void => {},
       (): void => {},
@@ -285,25 +176,13 @@ export class 测试操作记录 {
     return 本次
   }
 
-  private 获得文档(): 操作记录文档 {
-    if (this.文档 === undefined) throw new Error('操作记录尚未初始化')
-    return this.文档
+  private 获得录制(): 测试录制 {
+    if (this.录制 === undefined) throw new Error('操作记录尚未初始化')
+    return this.录制
   }
 
-  private 查找条目(文档: 操作记录文档, id: number): 操作记录条目 {
-    检查索引(id, '操作 ID', 1)
-    let 条目 = 文档.entries.find((候选) => 候选.id === id)
-    if (条目 === undefined) throw new Error(`找不到操作记录 ${String(id)}`)
-    return 条目
-  }
-
-  private 分配编号(文档: 操作记录文档): number {
-    if (Number.isSafeInteger(文档.nextId + 1) === false) throw new Error('操作记录 ID 已用尽')
-    return 文档.nextId
-  }
-
-  private async 提交(文档: 操作记录文档): Promise<void> {
-    let 内容 = `${JSON.stringify(文档, null, 2)}\n`
+  private async 提交(录制: 测试录制): Promise<void> {
+    let 内容 = `${JSON.stringify(录制.快照(), null, 2)}\n`
     let 临时路径 = `${this.文件路径}.${randomUUID()}.tmp`
     let 文件 = await open(临时路径, 'wx', 0o600)
     try {
@@ -322,6 +201,6 @@ export class 测试操作记录 {
       }
       throw 错误
     }
-    this.文档 = 文档
+    this.录制 = 录制
   }
 }

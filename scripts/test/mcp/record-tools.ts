@@ -17,24 +17,54 @@ export function 注册操作记录工具(
 
   注册(
     'record_list',
-    'List operation and assertion summaries in the current order. Use record_get for parameters, results and evidence.',
-    z.strictObject({ offset: z.int().nonnegative().default(0), limit: z.int().positive().default(50) }),
-    async ({ offset, limit }) => 直接返回(await 记录.列出(offset, limit)),
+    'Browser and test tool calls are recorded automatically and return recordId. After a business action or check, use view: recording and afterId to review new entries, including excluded calls and manual entries. The default view lists the replay draft in order. Use record_get for details.',
+    z.strictObject({
+      offset: z.int().nonnegative().default(0),
+      limit: z.int().positive().default(50),
+      view: z.enum(['replay', 'recording']).default('replay'),
+      afterId: z.int().nonnegative().optional(),
+    }),
+    async ({ offset, limit, view, afterId }) =>
+      直接返回(await 记录.列出(offset, limit, { 原始: view === 'recording', 在此编号后: afterId })),
     只读,
   )
   注册(
     'record_get',
-    'Read an operation or assertion by its stable record ID.',
+    'Read a recorded call, assertion, or manual entry by its stable ID, including excluded entries and suggestions.',
     z.strictObject({ id: 编号模型 }),
     async ({ id }) => 直接返回({ entry: await 记录.获得(id) }),
     只读,
   )
   注册(
+    'record_review',
+    'Review the replay draft as ordered steps, with their record IDs and any notes linked to multiple operations. Use record_list for summaries and record_get for original results.',
+    无参数模型,
+    async () => {
+      let { 步骤们, 备注们 } = await 记录.获得审阅()
+      return 直接返回({
+        steps: 步骤们.map(({ 名称, 条目编号们 }) => ({
+          ...(名称 === undefined ? {} : { title: 名称 }),
+          ids: [...条目编号们],
+        })),
+        notes: 备注们,
+      })
+    },
+    只读,
+  )
+  注册(
+    'record_add_manual',
+    'Add a description of an action performed outside the test MCP tools. The entry is a manual account of what happened. If replay depends on it, provide reproducible setup in the test separately.',
+    z.strictObject({ description: z.string().trim().min(1) }),
+    async ({ description }) => 直接返回({ id: await 记录.补录(description) }),
+  )
+  注册(
     'record_note',
-    'Add a step title or a short decision note to a selected operation or assertion. When useful, say what you observed, what you chose to do or check, and why the check matters. Export shows decision notes on the relevant report step. Pass null to clear either field.',
+    'With id, update the title or decision on a single entry. With ids and a decision, add one shared note linked to several entries. With noteId and a decision, edit an existing shared note. Pass null to clear a single-entry field or remove the shared note.',
     z
       .strictObject({
-        id: 编号模型,
+        id: 编号模型.optional(),
+        ids: z.array(编号模型).min(1).optional(),
+        noteId: 编号模型.optional(),
         note: z.string().nullable().optional().describe('Optional title for the exported step.'),
         decision: z
           .string()
@@ -44,24 +74,60 @@ export function 注册操作记录工具(
           .optional()
           .describe('Optional evidence-based explanation for the report.'),
       })
-      .refine(({ note, decision }) => note !== undefined || decision !== undefined, 'Provide note or decision.'),
-    async ({ id, note, decision }) => {
+      .refine(({ id, ids, noteId, note, decision }) => {
+        if ([id, ids, noteId].filter((值) => 值 !== undefined).length !== 1) return false
+        if (ids !== undefined) return typeof decision === 'string' && note === undefined
+        if (noteId !== undefined) return decision !== undefined && note === undefined
+        return note !== undefined || decision !== undefined
+      }, 'Use id with note or decision, ids with a decision string, or noteId with decision.'),
+    async ({ id, ids, noteId, note, decision }) => {
+      if (ids !== undefined && typeof decision === 'string')
+        return 直接返回({ noteId: await 记录.添加备注(ids, decision), ids })
+      if (noteId !== undefined && decision !== undefined) {
+        await 记录.更新备注(noteId, decision)
+        return 直接返回({ noteId })
+      }
+      if (id === undefined) throw new Error('缺少要更新说明的记录 ID')
       await 记录.更新说明(id, note, decision)
       return 直接返回({ id })
     },
   )
   注册(
+    'record_add_suggestion',
+    'Record an improvement suggestion about an operation, interaction, interface, or other aspect observed during exploration. Attach it to a completed record by ID and describe the observation and impact. Add a concrete improvement if known. The report labels suggestions separately from the acceptance result.',
+    z.strictObject({
+      id: 编号模型.describe('Record ID this suggestion belongs to.'),
+      title: z.string().trim().min(1),
+      observation: z.string().trim().min(1),
+      impact: z.string().trim().min(1),
+      improvement: z.string().trim().min(1).optional(),
+    }),
+    async ({ id, title, observation, impact, improvement }) => {
+      await 记录.添加建议(id, { 标题: title, 现象: observation, 影响: impact, 改进方向: improvement })
+      return 直接返回({ id })
+    },
+  )
+  注册(
     'record_remove',
-    'Remove entries from the record by ID. The browser and database state are untouched.',
+    'Exclude entries from the replay draft by ID. The original recording and evidence remain available. If an assertion still depends on an excluded call, explicitly exclude that assertion in the same edit or keep the call.',
     z.strictObject({ ids: z.array(编号模型).min(1) }),
     async ({ ids }) => {
-      await 记录.删除(ids)
+      await 记录.排除(ids)
+      return 直接返回({ ids })
+    },
+  )
+  注册(
+    'record_restore',
+    'Restore excluded entries to the end of the replay draft in the supplied order. Supply any required source calls before their assertions.',
+    z.strictObject({ ids: z.array(编号模型).min(1) }),
+    async ({ ids }) => {
+      await 记录.恢复(ids)
       return 直接返回({ ids })
     },
   )
   注册(
     'record_move',
-    'Move an entry before another entry. Use null to move it to the end.',
+    'Move the step containing an entry before the step containing beforeId. An ungrouped entry is its own step. Use null to move it to the end.',
     z.strictObject({ id: 编号模型, beforeId: 编号模型.nullable() }),
     async ({ id, beforeId }) => {
       await 记录.移动(id, beforeId)
@@ -69,8 +135,26 @@ export function 注册操作记录工具(
     },
   )
   注册(
+    'record_group',
+    'Group consecutive replay entries into one named business action or observation. Supply IDs in replay order. To take part of an existing group, ungroup it first.',
+    z.strictObject({ title: z.string().trim().min(1), ids: z.array(编号模型).min(1) }),
+    async ({ title, ids }) => {
+      await 记录.分组(title, ids)
+      return 直接返回({ title, ids })
+    },
+  )
+  注册(
+    'record_ungroup',
+    'Split the step containing id back into individual replay entries. The order and the original notes are preserved.',
+    z.strictObject({ id: 编号模型 }),
+    async ({ id }) => {
+      await 记录.拆组(id)
+      return 直接返回({ id })
+    },
+  )
+  注册(
     'record_clear',
-    'Clear the editable operation record. Browser and database state are untouched.',
+    'Discard the full recording and replay draft. To remove a call from replay while keeping its evidence, use record_remove.',
     无参数模型,
     async () => {
       await 记录.清空()
@@ -111,7 +195,7 @@ export function 注册操作记录工具(
   )
   注册(
     'record_export',
-    'Generate one requirement test scenario from a previously created requirement description file. Use steps for new exports and write concise Chinese business titles for the scenario and every step. Combine consecutive calls that serve the same business action into one step. For example, opening the login page, filling credentials, submitting and waiting for navigation can be grouped as “管理员登录”. Keep distinct verification outcomes as separate observations, such as “确认重名提示” and “核对新账号权限”. Do not use tool names such as browser_fill as step titles. For asynchronous UI outcomes, record and replay a targeted browser_wait or browser_wait_url for the expected result. Use whole-page snapshots to explore the UI. Keep actions and checks in replay order, include the earlier tool call for each assertion, and omit exploratory calls unnecessary for replay. Describe how the steps prove the selected acceptance criteria in scenarioApproach.',
+    'Generate a requirement test from an existing requirement description and the current replay draft. Review the draft with record_review. Optionally supply explicit steps in replay order. Use concise Chinese business titles, keep acceptance checks in an observation step, and describe how the steps prove the selected acceptance criteria in scenarioApproach. A failed, unfinished, or misplaced operation is reported by ID for you to correct.',
     z
       .strictObject({
         steps: z
@@ -123,7 +207,9 @@ export function 注册操作记录工具(
           )
           .min(1)
           .optional()
-          .describe('Business steps in replay order. Include at least one observation group containing only checks.'),
+          .describe(
+            'Optional explicit selection. Omit it to use the current replay draft. Include a separate observation that checks the acceptance criteria.',
+          ),
         ids: z
           .array(编号模型)
           .min(1)
@@ -158,7 +244,7 @@ export function 注册操作记录工具(
             'Coverage limits, setup choices, or other notes for the reader. The runner reports the actual result.',
           ),
       })
-      .refine(({ ids, steps }) => (ids === undefined) !== (steps === undefined), 'Provide either steps or ids.'),
+      .refine(({ ids, steps }) => ids === undefined || steps === undefined, 'Provide at most one of steps or ids.'),
     async ({
       ids,
       steps,
@@ -170,14 +256,8 @@ export function 注册操作记录工具(
       conclusionNotes,
     }) => {
       let 说明 = { 测试思路: scenarioApproach, 结论补充: conclusionNotes } satisfies Required<流程说明>
-      let 分组们 = steps ?? ids?.map((id) => ({ title: undefined, ids: [id] }))
-      if (分组们 === undefined) throw new Error('缺少导出步骤')
-      let 步骤组 = await Promise.all(
-        分组们.map(async ({ title, ids: 条目编号们 }) => ({
-          名称: title,
-          条目们: await Promise.all(条目编号们.map((id) => 记录.获得(id))),
-        })),
-      )
+      let 分组们 = steps?.map(({ title, ids }) => ({ 名称: title, 条目编号们: ids }))
+      let 步骤组 = await 记录.准备导出(分组们 ?? ids?.map((id) => ({ 条目编号们: [id] })))
       let { 写出需求测试 } = await import('../requirement/export-file')
       let 路径 = await 写出需求测试(项目根目录, {
         文件名: fileName,

@@ -1,16 +1,26 @@
-import { 流程说明模型, type 流程说明 } from '../../../src/model/test-requirement'
-import { 读取操作结果字段 } from '../../../src/test-tools/operation-assertion'
-import type { JSON值, 操作断言条目, 操作记录条目, 操作调用条目 } from '../../../src/test-tools/operation-record'
+import { 流程说明模型, type 流程说明, type 测试建议 } from '../../../src/model/test-requirement'
+import type {
+  JSON值,
+  回放条目,
+  导出回放步骤,
+  操作断言条目,
+  操作调用条目,
+} from '../../../src/model/test-requirement/recording'
 import { 生成调用代码, 生成重放地址, type 重放地址配置 } from './operation-code'
 
 type 导出参数 = 流程说明 & {
   需求模块路径: string
   覆盖验收点键们: readonly string[]
   流程名称: string
-  步骤组: readonly { 名称?: string | undefined; 条目们: readonly 操作记录条目[] }[]
+  步骤组: readonly 导出回放步骤[]
   测试地址: 重放地址配置
 }
-type 步骤代码 = ReturnType<typeof 生成调用代码> & { 决策说明: string | null; 提交断言结果?: true }
+type 步骤代码 = ReturnType<typeof 生成调用代码> & {
+  操作编号: number
+  建议们: readonly 测试建议[]
+  决策说明: string | null
+  提交断言结果?: true
+}
 let 返回浏览器地址的操作 = new Set([
   'browser_open',
   'browser_navigate',
@@ -35,56 +45,36 @@ function 代码字面量(值: JSON值): string {
   return JSON.stringify(值).replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029')
 }
 
-function 生成步骤(名称: string, 代码们: readonly 步骤代码[]): string {
+function 生成步骤(名称: string, 代码们: readonly 步骤代码[], 备注们: readonly string[]): string {
   let 类型 = 代码们.some((代码) => 代码.类型 === '行为') ? '行为' : '观察'
-  let 异步 = 代码们.some((代码) => 代码.异步 === true)
-  let 提交证据 = 代码们.some((代码) => 代码.决策说明 !== null || 代码.提交断言结果 === true)
-  let 语句 = 代码们.flatMap(({ 语句们, 决策说明 }) => {
+  let 建议们 = 代码们.flatMap(({ 操作编号, 建议们 }) => 建议们.map((建议) => ({ ...建议, 操作编号 })))
+  let 有建议 = 建议们.length > 0
+  let 异步 = 有建议 || 代码们.some((代码) => 代码.异步 === true)
+  let 提交证据 = 备注们.length > 0 || 代码们.some((代码) => 代码.决策说明 !== null || 代码.提交断言结果 === true)
+  let 语句 = 代码们.flatMap(({ 语句们, 决策说明, 建议们, 操作编号, 异步 }) => {
     let 当前语句 = [...语句们]
     if (决策说明 !== null)
       当前语句.unshift(`提交附件([{ 类型: '文本', 内容: ${代码字面量(`决策说明\n${决策说明}`)} }])`)
+    if (建议们.length > 0) {
+      let 操作函数 = 异步 === true ? 'async (): Promise<void>' : '(): void'
+      return [`await 执行操作(${String(操作编号)}, ${操作函数} => {`, ...当前语句.map((行) => `  ${行}`), '})']
+    }
     if (代码们.length === 1 || 语句们.some((行) => 行.startsWith('let ')) === false) return 当前语句
     return ['{', ...当前语句.map((行) => `  ${行}`), '}']
   })
+  语句.unshift(...备注们.map((备注) => `提交附件([{ 类型: '文本', 内容: ${代码字面量(`步骤备注\n${备注}`)} }])`))
   if (类型 === '行为') 语句.push(异步 === true ? 'return 当前状态' : 'return Promise.resolve(当前状态)')
   let 返回类型 = 类型 === '行为' ? 'Promise<测试上下文>' : 异步 === true ? 'Promise<void>' : 'void'
   let 函数 = 异步 === true ? 'async ' : ''
-  let 参数 = 提交证据 ? '当前状态, 提交附件' : '当前状态'
+  let 参数 = ['当前状态']
+  if (提交证据 || 有建议) 参数.push(提交证据 ? '提交附件' : '_提交附件')
+  if (有建议) 参数.push('执行操作')
+  let 选项 = 有建议 ? `, { 建议们: ${JSON.stringify(建议们)} }` : ''
   return [
-    `    new ${类型}<测试上下文>(${代码字面量(名称)}, ${函数}(${参数}): ${返回类型} => {`,
+    `    new ${类型}<测试上下文>(${代码字面量(名称)}, ${函数}(${参数.join(', ')}): ${返回类型} => {`,
     ...语句.flatMap((行) => 行.split('\n').map((子行) => `      ${子行}`)),
-    '    }),',
+    `    }${选项}),`,
   ].join('\n')
-}
-
-function 验证所选条目(条目们: readonly 操作记录条目[]): ReadonlyMap<number, 操作调用条目> {
-  let 条目索引 = new Map<number, { 条目: 操作记录条目; 索引: number }>()
-  for (let [索引, 条目] of 条目们.entries()) {
-    let id = 条目.id
-    if (Number.isSafeInteger(id) === false || id <= 0) throw new Error(`无效的操作记录 ID #${String(id)}`)
-    if (条目索引.has(id)) throw new Error(`重复选择了操作记录 #${String(id)}`)
-    if (条目.kind === 'call' && 条目.status === 'pending')
-      throw new Error(`操作记录 #${String(id)}（${条目.tool}）尚未完成`)
-    条目索引.set(id, { 条目, 索引 })
-  }
-  let 断言来源们 = new Map<number, 操作调用条目>()
-  for (let [索引, 条目] of 条目们.entries()) {
-    if (条目.kind !== 'assertion') continue
-    let 引用们 = [
-      { sourceId: 条目.sourceId, path: 条目.path },
-      ...(条目.expectedFrom === undefined ? [] : [条目.expectedFrom]),
-    ]
-    for (let 引用 of 引用们) {
-      let 来源 = 条目索引.get(引用.sourceId)
-      let 说明 = `断言 #${String(条目.id)} 的来源操作 #${String(引用.sourceId)}`
-      if (来源 === undefined || 来源.条目.kind !== 'call') throw new Error(`${说明}未被选中`)
-      if (来源.索引 >= 索引) throw new Error(`${说明}必须排在该断言前面`)
-      if (来源.条目.status !== 'passed') throw new Error(`${说明}必须是成功完成的调用`)
-      读取操作结果字段(new Map([[引用.sourceId, 来源.条目.result]]), 引用.sourceId, 引用.path)
-      断言来源们.set(引用.sourceId, 来源.条目)
-    }
-  }
-  return 断言来源们
 }
 
 function 生成断言期望(断言: 操作断言条目, 来源: 操作调用条目, 测试地址: 重放地址配置): string {
@@ -110,11 +100,17 @@ export function 生成需求测试代码(参数: 导出参数): string {
     值 === undefined ? [] : [`  ${代码字面量(字段)}: ${代码字面量(值)},`],
   )
   let 条目们 = 参数.步骤组.flatMap((分组) => 分组.条目们)
-  if (条目们.length === 0) throw new Error('没有选中可导出的操作记录')
-  let 断言来源们 = 验证所选条目(条目们)
-  let 有断言 = 断言来源们.size > 0
-  let 生成条目代码 = (条目: 操作记录条目): 步骤代码 => {
-    let 决策说明 = 条目.decision ?? null
+  let 引用编号们 = new Set(
+    条目们.flatMap((条目) => {
+      if (条目.kind !== 'assertion') return []
+      return 条目.expectedFrom === undefined ? [条目.sourceId] : [条目.sourceId, 条目.expectedFrom.sourceId]
+    }),
+  )
+  let 断言来源们 = new Map<number, 操作调用条目>()
+  for (let 条目 of 条目们) if (条目.kind === 'call' && 引用编号们.has(条目.id)) 断言来源们.set(条目.id, 条目)
+  let 有断言 = 引用编号们.size > 0
+  let 生成条目代码 = (条目: 回放条目): 步骤代码 => {
+    let 记录说明 = { 操作编号: 条目.id, 建议们: 条目.suggestions ?? [], 决策说明: 条目.decision ?? null }
     switch (条目.kind) {
       case 'assertion': {
         let 说明 = 条目.notes?.trim()
@@ -125,7 +121,7 @@ export function 生成需求测试代码(参数: 导出参数): string {
         return {
           名称: 说明 === undefined || 说明 === '' ? 名称 : 说明,
           类型: '观察',
-          决策说明,
+          ...记录说明,
           提交断言结果: true,
           语句们: [
             `let 实际 = 读取操作结果字段(当前状态.结果们, ${String(条目.sourceId)}, ${代码字面量(条目.path)})`,
@@ -138,26 +134,22 @@ export function 生成需求测试代码(参数: 导出参数): string {
         }
       }
       case 'call':
-        return { ...生成调用代码(条目, { 需要结果: 断言来源们.has(条目.id), 测试地址: 参数.测试地址 }), 决策说明 }
+        return { ...生成调用代码(条目, { 需要结果: 断言来源们.has(条目.id), 测试地址: 参数.测试地址 }), ...记录说明 }
     }
   }
-  let 分组代码们 = 参数.步骤组.map(({ 名称, 条目们 }) => {
+  let 分组代码们 = 参数.步骤组.map(({ 名称, 条目们, 备注们 }) => {
     let 代码们 = 条目们.map(生成条目代码)
     let 第一项 = 代码们[0]
     if (第一项 === undefined) throw new Error('导出步骤至少需要一条记录')
     let 步骤名称 = 名称?.trim() ?? 第一项.名称
     if (步骤名称 === '') throw new Error('导出步骤名称不能为空')
-    return { 名称: 步骤名称, 代码们 }
-  })
-  let 有等待检查 = 条目们.some(
-    (条目) => 条目.kind === 'call' && (条目.tool === 'browser_wait' || 条目.tool === 'browser_wait_url'),
-  )
-  if (有断言 === false && 有等待检查 === false)
-    throw new Error(
-      `所选操作记录 ${条目们.map(({ id }) => `#${String(id)}`).join('、')} 缺少验收检查，请选择断言或浏览器等待步骤`,
+    let 含验收检查 = 条目们.some(
+      (条目) => 条目.kind === 'assertion' || 条目.tool === 'browser_wait' || 条目.tool === 'browser_wait_url',
     )
-  if (分组代码们.some(({ 代码们 }) => 代码们.every(({ 类型 }) => 类型 === '观察')) === false)
-    throw new Error('导出流程至少需要一个观察步骤，请把验收检查单独分组')
+    return { 名称: 步骤名称, 代码们, 含验收检查, 备注们 }
+  })
+  if (分组代码们.some(({ 代码们, 含验收检查 }) => 含验收检查 && 代码们.every(({ 类型 }) => 类型 === '观察')) === false)
+    throw new Error('导出流程至少需要一个独立的验收观察，请将断言或浏览器等待放在只含检查的步骤中')
 
   let 步骤们 = 分组代码们.flatMap(({ 代码们 }) => 代码们)
   let 导入们: string[] = []
@@ -189,7 +181,7 @@ export function 生成需求测试代码(参数: 导出参数): string {
     `  名称: ${代码字面量(流程名称)},`,
     ...流程说明代码,
     '  步骤们: [',
-    ...分组代码们.map(({ 名称, 代码们 }) => 生成步骤(名称, 代码们)),
+    ...分组代码们.map(({ 名称, 代码们, 备注们 }) => 生成步骤(名称, 代码们, 备注们)),
     '  ],',
     `  覆盖验收点们: [${覆盖验收点代码}].map((点: 验收点 | undefined): 验收点 => {`,
     '    if (点 instanceof 验收点 === false || 业务需求.包含(点) === false)',

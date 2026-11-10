@@ -33,11 +33,11 @@
   - 由 `scripts/test/requirement/run-requirement.ts` 驱动。
   - 运行 `npm run test:requirement`。可交互选择，或指定 `--all`、`--scenario=<流程名>`、`--requirement=<需求名>`、`--list`、`--auto` 或 `--demo`。任务参数 `--prepare-only` 可预览计划。
   - 每个需求的定义和流程都放在 `test/requirement/<name>/`，描述文件统一命名为 `index.requirement.ts`。列出流程和选定流程回放时允许缺少覆盖。全量运行遇到未覆盖的验收点时，会生成报告并返回失败，数据库准备和流程执行都不会开始。
-  - 自动模式在 CI 中每条流程最多尝试三次。报告输出至 `test-outputs/requirement-report/`。HTML 和 JSON 报告包含只有描述文件的需求。验收点没有关联流程时为「未实现」，有关联流程但没有尝试时为「未执行」。需求按「未证明、未实现、未执行、已证明」从高到低汇总。HTML 目录和执行结论展示验收点名称，详情展示完整描述。打开对应的流程尝试可以查看步骤、附件、失败信息和浏览器 Trace。
+  - 自动模式在 CI 中每条流程最多尝试三次。报告输出至 `test-outputs/requirement-report/`。状态规则、步骤证据和建议可在 HTML 报告中查看。
 
 ## 交互式测试 MCP
 
-测试开发套件把操作、结果和证据路径写入 `operations.json`。可以在保留浏览器和数据库现场的同时修剪记录，再导出为可回放的需求测试。
+测试开发套件自动把操作、结果和证据路径写入 `operations.json`。可以按业务步骤审阅和编辑回放草稿，再导出为需求测试。操作方法见 [AI 需求测试提示词](requirement-test-ai.md)。
 
 ### 启动和连接
 
@@ -63,6 +63,7 @@ codex mcp add playground-test --url http://127.0.0.1:30006/mcp
 - `http_request` 请求当前测试后端的接口。管理员请求可用 `auth: 'test-admin'`，测试密码字段使用 `$test-password:<标签>`。
 - `database_reset` 关闭浏览器会话、重置测试库并重启后端。默认保留操作记录，传入 `clearRecord: true` 可一并清空。
 - `record_add_assertion` 用 `expected` 核对固定值，用 `expectedFrom: { sourceId, path }` 比较两次操作的结果。导出时，把断言引用的操作都放在断言前。
+- `record_add_suggestion` 为录制操作记录建议，导出后随对应步骤进入报告。
 
 ### 退出后再回放
 

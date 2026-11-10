@@ -39,16 +39,20 @@ export class 浏览器步骤取证作用域 {
     return 记录
   }
 
-  public async 运行<T>(获得配置: (会话名称: string) => 浏览器步骤证据配置, 执行: () => Promise<T>): Promise<T> {
+  public async 运行<T>(
+    获得配置: (会话名称: string) => 浏览器步骤证据配置,
+    执行: () => Promise<T>,
+    取证范围: '步骤' | '操作' = '步骤',
+  ): Promise<T> {
     let 记录们 = new Map<浏览器步骤证据记录器, 步骤证据记录>()
     let 当前 = { 已结束: false, 获得配置, 记录们 }
     return await this.当前.run(当前, async (): Promise<T> => {
       try {
         let 结果 = await 执行()
-        for (let 记录器 of 记录们.keys()) await 记录器.采集('步骤结束', '步骤结束时的页面')
+        for (let 记录器 of 记录们.keys()) await 记录器.采集('步骤结束', `${取证范围}结束时的页面`)
         return 结果
       } catch (错误) {
-        for (let 记录器 of 记录们.keys()) await 记录器.采集('失败现场', '步骤失败时的页面')
+        for (let 记录器 of 记录们.keys()) await 记录器.采集('失败现场', `${取证范围}失败时的页面`)
         throw 错误
       } finally {
         当前.已结束 = true

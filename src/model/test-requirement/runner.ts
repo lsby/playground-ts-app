@@ -1,4 +1,14 @@
-import { 流程, 流程步骤附件列表模型, 状态, 行为, type 提交步骤附件, type 流程步骤附件, type 验收点 } from './model'
+import {
+  流程,
+  流程步骤附件列表模型,
+  状态,
+  行为,
+  type 执行回放操作,
+  type 提交步骤附件,
+  type 流程建议,
+  type 流程步骤附件,
+  type 验收点,
+} from './model'
 
 export type 流程运行错误 = {
   文本: string
@@ -9,11 +19,13 @@ export type 流程运行错误 = {
 }
 
 type 执行时段 = { 开始时间: string; 结束时间: string; 耗时毫秒: number }
-type 步骤标识 = { 名称: string; 类型: '准备' | '行为' | '观察' }
+type 步骤标识 = { 名称: string; 类型: '准备' | '行为' | '观察'; 建议们: readonly 流程建议[] }
+type 执行步骤函数<结果> = (提交: 提交步骤附件, 执行操作: 执行回放操作) => Promise<结果>
 type 已执行步骤 = 步骤标识 &
   执行时段 & {
     状态: '通过' | '失败' | '中断'
     附件组们: readonly (readonly 流程步骤附件[])[]
+    操作附件位置们?: readonly { 操作编号: number; 附件组索引: number }[]
     取证错误们: readonly 流程运行错误[]
     错误?: 流程运行错误
   }
@@ -31,6 +43,7 @@ export type 流程运行描述<系统状态 extends object> = 执行时段 & {
 export type 流程运行配置 = {
   取消信号: AbortSignal
   执行步骤: <结果>(提交: 提交步骤附件, 记录错误: (错误: unknown) => void, 执行: () => Promise<结果>) => Promise<结果>
+  执行操作?: (提交: 提交步骤附件, 记录错误: (错误: unknown) => void, 执行: Parameters<执行回放操作>[1]) => Promise<void>
   格式化错误: (错误: unknown) => 流程运行错误
 }
 
@@ -52,19 +65,20 @@ export class 运行器<系统状态 extends object> {
     let 开始 = Date.now()
     let 流程步骤们 = 当前流程.获得步骤们()
     let 步骤们: 运行步骤描述[] = [
-      { 名称: '准备数据', 类型: '准备', 状态: '未执行' },
+      { 名称: '准备数据', 类型: '准备', 状态: '未执行', 建议们: [] },
       ...流程步骤们.map(
         (步骤): 运行步骤描述 => ({
           名称: 步骤.获得描述(),
           类型: 步骤 instanceof 行为 ? '行为' : '观察',
           状态: '未执行',
+          建议们: 步骤.获得建议们(),
         }),
       ),
     ]
     let 日志们: string[] = []
     let 当前状态: 状态<系统状态> | undefined
     let 错误详情: 流程运行错误 | undefined
-    let 运行步骤 = async <结果>(索引: number, 执行: (提交: 提交步骤附件) => Promise<结果>): Promise<结果> => {
+    let 运行步骤 = async <结果>(索引: number, 执行: 执行步骤函数<结果>): Promise<结果> => {
       let 步骤 = 步骤们[索引]
       if (步骤 === undefined) throw new Error(`流程步骤索引越界：${String(索引)}`)
       this.配置.取消信号.throwIfAborted()
@@ -82,10 +96,10 @@ export class 运行器<系统状态 extends object> {
       当前状态 = 已知状态
       for (let [索引, 步骤] of 流程步骤们.entries()) {
         if (步骤 instanceof 行为) {
-          已知状态 = await 运行步骤(索引 + 1, (提交) => 已知状态.迁移(步骤, 提交))
+          已知状态 = await 运行步骤(索引 + 1, (提交, 执行操作) => 已知状态.迁移(步骤, 提交, 执行操作))
           当前状态 = 已知状态
         } else {
-          await 运行步骤(索引 + 1, (提交) => 步骤.验证(已知状态.读取(), 提交))
+          await 运行步骤(索引 + 1, (提交, 执行操作) => 步骤.验证(已知状态.读取(), 提交, 执行操作))
         }
       }
       this.配置.取消信号.throwIfAborted()
@@ -111,40 +125,53 @@ export class 运行器<系统状态 extends object> {
 
   private async 记录步骤<结果>(
     步骤: 步骤标识,
-    执行: (提交: 提交步骤附件) => Promise<结果>,
+    执行: 执行步骤函数<结果>,
     记录: (步骤: 已执行步骤) => void,
   ): Promise<结果> {
     let 开始 = Date.now()
     let 附件组们: 流程步骤附件[][] = []
     let 取证错误们: 流程运行错误[] = []
+    let 操作附件位置 = new Map<number, number>()
+    let 当前操作编号: number | undefined
     let 提交: 提交步骤附件 = (提交内容, 选项) => {
       let 附件们 = 流程步骤附件列表模型.parse(提交内容)
       if (附件们.length === 0) return
       let 上一组 = 附件组们.at(-1)
       if (选项?.并入上一组 === true && 上一组 !== undefined) 上一组.push(...附件们)
       else 附件组们.push(附件们)
+      if (当前操作编号 !== undefined) 操作附件位置.set(当前操作编号, 附件组们.length - 1)
     }
     let 记录取证错误 = (错误: unknown): void => {
       取证错误们.push(this.配置.格式化错误(错误))
     }
+    let 执行操作: 执行回放操作 = async (编号, 操作) => {
+      if (当前操作编号 !== undefined) throw new Error('同一个流程步骤不能同时记录多个回放操作')
+      当前操作编号 = 编号
+      try {
+        if (this.配置.执行操作 === undefined) await 操作()
+        else await this.配置.执行操作(提交, 记录取证错误, 操作)
+      } finally {
+        当前操作编号 = undefined
+      }
+    }
+    let 附件记录 = (): Pick<已执行步骤, '附件组们' | '操作附件位置们' | '取证错误们'> => ({
+      附件组们: 附件组们.map((组) => [...组]),
+      ...(操作附件位置.size === 0
+        ? {}
+        : { 操作附件位置们: Array.from(操作附件位置, ([操作编号, 附件组索引]) => ({ 操作编号, 附件组索引 })) }),
+      取证错误们: [...取证错误们],
+    })
     try {
-      let 执行结果 = await this.配置.执行步骤(提交, 记录取证错误, () => 执行(提交))
+      let 执行结果 = await this.配置.执行步骤(提交, 记录取证错误, () => 执行(提交, 执行操作))
       this.配置.取消信号.throwIfAborted()
-      记录({
-        ...步骤,
-        ...计算时段(开始),
-        状态: '通过',
-        附件组们: 附件组们.map((组) => [...组]),
-        取证错误们: [...取证错误们],
-      })
+      记录({ ...步骤, ...计算时段(开始), 状态: '通过', ...附件记录() })
       return 执行结果
     } catch (错误) {
       记录({
         ...步骤,
         ...计算时段(开始),
         状态: this.配置.取消信号.aborted ? '中断' : '失败',
-        附件组们: 附件组们.map((组) => [...组]),
-        取证错误们: [...取证错误们],
+        ...附件记录(),
         错误: this.配置.格式化错误(错误),
       })
       throw 错误

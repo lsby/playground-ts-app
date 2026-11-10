@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 
 import type { 浏览器测试模式 } from '../model/browser-test'
 import type {
+  可等待结果,
   提交步骤附件,
   流程步骤附件,
   测试数据库值,
@@ -93,6 +94,10 @@ export class 测试运行工具 {
 
   public async 收集附件(记录错误: (错误: unknown) => void): Promise<readonly 需求测试附件[]> {
     return await this.浏览器.收集附件(记录错误)
+  }
+
+  public 执行操作(提交: 提交步骤附件, 记录错误: (错误: unknown) => void, 执行: () => 可等待结果<void>): Promise<void> {
+    return this.浏览器.执行步骤(提交, 记录错误, async (): Promise<void> => await 执行(), '操作')
   }
 
   public async 关闭当前现场(): Promise<void> {

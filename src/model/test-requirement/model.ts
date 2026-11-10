@@ -85,17 +85,36 @@ export let 流程步骤附件列表模型 = z
 export type 流程步骤附件 = z.infer<typeof 流程步骤附件列表模型>[number]
 export type 提交步骤附件 = (附件们: readonly 流程步骤附件[], 选项?: { 并入上一组?: boolean }) => void
 
+export let 测试建议模型 = z.strictObject({
+  标题: z.string().trim().min(1),
+  现象: z.string().trim().min(1),
+  影响: z.string().trim().min(1),
+  改进方向: z.string().trim().min(1).optional(),
+})
+export type 测试建议 = Readonly<z.infer<typeof 测试建议模型>>
+let 流程建议模型 = 测试建议模型.extend({ 操作编号: z.number().int().positive().safe().optional() })
+export type 流程建议 = Readonly<z.infer<typeof 流程建议模型>>
+type 流程步骤选项 = { 建议们?: readonly 流程建议[] }
+export type 执行回放操作 = (操作编号: number, 执行: () => 可等待结果<void>) => Promise<void>
+
+let 直接执行回放操作: 执行回放操作 = async (_编号, 执行) => await 执行()
+
 /**
  * 流程步骤是行为和观察共同具有的一般概念。
  * 它持有可供运行日志和报告识别的步骤描述，具体执行语义由子类提供。
  */
 export abstract class 流程步骤 {
   private readonly 描述: string
-  protected constructor(描述: string) {
+  private readonly 建议们: readonly 流程建议[]
+  protected constructor(描述: string, 选项?: 流程步骤选项) {
     this.描述 = 解析领域文本('流程步骤描述', 描述)
+    this.建议们 = 流程建议模型.array().parse(选项?.建议们 ?? [])
   }
   public 获得描述(): string {
     return this.描述
+  }
+  public 获得建议们(): readonly 流程建议[] {
+    return this.建议们.map((建议) => ({ ...建议 }))
   }
 }
 
@@ -104,13 +123,17 @@ export abstract class 流程步骤 {
  * 它持有状态迁移函数，能够执行一次迁移。
  */
 export class 行为<系统状态 extends object> extends 流程步骤 {
-  private readonly 迁移函数: (当前状态: 系统状态, 提交附件: 提交步骤附件) => Promise<系统状态>
-  public constructor(描述: string, 迁移函数: (当前状态: 系统状态, 提交附件: 提交步骤附件) => Promise<系统状态>) {
-    super(描述)
+  private readonly 迁移函数: (当前状态: 系统状态, 提交附件: 提交步骤附件, 执行操作: 执行回放操作) => Promise<系统状态>
+  public constructor(
+    描述: string,
+    迁移函数: (当前状态: 系统状态, 提交附件: 提交步骤附件, 执行操作: 执行回放操作) => Promise<系统状态>,
+    选项?: 流程步骤选项,
+  ) {
+    super(描述, 选项)
     this.迁移函数 = 迁移函数
   }
-  public 迁移(当前状态: 系统状态, 提交附件: 提交步骤附件): Promise<系统状态> {
-    return this.迁移函数(当前状态, 提交附件)
+  public 迁移(当前状态: 系统状态, 提交附件: 提交步骤附件, 执行操作 = 直接执行回放操作): Promise<系统状态> {
+    return this.迁移函数(当前状态, 提交附件, 执行操作)
   }
 }
 
@@ -119,16 +142,21 @@ export class 行为<系统状态 extends object> extends 流程步骤 {
  * 验证函数可提交附件，验证失败时通过异常终止流程。
  */
 export class 观察<系统状态 extends object> extends 流程步骤 {
-  private readonly 验证函数: (当前状态: Readonly<系统状态>, 提交附件: 提交步骤附件) => 可等待结果<void>
+  private readonly 验证函数: (
+    当前状态: Readonly<系统状态>,
+    提交附件: 提交步骤附件,
+    执行操作: 执行回放操作,
+  ) => 可等待结果<void>
   public constructor(
     描述: string,
-    验证函数: (当前状态: Readonly<系统状态>, 提交附件: 提交步骤附件) => 可等待结果<void>,
+    验证函数: (当前状态: Readonly<系统状态>, 提交附件: 提交步骤附件, 执行操作: 执行回放操作) => 可等待结果<void>,
+    选项?: 流程步骤选项,
   ) {
-    super(描述)
+    super(描述, 选项)
     this.验证函数 = 验证函数
   }
-  public async 验证(当前状态: Readonly<系统状态>, 提交附件: 提交步骤附件): Promise<void> {
-    await this.验证函数(当前状态, 提交附件)
+  public async 验证(当前状态: Readonly<系统状态>, 提交附件: 提交步骤附件, 执行操作 = 直接执行回放操作): Promise<void> {
+    await this.验证函数(当前状态, 提交附件, 执行操作)
   }
 }
 
@@ -141,8 +169,12 @@ export class 状态<系统状态 extends object> {
   public constructor(系统内容: 系统状态) {
     this.系统内容 = 系统内容
   }
-  public async 迁移(当前行为: 行为<系统状态>, 提交附件: 提交步骤附件): Promise<状态<系统状态>> {
-    return new 状态<系统状态>(await 当前行为.迁移(this.系统内容, 提交附件))
+  public async 迁移(
+    当前行为: 行为<系统状态>,
+    提交附件: 提交步骤附件,
+    执行操作 = 直接执行回放操作,
+  ): Promise<状态<系统状态>> {
+    return new 状态<系统状态>(await 当前行为.迁移(this.系统内容, 提交附件, 执行操作))
   }
   public 读取(): Readonly<系统状态> {
     return this.系统内容

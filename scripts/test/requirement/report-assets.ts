@@ -149,6 +149,22 @@ export let 交互脚本 = `
       else if (buttonBounds.bottom > listBounds.bottom) timeline.scrollTop += buttonBounds.bottom - listBounds.bottom
     }
     for (let [index, button] of buttons.entries()) button.onclick = () => selectStep(index)
+    for (let link of workspace.parentElement.querySelectorAll('[data-suggestion-step]')) {
+      link.onclick = () => {
+        let index = Number(link.dataset.suggestionStep)
+        selectStep(index)
+        let panel = document.getElementById(buttons[index].getAttribute('aria-controls'))
+        let suggestion = panel.querySelector('[data-suggestion-card="' + link.dataset.suggestionIndex + '"]')
+        let frame = suggestion.closest('[data-frame]')
+        if (frame !== null) {
+          let gallery = frame.closest('[data-gallery]')
+          let frames = [...gallery.querySelectorAll('[data-frame]')]
+          showGalleryPage(gallery, frames, frames.indexOf(frame))
+        }
+        suggestion.focus({ preventScroll: true })
+        suggestion.scrollIntoView({ block: 'nearest' })
+      }
+    }
     previous.onclick = () => selectStep(current - 1)
     next.onclick = () => selectStep(current + 1)
     stepResets.set(workspace, () => {
@@ -275,7 +291,7 @@ header{background:light-dark(#183d34,#122c23);color:light-dark(#fff,#e5f0ea)}
 .layout{--directory-width:310px;flex:1;min-height:0;width:min(100%,1440px);margin:0 auto;padding:28px 36px 24px;display:grid;grid-template-columns:var(--directory-width) 16px minmax(0,1fr);gap:4px}
 .surface{background:light-dark(#fff,#1a2621);border:1px solid light-dark(#dbe4df,#35483f);border-radius:12px}
 .nav,.layout main{min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
-.nav{--directory-line:light-dark(#aebfb7,#587265);--directory-row-mid:14px;--point-toggle-width:22px;--point-toggle-center:calc(var(--point-toggle-width) / 2);font-size:13px;font-weight:400}
+.nav{--directory-line:light-dark(#aebfb7,#587265);--directory-row-mid:14px;--point-toggle-width:22px;--point-toggle-center:calc(var(--point-toggle-width) / 2);container-type:inline-size;font-size:13px;font-weight:400}
 .directory-resizer{display:grid;place-items:center;cursor:col-resize;touch-action:none;border-radius:5px}
 .directory-resizer::before{content:"";width:2px;height:100%;background:light-dark(#cbd8d1,#40564c);border-radius:2px}
 .directory-resizer:hover::before,.directory-resizer:focus-visible::before{background:light-dark(#367b68,#7bc7a8)}
@@ -285,15 +301,20 @@ header{background:light-dark(#183d34,#122c23);color:light-dark(#fff,#e5f0ea)}
 .requirement-group{margin:0 12px 2px}
 .requirement{position:relative;min-height:28px;padding:4px 10px;display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;gap:9px;cursor:pointer;list-style:none}
 .requirement::-webkit-details-marker{display:none}
-.requirement-name{color:inherit;text-decoration:none}
+.requirement-name{display:flex;min-width:0;align-items:center;gap:6px;color:inherit;text-decoration:none}
 .requirement:has(.requirement-name[aria-current=true]){border-radius:5px;background:light-dark(#e8f4ed,#254838)}
 .requirement::before{content:"";width:6px;height:6px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(-45deg)}
 .requirement-group[open]>.requirement::before{transform:rotate(45deg)}
 .requirement-group[open]>.requirement::after,.point-row:has(.point-toggle[aria-expanded=true])::after{content:"";position:absolute;left:13px;top:calc(50% + 6px);bottom:0;border-left:1px solid var(--directory-line);pointer-events:none}
 .point-row:has(.point-toggle[aria-expanded=true])::after{left:var(--point-toggle-center)}
 .point-count{color:light-dark(#60736b,#a6bfb4);font-size:12px;font-weight:400;white-space:nowrap}
-.requirement-meta{display:flex;align-items:center;gap:7px}
-.nav .directory-status{display:block;width:8px;height:8px;border-radius:50%;background:currentColor}
+@container (max-width:230px){
+  .requirement{grid-template-columns:8px minmax(0,1fr)}
+  .point-count{display:none}
+  :is(.requirement-name,.point,.flow-link):has(.advisory){flex-wrap:wrap;row-gap:3px}
+  :is(.requirement-name,.point,.flow-link):has(.advisory)>:is(.requirement-title,.point-name,.flow-name){flex-basis:100%}
+}
+.nav .badge{flex-shrink:0;padding:2px 5px;font-size:11px}
 .points,.flow-links{margin:0 0 0 13px;padding:0 0 0 var(--branch-indent)}
 .points{--branch-indent:10px}
 .flow-links{--branch-indent:23px;margin-left:var(--point-toggle-center)}
@@ -306,28 +327,36 @@ header{background:light-dark(#183d34,#122c23);color:light-dark(#fff,#e5f0ea)}
 .point-toggle{display:grid;place-items:center;width:var(--point-toggle-width);height:28px;border:0;border-radius:5px;background:transparent;color:inherit;cursor:pointer}
 .point-toggle::before{content:"";width:5px;height:5px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(-45deg)}
 .point-toggle[aria-expanded=true]::before{transform:rotate(45deg)}
-.point{grid-column:2;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;text-align:left;border:1px solid transparent;border-radius:5px;background:light-dark(#fff,#1a2621);padding:3px 7px 3px 1px;color:light-dark(#263c33,#daece2);text-decoration:none}
+.point{grid-column:2;display:flex;min-width:0;align-items:center;gap:6px;text-align:left;border:1px solid transparent;border-radius:5px;background:light-dark(#fff,#1a2621);padding:3px 7px 3px 1px;color:light-dark(#263c33,#daece2);text-decoration:none}
 .point:hover{background:light-dark(#f4f8f5,#293b32)}
 .point[aria-current=true]{background:light-dark(#e8f4ed,#254838);border-color:light-dark(#a4c9b6,#527e69)}
 .flow-links{list-style:none}
-.flow-link{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-height:28px;padding:4px 7px;border-radius:5px;color:inherit;text-decoration:none}
-.requirement-name,.point-name,.flow-link .flow-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.flow-link{display:flex;align-items:center;gap:6px;min-height:28px;padding:4px 7px;border-radius:5px;color:inherit;text-decoration:none}
+.requirement-title,.point-name,.flow-link .flow-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .flow-link:hover,.flow-link[aria-current=true]{background:light-dark(#e8f4ed,#254838)}
 .muted{color:light-dark(#52665e,#b5c9bf)}
 .navfoot{border-top:1px solid light-dark(#e2e9e5,#35483f);padding:15px 18px;font-size:12px;color:light-dark(#52665e,#b5c9bf)}
-.layout main{min-width:0}
+.layout main{min-width:0;container-type:inline-size}
 .hero{padding:20px 25px 22px;margin-bottom:16px}
 h1{margin:4px 0 6px;font-size:29px;line-height:1.27;letter-spacing:-.015em}
 p{margin:0}
 .stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .report-description{color:light-dark(#52665e,#b5c9bf)}
+.report-overview{display:grid;grid-template-columns:minmax(0,1fr) minmax(245px,36%);align-items:start;gap:24px}
+.status-rules{padding:10px 13px;border:1px solid light-dark(#dbe4df,#35483f);border-radius:8px;font-size:13px}
+.status-rules p,.status-rules dt{font-weight:650}
+.status-rules dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 10px;margin:5px 0 0}
+.status-rules dd{margin:0;color:light-dark(#52665e,#b5c9bf);overflow-wrap:anywhere}
+@container (max-width:680px){.report-overview{grid-template-columns:minmax(0,1fr);gap:14px}}
 .report-related{margin-top:16px;padding-top:12px;border-top:1px solid light-dark(#dbe4df,#35483f)}
 .report-related h2,.report-related h3{margin:0 0 6px;font-size:15px}
 .report-related ul{list-style:none;margin:0;padding:0}
-.report-related li{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:5px 0}
+.report-related li{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:5px 0}
 .report-link{color:light-dark(#17664a,#a9e7c9);text-underline-offset:3px;overflow-wrap:anywhere}
 .badge{display:inline-flex;align-items:center;gap:5px;border-radius:6px;padding:3px 8px;font-size:12px;line-height:1.35;font-weight:650;white-space:nowrap}
 .ok{color:light-dark(#155e43,#a9e7c9);background:light-dark(#e1f2e8,#234837)}
+.advisory{color:light-dark(#235c63,#a9e6e8);background:light-dark(#ddf2f2,#24484b)}
+.partial{color:light-dark(#245a89,#b9ddff);background:light-dark(#e5f0fb,#233b56)}
 .interrupted{color:light-dark(#765118,#f3d094);background:light-dark(#fff2d8,#463720)}
 .unimplemented{color:light-dark(#68429b,#d9baf7);background:light-dark(#f1e8fa,#3e2b52)}
 .neutral{color:light-dark(#475f55,#c2d6ca);background:light-dark(#edf2ef,#32443b)}
@@ -338,7 +367,7 @@ p{margin:0}
 .flow{overflow:hidden}
 .flowhead{padding:20px 25px 17px;border-bottom:1px solid light-dark(#e3ebe6,#35483f)}
 .flowhead h3{font-size:19px;margin:5px 0 6px;line-height:1.4}
-.flowhead h3 .badge{margin-inline-start:6px;vertical-align:middle}
+.status-heading .badge{margin-inline-start:6px;vertical-align:middle}
 .flowhead p+p,.pointcard p+p{margin-top:4px}
 .flowhead code{overflow-wrap:anywhere}
 .flowhead .flow-approach{margin-top:14px}
@@ -358,6 +387,12 @@ p{margin:0}
 .stepmeta{display:flex;gap:8px;align-items:start;justify-content:space-between;margin-bottom:4px}
 .timing{font-size:12px;color:light-dark(#576d62,#a8beb3);white-space:nowrap}
 .stepmeta h4{font-size:15px;margin:0;font-weight:670;overflow-wrap:anywhere}
+.suggestion-index{margin:8px 25px;padding:10px 12px;border:1px solid light-dark(#cbdedb,#41655e);border-radius:8px}
+.suggestion-index h4,.step-suggestion h5{font-size:14px;margin:0 0 4px;overflow-wrap:anywhere}
+.suggestion-index ul{margin:4px 0 0;padding-left:20px}
+.suggestion-link{padding:3px 0;border:0;background:none;text-align:left;cursor:pointer;text-decoration:underline}
+.step-suggestion{margin-top:9px;padding:10px 12px;border-left:3px solid light-dark(#6b9b91,#87b9ad);background:light-dark(#edf6f4,#233e38);border-radius:6px}
+.step-suggestion p+p{margin-top:4px}
 .step-pagination{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid light-dark(#dbe4df,#35483f)}
 .step-pagination button{padding:3px 8px;border:1px solid light-dark(#d4e7dc,#395e4d);border-radius:5px;background:transparent;color:inherit;cursor:pointer}
 .step-pagination button[aria-disabled=true]{opacity:.45;cursor:default}

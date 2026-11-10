@@ -4,7 +4,6 @@ import path from 'node:path'
 import type { 浏览器测试模式 } from '../../../src/model/browser-test'
 import {
   行为,
-  type 流程步骤附件,
   type 流程运行错误,
   type 需求,
   type 需求测试流程,
@@ -13,6 +12,18 @@ import {
   type 验收点,
 } from '../../../src/model/test-requirement'
 import { 交互脚本, 样式 } from './report-assets'
+import { 生成切图控件, 生成步骤证据Html, 转义Html } from './report-evidence'
+import {
+  汇总需求状态,
+  汇总验收点状态,
+  流程状态样式,
+  状态规则说明,
+  验收状态展示顺序,
+  验收状态样式,
+  type 标记样式,
+  type 流程状态,
+  type 验收状态,
+} from './report-status'
 
 type 需求测试登记 = { 流程: 需求测试流程; 需求们: readonly 需求[]; 文件: string }
 export type 需求测试附件记录 = Omit<需求测试附件, '路径'> & { 相对路径: string }
@@ -38,58 +49,32 @@ type 报告参数 = {
   覆盖错误们: readonly string[]
   中断码: number | undefined
 }
-type 验收状态 = '已证明' | '未证明' | '未实现' | '未执行'
-type 目录流程 = { id: string; 测试: 需求测试登记; 状态: 需求测试结果['状态'] | '未执行' }
-type 验收目录项 = { id: string; 点: 验收点; 状态: 验收状态; 关联流程们: readonly 目录流程[] }
+type 目录流程 = { id: string; 测试: 需求测试登记; 状态: 流程状态; 有建议: boolean }
+type 验收目录项 = { id: string; 点: 验收点; 状态: 验收状态; 有建议: boolean; 关联流程们: readonly 目录流程[] }
 type 步骤记录 = 需求测试结果['步骤们'][number]
-type 标记样式 = 'ok' | 'interrupted' | 'unimplemented' | 'neutral' | 'fail'
-type 报告摘要 = { 通过数: number; 失败数: number; 中断数: number; 未执行数: number }
-let 流程状态样式: Record<需求测试结果['状态'] | '未执行', 标记样式> = {
-  通过: 'ok',
-  失败: 'fail',
-  中断: 'interrupted',
-  未执行: 'neutral',
-}
-let 验收状态优先级: readonly 验收状态[] = ['未证明', '未实现', '未执行', '已证明']
-
-function 转义Html(值: string): string {
-  return 值
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
-}
+type 报告摘要 = { 通过数: number; 建议数: number; 失败数: number; 中断数: number; 未执行数: number }
 
 function 状态标记(文字: string, 样式: 标记样式): string {
   return `<span class="badge ${样式}">${转义Html(文字)}</span>`
 }
 
-function 验收状态样式(状态: 验收状态): 标记样式 {
-  switch (状态) {
-    case '已证明':
-      return 'ok'
-    case '未证明':
-      return 'fail'
-    case '未实现':
-      return 'unimplemented'
-    case '未执行':
-      return 'neutral'
-  }
+function 建议标记(有建议: boolean): string {
+  return 有建议 ? 状态标记('有建议', 'advisory') : ''
 }
 
-function 目录状态标记(状态: 验收状态 | 需求测试结果['状态'], 样式: 标记样式): string {
-  return `<span class="directory-status ${样式}" role="img" aria-label="${状态}" title="${状态}"></span>`
+function 生成状态规则Html(层级: keyof typeof 状态规则说明): string {
+  let 条目 = Object.entries(状态规则说明[层级])
+    .map(([状态, 说明]) => `<dt>${转义Html(状态)}</dt><dd>${转义Html(说明)}</dd>`)
+    .join('')
+  return `<aside class="status-rules" aria-label="${层级}状态说明"><p>状态怎么算</p><dl>${条目}</dl></aside>`
 }
 
 function 生成关联流程链接(条目: 验收目录项, 目录中: boolean): string {
   return 条目.关联流程们
-    .map(({ id, 测试, 状态 }) => {
+    .map(({ id, 测试, 状态, 有建议 }) => {
       let 名称 = 转义Html(测试.流程.获得名称())
-      let 样式 = 流程状态样式[状态]
-      let 色点 = 目录中 ? 目录状态标记(状态, 样式) : ''
-      let 标记 = 目录中 ? '' : 状态标记(状态, 样式)
-      return `<li><a class="${目录中 ? 'flow-link' : 'report-link'}" href="#${条目.id}/${id}" data-acceptance="${条目.id}" data-flow-target="${id}" title="${名称}"><span class="flow-name">${名称}</span>${色点}</a>${标记}</li>`
+      let 标记 = 状态标记(状态, 流程状态样式[状态]) + 建议标记(有建议)
+      return `<li><a class="${目录中 ? 'flow-link' : 'report-link'}" href="#${条目.id}/${id}" data-acceptance="${条目.id}" data-flow-target="${id}" title="${名称}"><span class="flow-name">${名称}</span>${目录中 ? 标记 : ''}</a>${目录中 ? '' : 标记}</li>`
     })
     .join('')
 }
@@ -105,42 +90,19 @@ function 生成错误Html(错误: 流程运行错误): string {
   return `<div class="problem">${位置}${预期值}${实际值}<pre>${转义Html(错误.文本)}</pre></div>`
 }
 
-function 生成切图控件(位置: string): string {
-  return `<div class="gallery-controls" data-gallery-controls>
-    <button type="button" data-prev aria-label="上一张" aria-disabled="true">‹</button>
-    <span data-index aria-live="polite">${位置}</span>
-    <button type="button" data-next aria-label="下一张">›</button>
-  </div>`
-}
-
-function 生成步骤附件Html(附件组们: readonly (readonly 流程步骤附件[])[]): string {
-  if (附件组们.length === 0) return ''
-  let 控件 = 附件组们.length === 1 ? '' : 生成切图控件(`1 / ${String(附件组们.length)}`)
-  let 图片序号 = 0
-  let 页面们 = 附件组们
-    .map((附件们, 页索引) => {
-      let 内容 = 附件们
-        .map((附件) => {
-          switch (附件.类型) {
-            case '文本':
-              return 附件.日志流 === undefined
-                ? `<p>${转义Html(附件.内容)}</p>`
-                : `<details class="step-log"><summary>后端日志（${附件.日志流}）</summary><p>${转义Html(附件.内容)}</p></details>`
-            case '图片': {
-              图片序号 += 1
-              let 说明 = 转义Html(附件.说明 ?? `步骤图片 ${String(图片序号)}`)
-              return `<figure class="gallery-frame">
-        <button type="button" class="step-image" data-zoom aria-haspopup="dialog" aria-label="查看大图">
-          <img src="data:${转义Html(附件.内容类型)};base64,${转义Html(附件.内容)}" alt="${说明}" loading="lazy">
-        </button><figcaption>${说明}</figcaption></figure>`
-            }
-          }
-        })
-        .join('')
-      return `<div class="gallery-page" data-frame${页索引 === 0 ? '' : ' hidden'}>${内容}</div>`
-    })
-    .join('')
-  return `<div class="step-attachments" data-gallery>${控件}${页面们}</div>`
+function 生成建议目录(步骤们: readonly 步骤记录[]): string {
+  let 条目们 = 步骤们.flatMap((步骤, 步骤索引) =>
+    步骤.建议们.map(
+      (
+        { 标题 },
+        建议索引,
+      ) => `<li><button type="button" class="report-link suggestion-link" data-suggestion-step="${String(步骤索引)}" data-suggestion-index="${String(建议索引)}">
+        ${转义Html(标题)} <span class="muted">· ${转义Html(步骤.名称)}</span></button></li>`,
+    ),
+  )
+  if (条目们.length === 0) return ''
+  return `<section class="suggestion-index"><h4>建议 · ${String(条目们.length)} 条</h4>
+    <p class="muted">探索时记录</p><ul>${条目们.join('')}</ul></section>`
 }
 
 function 生成步骤Html(id: string, 步骤们: readonly 步骤记录[]): string {
@@ -159,16 +121,18 @@ function 生成步骤Html(id: string, 步骤们: readonly 步骤记录[]): strin
         : `<details class="problems"><summary>取证错误</summary>${步骤.取证错误们.map(生成错误Html).join('')}</details>`
     let 步骤id = `${id}-step-${String(序号 + 1)}`
     let 名称 = 转义Html(步骤.名称)
+    let 建议数 = 步骤.建议们.length
+    let 建议标记 = 建议数 === 0 ? '' : ` · 建议 ${String(建议数)} 条`
     目录.push(`<li class="step">
         <button type="button" data-step-select aria-controls="${步骤id}"${序号 === 0 ? ' aria-current="step"' : ''}>
           <span class="num">${String(序号 + 1).padStart(2, '0')}</span>
-          <span><span class="type">${步骤.类型}</span><strong>${名称}</strong></span>
+          <span><span class="type">${步骤.类型}${建议标记}</span><strong>${名称}</strong></span>
         </button></li>`)
     详情.push(`<section id="${步骤id}" data-step-panel${序号 === 0 ? '' : ' hidden'}>
         <div class="stepmeta"><h4>${名称}</h4><span class="timing${样式}">${状态}${耗时}</span></div>
-        ${步骤.状态 === '未执行' ? '' : 生成步骤附件Html(步骤.附件组们)}${错误}${取证错误们}</section>`)
+        ${生成步骤证据Html(步骤)}${错误}${取证错误们}</section>`)
   }
-  return `<div class="step-workspace" data-step-workspace>
+  return `<div>${生成建议目录(步骤们)}<div class="step-workspace" data-step-workspace>
     <ol class="timeline" aria-label="流程步骤">${目录.join('')}</ol>
     <div class="step-evidence">
       <div class="step-panels" data-step-panels>${详情.join('')}</div>
@@ -178,7 +142,7 @@ function 生成步骤Html(id: string, 步骤们: readonly 步骤记录[]): strin
         <button type="button" data-step-next aria-disabled="${String(步骤们.length === 1)}">下一步</button>
       </div>
     </div>
-  </div>`
+  </div></div>`
 }
 
 function 生成流程附件Html(附件们: readonly 需求测试附件记录[]): string {
@@ -199,7 +163,7 @@ function 生成流程附件Html(附件们: readonly 需求测试附件记录[]):
 }
 
 function 归纳执行结论(尝试们: readonly 需求测试尝试记录[]): {
-  状态: 需求测试结果['状态'] | '未执行'
+  状态: 流程状态
   尝试次数: number
   已证明验收点名称们: string[]
   已证明验收点描述们: string[]
@@ -227,14 +191,15 @@ function 生成执行结论Html(id: string, 结论: ReturnType<typeof 归纳执�
   let 已证明 = 结论.已证明验收点名称们.map((名称) => `<li>${转义Html(名称)}</li>`).join('')
   return `<section class="flow-conclusion" aria-labelledby="${id}-conclusion">
     <div class="headline"><h4 id="${id}-conclusion">执行结论</h4>${状态标记(标记, 流程状态样式[结论.状态])}</div>
-    ${已证明 === '' ? '' : `<p>已证明的验收点</p><ul>${已证明}</ul>`}
+    ${已证明 === '' ? '' : `<p>本流程已验证的验收点</p><ul>${已证明}</ul>`}
     ${结论.未完成步骤 === undefined ? '' : `<p><strong>未完成步骤：</strong>${转义Html(结论.未完成步骤)}</p>`}
     ${结论.原因 === undefined || 结论.原因 === '' ? '' : `<p class="flow-text"><strong>原因：</strong>${转义Html(结论.原因)}</p>`}
     ${补充 === undefined ? '' : `<h5>补充说明</h5><p class="flow-text">${转义Html(补充)}</p>`}
     </section>`
 }
 
-function 生成流程Html(id: string, { 流程, 文件 }: 需求测试登记, 尝试们: readonly 需求测试尝试记录[]): string {
+function 生成流程Html({ id, 测试, 有建议 }: 目录流程, 尝试们: readonly 需求测试尝试记录[]): string {
+  let { 流程, 文件 } = 测试
   let 已运行 = 尝试们.length > 0
   let { 测试思路, 结论补充 } = 流程.获得说明()
   let 结论 = 归纳执行结论(尝试们)
@@ -261,21 +226,27 @@ function 生成流程Html(id: string, { 流程, 文件 }: 需求测试登记, �
       `${id}-plan`,
       流程
         .获得步骤们()
-        .map((步骤) => ({ 名称: 步骤.获得描述(), 类型: 步骤 instanceof 行为 ? '行为' : '观察', 状态: '未执行' })),
+        .map((步骤) => ({
+          名称: 步骤.获得描述(),
+          类型: 步骤 instanceof 行为 ? '行为' : '观察',
+          状态: '未执行',
+          建议们: 步骤.获得建议们(),
+        })),
     )}`
   return `<section id="${id}" class="surface flow" data-flow hidden>
-    <div class="flowhead">
+    <div class="flowhead report-overview"><div>
     <div class="label">流程</div>
-    <h3>${转义Html(流程.获得名称())} ${标记}</h3>
+    <h3 class="status-heading">${转义Html(流程.获得名称())} ${标记}${建议标记(有建议)}</h3>
     <p><strong>对应文件：</strong><code>test/requirement/${转义Html(文件)}</code></p>
     ${测试思路 === undefined ? '' : `<p class="flow-approach flow-text"><strong>测试思路：</strong>${转义Html(测试思路)}</p>`}
+    </div>${生成状态规则Html('流程')}
     </div>${记录}${计划}${生成执行结论Html(id, 结论, 结论补充)}</section>`
 }
 
 function 生成报告目录(参数: 报告参数): {
   记录索引: ReadonlyMap<需求测试流程, readonly 需求测试尝试记录[]>
   流程编号们: readonly 目录流程[]
-  需求条目们: readonly { 需求: 需求; 状态: 验收状态; 条目们: readonly 验收目录项[] }[]
+  需求条目们: readonly { 需求: 需求; 状态: 验收状态; 有建议: boolean; 条目们: readonly 验收目录项[] }[]
 } {
   let 记录索引 = new Map(参数.记录们.map(({ 测试, 尝试们 }) => [测试.流程, 尝试们]))
   let 流程编号们 = 参数.流程们.map(
@@ -283,6 +254,7 @@ function 生成报告目录(参数: 报告参数): {
       测试,
       id: `flow-${String(索引 + 1)}`,
       状态: 记录索引.get(测试.流程)?.at(-1)?.结果.状态 ?? '未执行',
+      有建议: 测试.流程.获得步骤们().some((步骤) => 步骤.获得建议们().length > 0),
     }),
   )
   let 点序号 = 0
@@ -290,16 +262,17 @@ function 生成报告目录(参数: 报告参数): {
     let 条目们 = 需求.获得验收点们().map((点): 验收目录项 => {
       点序号 += 1
       let 关联流程们 = 流程编号们.filter(({ 测试 }) => 测试.流程.获得覆盖验收点们().includes(点))
-      let 关联结果们 = 关联流程们
-        .map(({ 测试 }) => 记录索引.get(测试.流程)?.at(-1)?.结果)
-        .filter((结果) => 结果 !== undefined)
-      let 状态: 验收状态 = 关联流程们.length === 0 ? '未实现' : '未执行'
-      if (关联结果们.some((结果) => 结果.证明验收点们.includes(点))) 状态 = '已证明'
-      else if (关联结果们.length > 0) 状态 = '未证明'
-      return { id: `acceptance-${String(点序号)}`, 点, 状态, 关联流程们 }
+      let 状态 = 汇总验收点状态(关联流程们.map((流程) => 流程.状态))
+      return {
+        id: `acceptance-${String(点序号)}`,
+        点,
+        状态,
+        有建议: 关联流程们.some((流程) => 流程.有建议),
+        关联流程们,
+      }
     })
-    let 状态 = 验收状态优先级.find((值) => 条目们.some((条目) => 条目.状态 === 值)) ?? '已证明'
-    return { 需求, 状态, 条目们 }
+    let 状态 = 汇总需求状态(条目们.map((条目) => 条目.状态))
+    return { 需求, 状态, 有建议: 条目们.some((条目) => 条目.有建议), 条目们 }
   })
   return { 记录索引, 流程编号们, 需求条目们 }
 }
@@ -313,7 +286,7 @@ function 生成报告Html(
   let 导航: string[] = []
   let 需求卡片: string[] = []
   let 验收卡片: string[] = []
-  for (let [序号, { 需求, 状态: 需求状态, 条目们 }] of 需求条目们.entries()) {
+  for (let [序号, { 需求, 状态: 需求状态, 有建议, 条目们 }] of 需求条目们.entries()) {
     let id = `requirement-${String(序号 + 1)}`
     let 名称 = 转义Html(需求.获得名称())
     let 导航验收点 = 条目们
@@ -330,41 +303,44 @@ function 生成报告Html(
           <div class="point-row">
             ${流程按钮}
             <a class="point" href="#${条目.id}" data-acceptance="${条目.id}"><span class="point-name" title="${验收点名称}">${验收点名称}</span>
-            ${目录状态标记(条目.状态, 验收状态样式(条目.状态))}</a>
+            ${状态标记(条目.状态, 验收状态样式[条目.状态])}${建议标记(条目.有建议)}</a>
           </div>
           ${流程列表}</div>`
       })
       .join('')
-    let 状态计数: Record<验收状态, number> = { 已证明: 0, 未证明: 0, 未实现: 0, 未执行: 0 }
+    let 状态计数: Record<验收状态, number> = { 已证明: 0, 部分通过: 0, 证明失败: 0, 未实现: 0, 未执行: 0 }
     for (let { 状态 } of 条目们) 状态计数[状态] += 1
-    let 状态汇总 = 验收状态优先级
-      .map((状态) => 状态标记(`${String(状态计数[状态])} 项${状态}`, 验收状态样式(状态)))
+    let 状态汇总 = 验收状态展示顺序
+      .map((状态) => 状态标记(`${String(状态计数[状态])} 项${状态}`, 验收状态样式[状态]))
       .join('')
     导航.push(`<details class="requirement-group" name="requirement-directory" data-requirement-group="${id}">
-      <summary class="requirement"><a class="requirement-name" href="#${id}" data-requirement-target="${id}" title="${名称}">${名称}</a><span class="requirement-meta">
-      <span class="point-count">${String(条目们.length)} 项验收点</span>${目录状态标记(需求状态, 验收状态样式(需求状态))}</span></summary>
+      <summary class="requirement"><a class="requirement-name" href="#${id}" data-requirement-target="${id}" title="${名称}"><span class="requirement-title">${名称}</span>${状态标记(需求状态, 验收状态样式[需求状态])}${建议标记(有建议)}</a>
+      <span class="point-count">${String(条目们.length)} 项验收点</span></summary>
       <div class="points">${导航验收点}</div></details>`)
     let 验收点链接 = 条目们
       .map(
-        ({ id, 点, 状态 }) =>
-          `<li><a class="report-link" href="#${id}" data-acceptance="${id}">${转义Html(点.获得名称())}</a>${状态标记(状态, 验收状态样式(状态))}</li>`,
+        ({ id, 点, 状态, 有建议 }) =>
+          `<li><a class="report-link" href="#${id}" data-acceptance="${id}">${转义Html(点.获得名称())}</a>${状态标记(状态, 验收状态样式[状态])}${建议标记(有建议)}</li>`,
       )
       .join('')
     需求卡片.push(`<section id="${id}" class="surface hero" data-requirement hidden>
-      <div class="label">需求</div><h1>${名称}</h1>
+      <div class="report-overview"><div>
+      <div class="label">需求</div><h1 class="status-heading">${名称} ${状态标记(需求状态, 验收状态样式[需求状态])}${建议标记(有建议)}</h1>
       <p class="report-description">${转义Html(需求.获得描述())}</p><div class="stats">${状态汇总}</div>
+      </div>${生成状态规则Html('需求')}</div>
       <div class="report-related"><h2>验收点</h2><ul>${验收点链接}</ul></div></section>`)
     for (let 条目 of 条目们) {
-      let 边框 = 条目.状态 === '已证明' ? '' : 条目.状态 === '未证明' ? ' failurebar' : ' pendingbar'
+      let 边框 = 条目.状态 === '已证明' ? '' : 条目.状态 === '证明失败' ? ' failurebar' : ' pendingbar'
       验收卡片.push(`<section id="${条目.id}" class="surface pointcard${边框}" data-point data-requirement-id="${id}" data-flow-ids="${条目.关联流程们.map(({ id }) => id).join(' ')}" hidden>
-        <div class="label">验收点</div><h2>${转义Html(条目.点.获得名称())}</h2>
+        <div class="report-overview"><div>
+        <div class="label">验收点</div><h2 class="status-heading">${转义Html(条目.点.获得名称())} ${状态标记(条目.状态, 验收状态样式[条目.状态])}${建议标记(条目.有建议)}</h2>
         <p class="report-description">${转义Html(条目.点.获得描述())}</p>
-        <p><strong>状态：</strong>${状态标记(条目.状态, 验收状态样式(条目.状态))}</p>
+        </div>${生成状态规则Html('验收点')}</div>
         <div class="report-related"><h3>关联流程</h3>${条目.关联流程们.length === 0 ? '<p class="muted">暂无关联流程。</p>' : `<ul>${生成关联流程链接(条目, false)}</ul>`}</div></section>`)
     }
   }
 
-  let 流程卡片 = 流程编号们.map(({ 测试, id }) => 生成流程Html(id, 测试, 记录索引.get(测试.流程) ?? [])).join('')
+  let 流程卡片 = 流程编号们.map((流程) => 生成流程Html(流程, 记录索引.get(流程.测试.流程) ?? [])).join('')
   let 空状态说明 = 需求条目们.length === 0 ? '没有已登记的需求测试。' : '请选择左侧目录中的需求、验收点或流程。'
   let 日志链接 = [
     { 文件: 'server.stdout.log', 名称: '服务日志（stdout）' },
@@ -390,7 +366,7 @@ function 生成报告Html(
     <option value="light">浅色</option><option value="dark">深色</option></select></label></div></div></header>
     <div class="layout">
       <nav id="report-directory" class="surface nav" aria-label="需求和验收点"><div class="navhead"><span class="label">需求目录</span></div>${导航.join('')}
-        <div class="navfoot">通过 ${String(摘要.通过数)} · 失败 ${String(摘要.失败数)} · 中断 ${String(摘要.中断数)} · 未执行 ${String(摘要.未执行数)}</div></nav>
+        <div class="navfoot">通过 ${String(摘要.通过数)} · 失败 ${String(摘要.失败数)} · 中断 ${String(摘要.中断数)} · 未执行 ${String(摘要.未执行数)}${摘要.建议数 === 0 ? '' : ` · 有建议 ${String(摘要.建议数)}`}</div></nav>
       <div class="directory-resizer" role="separator" aria-orientation="vertical" aria-label="调整需求目录宽度" aria-controls="report-directory" tabindex="0"></div>
       <main>${中断提示}${基础设施错误}${需求卡片.join('')}${验收卡片.join('')}${流程卡片}
         <p class="surface hero" data-no-selection>${空状态说明}</p></main>
@@ -407,6 +383,8 @@ function 生成报告Html(
 }
 
 export function 保存需求测试报告(报告目录: string, 参数: 报告参数): { html路径: string; 全部通过: boolean } {
+  let 目录 = 生成报告目录(参数)
+  let 有建议流程 = new Set(目录.流程编号们.filter((条目) => 条目.有建议).map(({ 测试 }) => 测试.流程))
   let 流程记录们 = 参数.记录们.map(({ 测试, 尝试们 }) => {
     let 执行结论 = 归纳执行结论(尝试们)
     let 目标验收点们 = 测试.流程.获得覆盖验收点们()
@@ -419,6 +397,7 @@ export function 保存需求测试报告(报告目录: string, 参数: 报告参
       ...测试.流程.获得说明(),
       执行结论,
       状态: 执行结论.状态,
+      有建议: 有建议流程.has(测试.流程),
       尝试们: 尝试们.map(({ 结果, ...尝试 }) => {
         let { 证明验收点们, ...描述 } = 结果
         return {
@@ -439,12 +418,12 @@ export function 保存需求测试报告(报告目录: string, 参数: 报告参
     平台: process.platform,
     总流程数: 流程记录们.length,
     通过数: 流程记录们.filter((值) => 值.状态 === '通过').length,
+    建议数: 流程记录们.filter((值) => 值.有建议).length,
     失败数: 流程记录们.filter((值) => 值.状态 === '失败').length,
     中断数: 流程记录们.filter((值) => 值.状态 === '中断').length,
     未执行数: 流程记录们.filter((值) => 值.状态 === '未执行').length,
     总耗时毫秒: Math.max(0, 参数.结束时间 - 参数.开始时间),
   }
-  let 目录 = 生成报告目录(参数)
   let html = 生成报告Html(报告目录, 参数, 摘要, 目录)
   mkdirSync(报告目录, { recursive: true })
   let html路径 = path.join(报告目录, 'index.html')
@@ -458,14 +437,16 @@ export function 保存需求测试报告(报告目录: string, 参数: 报告参
         覆盖错误们: 参数.覆盖错误们,
         中断码: 参数.中断码,
         选中流程名称们: 参数.选中流程们.map(({ 流程 }) => 流程.获得名称()),
-        需求们: 目录.需求条目们.map(({ 需求, 状态, 条目们 }) => ({
+        需求们: 目录.需求条目们.map(({ 需求, 状态, 有建议, 条目们 }) => ({
           名称: 需求.获得名称(),
           描述: 需求.获得描述(),
           状态,
-          验收点们: 条目们.map(({ 点, 状态, 关联流程们 }) => ({
+          有建议,
+          验收点们: 条目们.map(({ 点, 状态, 有建议, 关联流程们 }) => ({
             名称: 点.获得名称(),
             描述: 点.获得描述(),
             状态,
+            有建议,
             关联流程名称们: 关联流程们.map(({ 测试 }) => 测试.流程.获得名称()),
           })),
         })),

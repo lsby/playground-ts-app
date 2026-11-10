@@ -43,7 +43,7 @@ export function 注册测试工具(server: McpServer, 宿主: MCP测试工具宿
   let 本地只读: ToolAnnotations = { readOnlyHint: true, openWorldHint: false }
   let 页面只读: ToolAnnotations = { readOnlyHint: true, openWorldHint: true }
 
-  注册(
+  注册无记录工具(
     'test_info',
     'Get the running test frontend and backend URLs and the local evidence directory.',
     无参数模型,

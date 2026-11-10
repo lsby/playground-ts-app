@@ -41,7 +41,14 @@ export function 创建工具注册器(server: McpServer, 保护: 工具调用保
   return (名称, 描述, 参数模型, 执行, 注解): void => {
     server.registerTool(
       名称,
-      { description: 描述, inputSchema: 参数模型, ...(注解 === undefined ? {} : { annotations: 注解 }) },
+      {
+        description:
+          记录 === undefined
+            ? 描述
+            : `${描述} Automatically recorded. The response includes recordId for review or editing.`,
+        inputSchema: 参数模型,
+        ...(注解 === undefined ? {} : { annotations: 注解 }),
+      },
       async (参数, 上下文): Promise<CallToolResult> => {
         try {
           return await 保护(async (): Promise<CallToolResult> => {
