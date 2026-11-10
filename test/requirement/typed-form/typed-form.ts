@@ -1,5 +1,5 @@
 import { 流程, 行为, 观察, 需求测试, type 需求测试工具 } from '../../../src/model/test-requirement'
-import { 业务需求, 验收点们 } from './typed-form.requirement'
+import { 业务需求, 验收点们 } from './index.requirement'
 
 /**
  * 验证强类型表单的填写与数据提交。

@@ -9,7 +9,7 @@ import {
   需求测试,
   type 需求测试工具,
 } from '../../../src/model/test-requirement'
-import { 业务需求, 验收点们 } from './user-management.requirement'
+import { 业务需求, 验收点们 } from './index.requirement'
 
 type 演示需求系统上下文 = { 工具: 需求测试工具; 引擎: 浏览器测试引擎; 新用户名后缀: string }
 

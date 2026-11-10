@@ -14,7 +14,7 @@ import {
 import { 读取操作结果字段 } from '../../../src/test-tools/operation-assertion'
 import type { JSON对象 } from '../../../src/test-tools/operation-record'
 import { 整理数据库查询结果 } from '../../../src/test-tools/operation-values'
-import { 业务需求, 验收点们 } from './visitor-registration.requirement'
+import { 业务需求, 验收点们 } from './index.requirement'
 
 type 测试数据 = { 结果们: Map<number, JSON对象> }
 type 测试上下文 = 需求测试上下文<测试数据>

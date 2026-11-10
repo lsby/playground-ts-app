@@ -1,6 +1,6 @@
 import type { 浏览器测试引擎 } from '../../../src/model/browser-test'
 import { 流程, 行为, 观察, 需求测试, type 需求测试工具 } from '../../../src/model/test-requirement'
-import { 业务需求, 验收点们 } from './dialog-and-user-table.requirement'
+import { 业务需求, 验收点们 } from './index.requirement'
 
 type 用户表格行 = { id: string; 名称: string }
 

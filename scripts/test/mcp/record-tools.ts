@@ -3,7 +3,7 @@ import { z } from 'zod-mcp'
 import type { 流程说明 } from '../../../src/model/test-requirement'
 import type { 测试操作记录 } from '../../../src/test-tools/operation-record'
 import { 项目根目录 } from '../../task/model/task-common'
-import { 需求描述文件名格式, 需求流程文件名格式 } from '../requirement/requirement-file'
+import { 需求流程文件名格式, 需求目录名格式 } from '../requirement/requirement-file'
 import { 直接返回, type 工具注册函数 } from './register-tool'
 import { 无参数模型 } from './tool-input'
 
@@ -133,11 +133,11 @@ export function 注册操作记录工具(
           .string()
           .regex(需求流程文件名格式)
           .describe('A lowercase kebab-case .ts file name for the new scenario, written beside the requirement file.'),
-        requirementFile: z
+        requirementDirectory: z
           .string()
-          .regex(需求描述文件名格式)
+          .regex(需求目录名格式)
           .describe(
-            'An existing lowercase kebab-case .requirement.ts file name. For example, checkout.requirement.ts is read from test/requirement/checkout/.',
+            'An existing lowercase kebab-case directory name, e.g. checkout for test/requirement/checkout/index.requirement.ts.',
           ),
         acceptanceCriteriaKeys: z
           .array(z.string().min(1))
@@ -163,7 +163,7 @@ export function 注册操作记录工具(
       ids,
       steps,
       fileName,
-      requirementFile,
+      requirementDirectory,
       acceptanceCriteriaKeys,
       scenarioName,
       scenarioApproach,
@@ -181,7 +181,7 @@ export function 注册操作记录工具(
       let { 写出需求测试 } = await import('../requirement/export-file')
       let 路径 = await 写出需求测试(项目根目录, {
         文件名: fileName,
-        需求文件名: requirementFile,
+        需求目录名: requirementDirectory,
         覆盖验收点键们: acceptanceCriteriaKeys,
         流程名称: scenarioName,
         ...说明,

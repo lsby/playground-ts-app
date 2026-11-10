@@ -12,7 +12,7 @@ import { 独占测试数据库 } from '../database-lock'
 import { 测试服务 } from '../test-server'
 import { 格式化需求测试错误 } from './format-error'
 import { 保存需求测试报告, type 需求测试尝试记录, type 需求测试附件记录 } from './report'
-import { 读取需求描述文件 } from './requirement-file'
+import { 读取需求描述文件, 需求描述文件名 } from './requirement-file'
 
 type 需求测试实例 = Pick<需求测试, '获得需求们' | '获得流程们' | '需要测试服务' | '运行'>
 type 需求测试入口 = { 实例: 需求测试实例; 文件: string; 流程: 需求测试流程; 需求们: readonly 需求[] }
@@ -63,6 +63,9 @@ export class 需求测试运行器 {
       .filter((项) => 项.isFile() && 项.name.endsWith('.ts'))
       .map((项) => path.relative(this.需求目录, path.join(项.parentPath, 项.name)).replaceAll('\\', '/'))
       .sort()
+    let 描述文件们 = 文件们.filter((名称) => 名称.endsWith('.requirement.ts'))
+    let 命名错误文件 = 描述文件们.find((文件) => path.posix.basename(文件) !== 需求描述文件名)
+    if (命名错误文件 !== undefined) throw new Error(`需求描述文件“${命名错误文件}”必须命名为 ${需求描述文件名}`)
     let 登记们: { 文件: string; 实例: 需求测试实例 }[] = []
     for (let 文件 of 文件们.filter((名称) => 名称.endsWith('.requirement.ts') === false)) {
       let 入口 = this.入口Schema.safeParse(await import(pathToFileURL(path.join(this.需求目录, 文件)).href))
@@ -72,7 +75,7 @@ export class 需求测试运行器 {
     }
     let 需求集合 = new Set(登记们.flatMap(({ 实例 }) => 实例.获得需求们()))
     let 测试们 = 登记们.flatMap((登记) => 登记.实例.获得流程们().map((流程) => ({ ...登记, 流程 })))
-    for (let 文件 of 文件们.filter((名称) => 名称.endsWith('.requirement.ts'))) {
+    for (let 文件 of 描述文件们) {
       let { 业务需求 } = await 读取需求描述文件(path.join(this.需求目录, 文件))
       需求集合.add(业务需求)
     }

@@ -4,12 +4,12 @@ import path from 'node:path'
 import { format, resolveConfig } from 'prettier'
 
 import { 生成需求测试代码 } from './export-operation-record'
-import { 读取需求描述文件, 需求描述文件名格式, 需求流程文件名格式 } from './requirement-file'
+import { 读取需求描述文件, 需求描述文件名, 需求流程文件名格式, 需求目录名格式 } from './requirement-file'
 import { 需求测试运行器 } from './run-requirement'
 
 type 导出参数 = Omit<Parameters<typeof 生成需求测试代码>[0], '需求模块路径' | '覆盖验收点键们'> & {
   文件名: string
-  需求文件名: string
+  需求目录名: string
   覆盖验收点键们?: readonly string[] | undefined
 }
 let 导出队列 = Promise.resolve()
@@ -30,13 +30,11 @@ async function 获得前端目录首页(项目根目录: string): Promise<Readon
 export function 写出需求测试(项目根目录: string, 参数: 导出参数): Promise<string> {
   let 导出 = 导出队列.then(async (): Promise<string> => {
     if (需求流程文件名格式.test(参数.文件名) === false) throw new Error('导出文件名必须是英文小写短横线命名的 .ts 文件')
-    if (需求描述文件名格式.test(参数.需求文件名) === false)
-      throw new Error('需求描述文件名必须是英文小写短横线命名的 .requirement.ts 文件')
-    let 目录名 = 参数.需求文件名.slice(0, -'.requirement.ts'.length)
-    let 需求目录 = path.join(项目根目录, 'test', 'requirement', 目录名)
+    if (需求目录名格式.test(参数.需求目录名) === false) throw new Error('需求目录名必须使用英文小写短横线命名')
+    let 需求目录 = path.join(项目根目录, 'test', 'requirement', 参数.需求目录名)
     if ((await lstat(需求目录)).isDirectory() === false) throw new Error(`需求目录必须是普通目录：${需求目录}`)
     let 文件 = path.join(需求目录, 参数.文件名)
-    let { 业务需求, 验收点们 } = await 读取需求描述文件(path.join(需求目录, 参数.需求文件名))
+    let { 业务需求, 验收点们 } = await 读取需求描述文件(path.join(需求目录, 需求描述文件名))
     let 字典键们 = Object.keys(验收点们)
     let 覆盖验收点键们 = 参数.覆盖验收点键们
     if (覆盖验收点键们 === undefined) {
@@ -51,7 +49,7 @@ export function 写出需求测试(项目根目录: string, 参数: 导出参数
     let 源码 = 生成需求测试代码({
       ...参数,
       流程名称,
-      需求模块路径: `./${参数.需求文件名.slice(0, -'.ts'.length)}`,
+      需求模块路径: `./${需求描述文件名.slice(0, -'.ts'.length)}`,
       覆盖验收点键们,
       测试地址: { ...参数.测试地址, 目录首页 },
     })
