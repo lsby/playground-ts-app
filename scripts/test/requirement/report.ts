@@ -66,6 +66,9 @@ function 生成状态规则Html(层级: keyof typeof 状态规则说明): string
   let 条目 = Object.entries(状态规则说明[层级])
     .map(([状态, 说明]) => `<dt>${转义Html(状态)}</dt><dd>${转义Html(说明)}</dd>`)
     .join('')
+  if (层级 === '流程') {
+    return `<details class="status-rules"><summary>状态怎么算</summary><dl>${条目}</dl></details>`
+  }
   return `<aside class="status-rules" aria-label="${层级}状态说明"><p>状态怎么算</p><dl>${条目}</dl></aside>`
 }
 
@@ -132,7 +135,7 @@ function 生成步骤Html(id: string, 步骤们: readonly 步骤记录[]): strin
         <div class="stepmeta"><h4>${名称}</h4><span class="timing${样式}">${状态}${耗时}</span></div>
         ${生成步骤证据Html(步骤)}${错误}${取证错误们}</section>`)
   }
-  return `<div>${生成建议目录(步骤们)}<div class="step-workspace" data-step-workspace>
+  return `<div class="step-group">${生成建议目录(步骤们)}<div class="step-workspace" data-step-workspace>
     <ol class="timeline" aria-label="流程步骤">${目录.join('')}</ol>
     <div class="step-panels">${详情.join('')}</div>
   </div></div>`
@@ -186,13 +189,13 @@ function 归纳执行结论(
 function 生成执行结论Html(id: string, 结论: ReturnType<typeof 归纳执行结论>, 补充: string | undefined): string {
   let 标记 = 结论.尝试次数 > 1 ? `${结论.状态} · ${String(结论.尝试次数)} 次尝试` : 结论.状态
   let 已证明 = 结论.已证明验收点名称们.map((名称) => `<li>${转义Html(名称)}</li>`).join('')
-  return `<section class="flow-conclusion" aria-labelledby="${id}-conclusion">
-    <div class="headline"><h4 id="${id}-conclusion">执行结论</h4>${状态标记(标记, 流程状态样式[结论.状态])}</div>
+  return `<details class="flow-conclusion" aria-labelledby="${id}-conclusion">
+    <summary id="${id}-conclusion">执行结论 ${状态标记(标记, 流程状态样式[结论.状态])}</summary>
     ${已证明 === '' ? '' : `<p>本流程已验证的验收点</p><ul>${已证明}</ul>`}
     ${结论.未完成步骤 === undefined ? '' : `<p><strong>未完成步骤：</strong>${转义Html(结论.未完成步骤)}</p>`}
     ${结论.原因 === undefined || 结论.原因 === '' ? '' : `<p class="flow-text"><strong>原因：</strong>${转义Html(结论.原因)}</p>`}
     ${补充 === undefined ? '' : `<h5>补充说明</h5><p class="flow-text">${转义Html(补充)}</p>`}
-    </section>`
+    </details>`
 }
 
 function 生成流程Html(
@@ -217,7 +220,7 @@ function 生成流程Html(
       let 附件错误 = 附件错误们.length === 0 ? '' : `<p>附件收集错误</p>${附件错误们.map(生成错误Html).join('')}`
       let 清理错误 = 清理错误们.length === 0 ? '' : `<p>资源清理错误</p>${清理错误们.map(生成错误Html).join('')}`
       let 错误们 = 错误 + 附件错误 + 清理错误
-      return `<details class="run"${索引 === 尝试们.length - 1 ? ' open' : ''}>
+      return `<details class="run" name="${id}-attempts"${索引 === 尝试们.length - 1 ? ' open' : ''}>
         <summary class="runhead">第 ${String(尝试序号)} 次尝试 · ${结果.状态} · ${格式化耗时(结果.耗时毫秒)}</summary>
         ${错误们 === '' ? '' : `<div class="run-problems">${错误们}</div>`}
         ${生成步骤Html(`${id}-attempt-${String(尝试序号)}`, 结果.步骤们)}${生成流程附件Html(附件们)}</details>`
@@ -241,9 +244,10 @@ function 生成流程Html(
     <div class="flowhead report-overview"><div>
     <div class="label">流程</div>
     <h3 class="status-heading">${转义Html(流程.获得名称())} ${标记}${建议标记(有建议)}</h3>
+    <details class="flow-description"><summary>测试说明</summary>
     <p><strong>对应文件：</strong><a class="source-link" href="${转义Html(VSCode地址)}" title="在 VS Code 中打开"><code>${转义Html(相对文件)}</code></a></p>
     ${测试思路 === undefined ? '' : `<p class="flow-approach flow-text"><strong>测试思路：</strong>${转义Html(测试思路)}</p>`}
-    </div>${生成状态规则Html('流程')}
+    </details></div>${生成状态规则Html('流程')}
     </div>${记录}${计划}${生成执行结论Html(id, 结论, 结论补充)}</section>`
 }
 
