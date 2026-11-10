@@ -306,7 +306,7 @@ header{background:light-dark(#183d34,#122c23);color:light-dark(#fff,#e5f0ea)}
 .point-toggle{display:grid;place-items:center;width:var(--point-toggle-width);height:28px;border:0;border-radius:5px;background:transparent;color:inherit;cursor:pointer}
 .point-toggle::before{content:"";width:5px;height:5px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(-45deg)}
 .point-toggle[aria-expanded=true]::before{transform:rotate(45deg)}
-.point{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;text-align:left;border:1px solid transparent;border-radius:5px;background:light-dark(#fff,#1a2621);padding:3px 7px 3px 1px;color:light-dark(#263c33,#daece2);text-decoration:none}
+.point{grid-column:2;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;text-align:left;border:1px solid transparent;border-radius:5px;background:light-dark(#fff,#1a2621);padding:3px 7px 3px 1px;color:light-dark(#263c33,#daece2);text-decoration:none}
 .point:hover{background:light-dark(#f4f8f5,#293b32)}
 .point[aria-current=true]{background:light-dark(#e8f4ed,#254838);border-color:light-dark(#a4c9b6,#527e69)}
 .flow-links{list-style:none}
@@ -329,6 +329,7 @@ p{margin:0}
 .badge{display:inline-flex;align-items:center;gap:5px;border-radius:6px;padding:3px 8px;font-size:12px;line-height:1.35;font-weight:650;white-space:nowrap}
 .ok{color:light-dark(#155e43,#a9e7c9);background:light-dark(#e1f2e8,#234837)}
 .interrupted{color:light-dark(#765118,#f3d094);background:light-dark(#fff2d8,#463720)}
+.unimplemented{color:light-dark(#68429b,#d9baf7);background:light-dark(#f1e8fa,#3e2b52)}
 .neutral{color:light-dark(#475f55,#c2d6ca);background:light-dark(#edf2ef,#32443b)}
 .pointcard{padding:19px 25px;margin-bottom:16px;border-left:4px solid light-dark(#43886c,#6bba98)}
 .pointcard.pendingbar{border-left-color:light-dark(#be8a3d,#d0a65e)}
@@ -337,6 +338,7 @@ p{margin:0}
 .flow{overflow:hidden}
 .flowhead{padding:20px 25px 17px;border-bottom:1px solid light-dark(#e3ebe6,#35483f)}
 .flowhead h3{font-size:19px;margin:5px 0 6px;line-height:1.4}
+.flowhead h3 .badge{margin-inline-start:6px;vertical-align:middle}
 .flowhead p+p,.pointcard p+p{margin-top:4px}
 .flowhead code{overflow-wrap:anywhere}
 .flowhead .flow-approach{margin-top:14px}

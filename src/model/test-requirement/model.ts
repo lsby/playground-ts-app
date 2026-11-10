@@ -12,12 +12,17 @@ export type 可等待结果<结果> = 结果 | Promise<结果>
 
 /**
  * 验收点是需求中可以被独立判定是否成立的最小承诺。
- * 它持有验收描述，并供流程声明自己准备证明哪项承诺。
+ * 它持有名称和验收描述，并供流程声明自己准备证明哪项承诺。
  */
 export class 验收点 {
+  private readonly 名称: string
   private readonly 描述: string
-  public constructor(参数: { 描述: string }) {
+  public constructor(参数: { 名称: string; 描述: string }) {
+    this.名称 = 解析领域文本('验收点名称', 参数.名称)
     this.描述 = 解析领域文本('验收点描述', 参数.描述)
+  }
+  public 获得名称(): string {
+    return this.名称
   }
   public 获得描述(): string {
     return this.描述
@@ -54,7 +59,7 @@ export class 需求 {
   public 检查覆盖(已覆盖验收点们: readonly 验收点[]): void {
     let 未覆盖 = this.验收点们.filter((验收点值) => 已覆盖验收点们.includes(验收点值) === false)
     if (未覆盖.length > 0)
-      throw new Error(`需求“${this.名称}”存在未覆盖验收点：${未覆盖.map((验收点值) => 验收点值.获得描述()).join('、')}`)
+      throw new Error(`需求“${this.名称}”存在未覆盖验收点：${未覆盖.map((验收点值) => 验收点值.获得名称()).join('、')}`)
   }
 }
 

@@ -32,8 +32,8 @@
 - **入口与命令**:
   - 由 `scripts/test/requirement/run-requirement.ts` 驱动。
   - 运行 `npm run test:requirement`。可交互选择，或指定 `--all`、`--scenario=<流程名>`、`--requirement=<需求名>`、`--list`、`--auto` 或 `--demo`。任务参数 `--prepare-only` 可预览计划。
-  - 每个需求的定义和流程都放在 `test/requirement/<name>/`。可以分次导出流程，并引用同目录下的 `<name>.requirement.ts`。列出流程和选定流程回放时允许缺少覆盖。选择全部流程或传入 `--all` 时，运行前会检查每个验收点是否都有流程覆盖，只有描述文件的需求也纳入检查。
-  - 自动模式在 CI 中每条流程最多尝试三次。报告输出至 `test-outputs/requirement-report/`，可按验收点查覆盖，或打开对应的流程尝试查看步骤、附件、失败信息和浏览器 Trace。
+  - 每个需求的定义和流程都放在 `test/requirement/<name>/`。可以分次导出流程，并引用同目录下的 `<name>.requirement.ts`。列出流程和选定流程回放时允许缺少覆盖。全量运行遇到未覆盖的验收点时，会生成报告并返回失败，数据库准备和流程执行都不会开始。
+  - 自动模式在 CI 中每条流程最多尝试三次。报告输出至 `test-outputs/requirement-report/`。HTML 和 JSON 报告包含只有描述文件的需求。验收点没有关联流程时为「未实现」，有关联流程但没有尝试时为「未执行」。需求按「未证明、未实现、未执行、已证明」从高到低汇总。HTML 目录和执行结论展示验收点名称，详情展示完整描述。打开对应的流程尝试可以查看步骤、附件、失败信息和浏览器 Trace。
 
 ## 交互式测试 MCP
 

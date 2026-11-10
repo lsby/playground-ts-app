@@ -58,7 +58,7 @@ export class 需求测试运行器 {
     return 流程们
   }
 
-  public async 发现登记(检查完整覆盖 = false): Promise<需求测试登记> {
+  public async 发现登记(): Promise<需求测试登记> {
     let 文件们 = (await readdir(this.需求目录, { recursive: true, withFileTypes: true }))
       .filter((项) => 项.isFile() && 项.name.endsWith('.ts'))
       .map((项) => path.relative(this.需求目录, path.join(项.parentPath, 项.name)).replaceAll('\\', '/'))
@@ -72,11 +72,9 @@ export class 需求测试运行器 {
     }
     let 需求集合 = new Set(登记们.flatMap(({ 实例 }) => 实例.获得需求们()))
     let 测试们 = 登记们.flatMap((登记) => 登记.实例.获得流程们().map((流程) => ({ ...登记, 流程 })))
-    if (检查完整覆盖) {
-      for (let 文件 of 文件们.filter((名称) => 名称.endsWith('.requirement.ts'))) {
-        let { 业务需求 } = await 读取需求描述文件(path.join(this.需求目录, 文件))
-        需求集合.add(业务需求)
-      }
+    for (let 文件 of 文件们.filter((名称) => 名称.endsWith('.requirement.ts'))) {
+      let { 业务需求 } = await 读取需求描述文件(path.join(this.需求目录, 文件))
+      需求集合.add(业务需求)
     }
     let 需求们 = [...需求集合]
     if (new Set(需求们.map((值) => 值.获得名称())).size !== 需求们.length) throw new Error('需求测试包含重复需求名称')
@@ -87,10 +85,6 @@ export class 需求测试运行器 {
     for (let 测试 of 测试们)
       for (let 验收点值 of 测试.流程.获得覆盖验收点们())
         if (验收点们.includes(验收点值) === false) throw new Error(`流程“${测试.流程.获得名称()}”引用了未登记验收点`)
-    if (检查完整覆盖) {
-      let 已覆盖 = 测试们.flatMap((测试) => [...测试.流程.获得覆盖验收点们()])
-      for (let 值 of 需求们) 值.检查覆盖(已覆盖)
-    }
     let 流程们 = 测试们.map((测试) => ({
       ...测试,
       需求们: 需求们.filter((值) => 测试.流程.获得覆盖验收点们().some((点) => 值.包含(点))),
@@ -110,16 +104,31 @@ export class 需求测试运行器 {
 
   private async 执行流程们(参数们: readonly string[]): Promise<number> {
     let 选项 = this.解析运行选项(参数们)
-    let 检查完整覆盖 = 选项.仅列出 === false && 选项.指定流程名称们.length === 0 && 选项.指定需求名称 === undefined
-    let { 流程们 } = await this.发现登记(检查完整覆盖)
-    let 选中流程们 = this.选择流程(流程们, 选项)
+    let 登记 = await this.发现登记()
+    let { 流程们, 需求们 } = 登记
+    let 选中流程们 = this.选择流程(登记, 选项)
     if (选项.仅列出) {
       for (let { 文件, 流程 } of 选中流程们) console.log(`${流程.获得名称()} · ${文件}`)
       return 0
     }
-    console.log(
-      `将执行 ${String(选中流程们.length)} 个需求流程：${选中流程们.map(({ 流程 }) => 流程.获得名称()).join('、')}`,
+    let 检查完整覆盖 = 选项.指定流程名称们.length === 0 && 选项.指定需求名称 === undefined
+    let 待检查需求们 = 需求们.filter(
+      (需求) => 检查完整覆盖 || (选中流程们.length === 0 && 需求.获得名称() === 选项.指定需求名称),
     )
+    let 已覆盖 = 流程们.flatMap(({ 流程 }) => [...流程.获得覆盖验收点们()])
+    let 覆盖错误们: string[] = []
+    for (let 需求 of 待检查需求们) {
+      try {
+        需求.检查覆盖(已覆盖)
+      } catch (错误) {
+        覆盖错误们.push(错误 instanceof Error ? 错误.message : String(错误))
+      }
+    }
+    if (覆盖错误们.length === 0)
+      console.log(
+        `将执行 ${String(选中流程们.length)} 个需求流程：${选中流程们.map(({ 流程 }) => 流程.获得名称()).join('、')}`,
+      )
+    else for (let 错误 of 覆盖错误们) console.error(错误)
 
     let 开始时间 = Date.now()
     await mkdir(this.报告目录, { recursive: true })
@@ -151,7 +160,7 @@ export class 需求测试运行器 {
     process.on('SIGINT', 处理SIGINT)
     process.on('SIGTERM', 处理SIGTERM)
     try {
-      if (选中流程们.length > 0) {
+      if (覆盖错误们.length === 0 && 选中流程们.length > 0) {
         释放数据库 = await 独占测试数据库(this.根目录)
         await new 测试服务(this.根目录, 报告目录).确认端口可用()
         if (已取消() === false) await this.运行准备任务('db:ensure:test:web')
@@ -160,7 +169,7 @@ export class 需求测试运行器 {
       }
       let 最大尝试次数 = 选项.模式 === '自动' && process.env['CI'] !== undefined && process.env['CI'] !== '' ? 3 : 1
       for (let [流程索引, { 测试, 尝试们 }] of 记录们.entries()) {
-        if (已取消()) break
+        if (覆盖错误们.length > 0 || 已取消()) break
         let 需要服务 = 测试.实例.需要测试服务()
         for (let 尝试序号 = 1; 尝试序号 <= 最大尝试次数 && 已取消() === false; 尝试序号 += 1) {
           let 附件目录 = path.join(报告目录, 'artifacts', String(流程索引 + 1), String(尝试序号))
@@ -211,10 +220,12 @@ export class 需求测试运行器 {
       服务地址,
       开始时间,
       结束时间: Date.now(),
+      需求们,
       流程们,
       选中流程们,
       记录们,
       基础设施错误们,
+      覆盖错误们,
       中断码,
     })
     console.log(`需求测试报告已生成：${pathToFileURL(产物.html路径).href}`)
@@ -316,7 +327,7 @@ export class 需求测试运行器 {
     return { 全部运行, 指定流程名称们, 指定需求名称, 模式: 演示模式 ? '演示' : '自动', 仅列出: values.list === true }
   }
 
-  private 选择流程(流程们: readonly 需求测试入口[], 选项: 需求测试运行选项): readonly 需求测试入口[] {
+  private 选择流程({ 流程们, 需求们 }: 需求测试登记, 选项: 需求测试运行选项): readonly 需求测试入口[] {
     if (选项.全部运行) return 流程们
     if (选项.指定流程名称们.length > 0)
       return 选项.指定流程名称们.map((名称) => {
@@ -326,9 +337,8 @@ export class 需求测试运行器 {
       })
     let 需求名称 = 选项.指定需求名称
     if (需求名称 === undefined) return 流程们
-    let 结果 = 流程们.filter((流程项) => 流程项.需求们.some((值) => 值.获得名称() === 需求名称))
-    if (结果.length === 0) throw new Error(`找不到包含需求“${需求名称}”的测试流程`)
-    return 结果
+    if (需求们.some((值) => 值.获得名称() === 需求名称) === false) throw new Error(`找不到需求“${需求名称}”`)
+    return 流程们.filter((流程项) => 流程项.需求们.some((值) => 值.获得名称() === 需求名称))
   }
 }
 
