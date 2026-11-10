@@ -260,6 +260,7 @@ export let 交互脚本 = `
     controls.querySelector('[data-next]').onclick = () => move(1)
     root.onkeydown = event => {
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+      if (event.target instanceof Element && event.target.closest('.step-log-content')) return
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
       event.preventDefault()
       if (root === dialog) fullImage.focus({ preventScroll: true })
@@ -288,7 +289,7 @@ export let 交互脚本 = `
   document.addEventListener('keydown', event => {
     if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || dialog.open) return
     if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return
-    if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable], .directory-resizer')) return
+    if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable], .directory-resizer, .step-log-content')) return
     let workspaces = [...(currentPanel?.querySelectorAll('[data-step-workspace]') ?? [])]
       .filter(workspace => workspace.closest('details:not([open])') === null)
     let workspace = workspaces.includes(activeWorkspace) ? activeWorkspace : workspaces.at(-1)
@@ -431,16 +432,20 @@ p{margin:0}
 .step-suggestion{margin-top:9px;padding:10px 12px;border-left:3px solid light-dark(#6b9b91,#87b9ad);background:light-dark(#edf6f4,#233e38);border-radius:6px}
 .step-suggestion p+p{margin-top:4px}
 .step-attachments{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;margin-top:9px}
-.step-attachments:not(:has([data-frame]:not([hidden]) .gallery-frame)){flex:none}
+.step-attachments:not(:has([data-frame]:not([hidden]) :is(.gallery-frame,.step-log))){flex:none}
 .step-attachments>.gallery-controls{flex-shrink:0}
 .step-attachments p{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
 .gallery-page:not([hidden]){flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
 .gallery-page>*{flex-shrink:0}
-.step-log summary{cursor:pointer;font-weight:600}
-.step-log p{margin-top:6px}
+.gallery-page>.step-log{display:flex;flex-direction:column;flex-shrink:1;min-height:0}
+.gallery-page:has(.gallery-frame)>.step-log{max-height:25%}
+.step-log-title{flex-shrink:0;font-weight:600;margin-bottom:6px}
+.step-log-content{min-height:0;overflow:auto;overscroll-behavior:contain}
+.step-log-content:focus-visible{outline:2px solid light-dark(#367b68,#7bc7a8);outline-offset:-2px}
 .step-image{display:block;flex:1;min-height:0;width:100%;padding:0;border:0;background:none;border-radius:6px;cursor:zoom-in}
 .step-image img{display:block;width:100%;height:100%;object-fit:contain;object-position:left center;border-radius:6px}
 .gallery-frame{flex:1;min-height:100px;display:flex;flex-direction:column;margin:0}
+.gallery-page:has(.step-log)>.gallery-frame{min-height:0}
 .gallery-frame figcaption{margin-top:4px;color:light-dark(#52665e,#b5c9bf);font-size:12px}
 .gallery-controls{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .gallery-controls button,.image-dialog button{cursor:pointer;border:1px solid light-dark(#d4e7dc,#395e4d);border-radius:5px;background:transparent;color:inherit;min-width:30px}

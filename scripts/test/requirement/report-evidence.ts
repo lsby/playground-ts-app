@@ -32,7 +32,8 @@ function 生成步骤附件Html(
             case '文本':
               return 附件.日志流 === undefined
                 ? `<p>${转义Html(附件.内容)}</p>`
-                : `<details class="step-log"><summary>后端日志（${附件.日志流}）</summary><p>${转义Html(附件.内容)}</p></details>`
+                : `<div class="step-log"><p class="step-log-title">后端日志（${附件.日志流}）</p>
+                  <div class="step-log-content" role="region" aria-label="后端日志（${附件.日志流}）" tabindex="0"><p>${转义Html(附件.内容)}</p></div></div>`
             case '图片': {
               图片序号 += 1
               let 说明 = 转义Html(附件.说明 ?? `步骤图片 ${String(图片序号)}`)
