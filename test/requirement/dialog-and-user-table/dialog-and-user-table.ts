@@ -1,6 +1,6 @@
-import type { 浏览器测试引擎 } from '../../src/model/browser-test'
-import { 流程, 行为, 观察, 需求, 需求测试, 验收点, type 需求测试工具 } from '../../src/model/test-requirement'
-import { 切换演示标签, 登录演示页 } from './helper/browser-demo-helper'
+import type { 浏览器测试引擎 } from '../../../src/model/browser-test'
+import { 流程, 行为, 观察, 需求测试, type 需求测试工具 } from '../../../src/model/test-requirement'
+import { 业务需求, 验收点们 } from './dialog-and-user-table.requirement'
 
 type 用户表格行 = { id: string; 名称: string }
 
@@ -15,15 +15,6 @@ function 比较文本(左值: string, 右值: string): number {
  * 准备演示账号后操作模态框和用户数据，检查实际尺寸、排序与行选择。
  */
 type 测试上下文 = { 工具: 需求测试工具 }
-
-let 模态框尺寸 = new 验收点({ 描述: '模态框可最大化并恢复原尺寸，未指定尺寸时能自适应内容。' })
-let 表格排序 = new 验收点({ 描述: '用户表格支持名称和 ID 多列排序，实际行顺序符合排序设置。' })
-let 表格选择 = new 验收点({ 描述: '重新排序后，Shift 范围选择仍以原选中行为锚点。' })
-let 业务需求 = new 需求({
-  名称: '模态框尺寸与用户表格操作',
-  描述: '演示页的模态框可以调整尺寸，用户列表可以排序、选择和打开编辑操作。',
-  验收点们: [模态框尺寸, 表格排序, 表格选择],
-})
 
 class 浮层模态框与业务表格测试 extends 需求测试 {
   private static 获得主流程步骤(): (行为<测试上下文> | 观察<测试上下文>)[] {
@@ -45,8 +36,16 @@ class 浮层模态框与业务表格测试 extends 需求测试 {
             跳过操作动画: true,
           },
           async () => {
-            await 登录演示页(引擎)
-            await 切换演示标签(引擎, '浮层反馈')
+            if (引擎.获得地址().includes('/demo/login.html') === false) await 引擎.导航('/demo/login.html')
+            let 用户名输入框 = 引擎.按角色('textbox', { name: '用户名' })
+            await 引擎.说明('正在进入演示系统登录页，准备执行自动登录', 用户名输入框)
+            await 引擎.输入(用户名输入框, 'admin')
+            await 引擎.输入(引擎.按角色('textbox', { name: '密码' }), '123456')
+            await 引擎.点击(引擎.按角色('button', { name: '登录演示系统' }))
+            await 引擎.等待地址('**/demo/index.html')
+            let 目标标签 = 引擎.按角色('tab', { name: '浮层反馈', exact: true })
+            await 引擎.说明('切换演示标签页至：“浮层反馈”', 目标标签)
+            await 引擎.点击(目标标签)
           },
         )
         return 当前状态
@@ -91,7 +90,9 @@ class 浮层模态框与业务表格测试 extends 需求测试 {
         await 引擎.验证隐藏(模态框)
 
         // 2. 业务示例：自适应模态框
-        await 切换演示标签(引擎, '业务示例')
+        let 业务示例标签 = 引擎.按角色('tab', { name: '业务示例', exact: true })
+        await 引擎.说明('切换演示标签页至：“业务示例”', 业务示例标签)
+        await 引擎.点击(业务示例标签)
         let 添加数据按钮 = 引擎.按角色('button', { name: '添加数据' })
         await 引擎.说明('点击“添加数据”打开未指定尺寸的自适应模态框', 添加数据按钮)
         await 引擎.点击(添加数据按钮)
@@ -248,7 +249,7 @@ class 浮层模态框与业务表格测试 extends 需求测试 {
           测试思路:
             '先比较弹窗与视口的实际尺寸，再用固定账号检查表格排序。选择一行后重新排序，用 Shift 扩展范围并检查选中结果。',
           步骤们: 浮层模态框与业务表格测试.获得主流程步骤(),
-          覆盖验收点们: [模态框尺寸, 表格排序, 表格选择],
+          覆盖验收点们: [验收点们.模态框尺寸, 验收点们.表格排序, 验收点们.表格选择],
         }),
       ],
       { 使用测试服务: true },

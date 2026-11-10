@@ -49,13 +49,9 @@ async function 运行开发套件(): Promise<void> {
     process.off('SIGINT', 请求退出)
     process.off('SIGTERM', 请求退出)
     try {
-      try {
-        await MCP?.关闭()
-      } finally {
-        let 结果们 = await Promise.allSettled([会话?.关闭(), 后端.关闭()])
-        let 错误们 = 结果们.filter((结果) => 结果.status === 'rejected').map((结果) => 结果.reason)
-        if (错误们.length > 0) throw new AggregateError(错误们, '关闭测试开发套件失败')
-      }
+      let 结果们 = await Promise.allSettled([后端.关闭(), 会话?.关闭(), MCP?.关闭()])
+      let 错误们 = 结果们.filter((结果) => 结果.status === 'rejected').map((结果) => 结果.reason)
+      if (错误们.length > 0) throw new AggregateError(错误们, '关闭测试开发套件失败')
     } finally {
       await 释放数据库()
     }

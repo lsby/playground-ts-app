@@ -12,9 +12,11 @@ import { 独占测试数据库 } from '../database-lock'
 import { 测试服务 } from '../test-server'
 import { 格式化需求测试错误 } from './format-error'
 import { 保存需求测试报告, type 需求测试尝试记录, type 需求测试附件记录 } from './report'
+import { 读取需求描述文件 } from './requirement-file'
 
 type 需求测试实例 = Pick<需求测试, '获得需求们' | '获得流程们' | '需要测试服务' | '运行'>
 type 需求测试入口 = { 实例: 需求测试实例; 文件: string; 流程: 需求测试流程; 需求们: readonly 需求[] }
+type 需求测试登记 = { 流程们: readonly 需求测试入口[]; 需求们: readonly 需求[] }
 type 需求测试运行选项 = {
   全部运行: boolean
   指定流程名称们: readonly string[]
@@ -52,20 +54,31 @@ export class 需求测试运行器 {
   }
 
   public async 发现测试(): Promise<readonly 需求测试入口[]> {
+    let { 流程们 } = await this.发现登记()
+    return 流程们
+  }
+
+  public async 发现登记(检查完整覆盖 = false): Promise<需求测试登记> {
     let 文件们 = (await readdir(this.需求目录, { recursive: true, withFileTypes: true }))
       .filter((项) => 项.isFile() && 项.name.endsWith('.ts'))
       .map((项) => path.relative(this.需求目录, path.join(项.parentPath, 项.name)).replaceAll('\\', '/'))
-      .filter((文件) => 文件.split('/').includes('helper') === false)
       .sort()
     let 登记们: { 文件: string; 实例: 需求测试实例 }[] = []
-    for (let 文件 of 文件们) {
+    for (let 文件 of 文件们.filter((名称) => 名称.endsWith('.requirement.ts') === false)) {
       let 入口 = this.入口Schema.safeParse(await import(pathToFileURL(path.join(this.需求目录, 文件)).href))
       if (入口.success === false)
         throw new Error(`需求测试文件“${文件}”未默认导出有效的测试子类`, { cause: 入口.error })
       登记们.push({ 文件, 实例: new 入口.data.default() })
     }
-    let 需求们 = 登记们.flatMap(({ 实例 }) => 实例.获得需求们())
+    let 需求集合 = new Set(登记们.flatMap(({ 实例 }) => 实例.获得需求们()))
     let 测试们 = 登记们.flatMap((登记) => 登记.实例.获得流程们().map((流程) => ({ ...登记, 流程 })))
+    if (检查完整覆盖) {
+      for (let 文件 of 文件们.filter((名称) => 名称.endsWith('.requirement.ts'))) {
+        let { 业务需求 } = await 读取需求描述文件(path.join(this.需求目录, 文件))
+        需求集合.add(业务需求)
+      }
+    }
+    let 需求们 = [...需求集合]
     if (new Set(需求们.map((值) => 值.获得名称())).size !== 需求们.length) throw new Error('需求测试包含重复需求名称')
     if (new Set(测试们.map((测试) => 测试.流程.获得名称())).size !== 测试们.length)
       throw new Error('需求测试包含重复流程名称')
@@ -74,12 +87,15 @@ export class 需求测试运行器 {
     for (let 测试 of 测试们)
       for (let 验收点值 of 测试.流程.获得覆盖验收点们())
         if (验收点们.includes(验收点值) === false) throw new Error(`流程“${测试.流程.获得名称()}”引用了未登记验收点`)
-    let 已覆盖 = 测试们.flatMap((测试) => [...测试.流程.获得覆盖验收点们()])
-    for (let 值 of 需求们) 值.检查覆盖(已覆盖)
-    return 测试们.map((测试) => ({
+    if (检查完整覆盖) {
+      let 已覆盖 = 测试们.flatMap((测试) => [...测试.流程.获得覆盖验收点们()])
+      for (let 值 of 需求们) 值.检查覆盖(已覆盖)
+    }
+    let 流程们 = 测试们.map((测试) => ({
       ...测试,
       需求们: 需求们.filter((值) => 测试.流程.获得覆盖验收点们().some((点) => 值.包含(点))),
     }))
+    return { 流程们, 需求们 }
   }
 
   public async 运行(参数们: readonly string[]): Promise<number> {
@@ -94,7 +110,8 @@ export class 需求测试运行器 {
 
   private async 执行流程们(参数们: readonly string[]): Promise<number> {
     let 选项 = this.解析运行选项(参数们)
-    let 流程们 = await this.发现测试()
+    let 检查完整覆盖 = 选项.仅列出 === false && 选项.指定流程名称们.length === 0 && 选项.指定需求名称 === undefined
+    let { 流程们 } = await this.发现登记(检查完整覆盖)
     let 选中流程们 = this.选择流程(流程们, 选项)
     if (选项.仅列出) {
       for (let { 文件, 流程 } of 选中流程们) console.log(`${流程.获得名称()} · ${文件}`)

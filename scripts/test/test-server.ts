@@ -4,13 +4,24 @@ import * as net from 'node:net'
 import * as path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { setTimeout as 等待 } from 'node:timers/promises'
+import { fileURLToPath } from 'node:url'
 
 import crossSpawn from 'cross-spawn'
 import { z } from 'zod'
 
 import type { 测试服务日志内容 } from '../../src/model/test-requirement/tools'
 import type { 测试服务日志位置 } from '../../src/test-tools/runtime'
+import { 开发任务表 } from '../task/taskfile/taskfile-dev'
 import { 测试日志缓冲 } from './service-log'
+import { 停止测试进程 } from './test-process'
+
+type 后端进程 = {
+  子进程: ChildProcess
+  已就绪: boolean
+  日志控制器: AbortController
+  日志任务?: Promise<PromiseSettledResult<void>[]>
+  停止任务?: Promise<void> | undefined
+}
 
 /**
  * 测试服务是为一次需求测试运行提供后端的独立进程。
@@ -19,9 +30,10 @@ import { 测试日志缓冲 } from './service-log'
  */
 export class 测试服务 {
   private 已尝试启动 = false
-  private 进程: ChildProcess | undefined
-  private readonly 日志控制器 = new AbortController()
-  private 日志任务: Promise<PromiseSettledResult<void>[]> | undefined
+  private 进程: 后端进程 | undefined
+  private readonly 意外退出 = Promise.withResolvers<void>()
+  private readonly 取消 = new AbortController()
+  private 重启任务: Promise<string> | undefined
   private 关闭任务: Promise<void> | undefined
   private 标准输出 = new 测试日志缓冲()
   private 错误输出 = new 测试日志缓冲()
@@ -37,6 +49,10 @@ export class 测试服务 {
 
   public 获得服务地址(): string {
     return this.获得配置().服务地址
+  }
+
+  public 确认已就绪(): void {
+    if (this.进程?.已就绪 !== true) throw new Error('测试后端未就绪，请重试 database_reset')
   }
 
   public 获得日志位置(): 测试服务日志位置 {
@@ -56,21 +72,72 @@ export class 测试服务 {
     if (this.已尝试启动) throw new Error('测试服务只能启动一次')
     this.检查未关闭()
     this.已尝试启动 = true
+    return await this.启动进程()
+  }
+
+  public async 重启(停机期间操作: (取消信号: AbortSignal) => Promise<void>): Promise<string> {
+    this.检查未关闭()
+    if (this.启动任务 !== 'run:service:test:watch' || this.已尝试启动 === false)
+      throw new Error('仅允许重启已启动的测试开发服务')
+    if (this.重启任务 !== undefined) throw new Error('测试服务正在重启')
+    this.重启任务 = this.执行重启(停机期间操作)
+    try {
+      return await this.重启任务
+    } finally {
+      this.重启任务 = undefined
+    }
+  }
+
+  public 关闭(): Promise<void> {
+    this.取消.abort(new Error('测试服务已关闭'))
+    this.关闭任务 ??= this.执行关闭()
+    return this.关闭任务
+  }
+
+  public 等待退出(): Promise<void> {
+    if (this.已尝试启动 === false) throw new Error('测试服务尚未启动')
+    return this.意外退出.promise
+  }
+
+  private async 执行重启(停机期间操作: (取消信号: AbortSignal) => Promise<void>): Promise<string> {
+    await this.停止当前进程()
+    await this.确认端口可用()
+    this.检查未关闭()
+    await 停机期间操作(this.取消.signal)
+    return await this.启动进程()
+  }
+
+  private async 执行关闭(): Promise<void> {
+    await this.重启任务?.catch((): void => {
+      // 重启调用负责报告自己的失败。关闭继续处理任何仍在运行的后端。
+    })
+    await this.停止当前进程()
+  }
+
+  private async 启动进程(): Promise<string> {
+    this.检查未关闭()
     let 环境文件 = z.string().min(1).parse(process.env['ENV_FILE_PATH'])
     let { 端口, 服务地址 } = this.获得配置()
     await this.确认端口可用()
     this.检查未关闭()
 
     fs.mkdirSync(this.报告目录, { recursive: true })
-    let 进程 = crossSpawn(
-      process.execPath,
-      ['--import', 'tsx', 'scripts/task/index.ts', this.启动任务, '--env', 环境文件],
-      { cwd: this.根目录, env: process.env, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32' },
-    )
-    this.进程 = 进程
+    let { 参数, 环境变量 } = this.获得启动命令(环境文件)
+    let 进程 = crossSpawn(process.execPath, 参数, {
+      cwd: this.根目录,
+      env: 环境变量,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
+    })
+    let 当前: 后端进程 = { 子进程: 进程, 已就绪: false, 日志控制器: new AbortController() }
+    this.进程 = 当前
     let 启动错误: Error | undefined
     进程.once('error', (错误): void => {
       启动错误 = 错误
+    })
+    进程.once('exit', (): void => {
+      if (当前.已就绪 && this.取消.signal.aborted === false) this.意外退出.resolve()
+      当前.已就绪 = false
     })
     try {
       let { stdout, stderr } = 进程
@@ -79,8 +146,8 @@ export class 测试服务 {
       stderr.on('data', (数据: Buffer): void => this.错误输出.追加(数据))
       stdout.pipe(process.stdout, { end: false })
       stderr.pipe(process.stderr, { end: false })
-      let 日志选项 = { signal: this.日志控制器.signal }
-      this.日志任务 = Promise.allSettled([
+      let 日志选项 = { signal: 当前.日志控制器.signal }
+      当前.日志任务 = Promise.allSettled([
         pipeline(stdout, fs.createWriteStream(path.join(this.报告目录, 'server.stdout.log'), { flags: 'a' }), 日志选项),
         pipeline(stderr, fs.createWriteStream(path.join(this.报告目录, 'server.stderr.log'), { flags: 'a' }), 日志选项),
       ])
@@ -92,13 +159,16 @@ export class 测试服务 {
         if (启动错误 !== undefined) throw 启动错误
         if (进程.exitCode !== null || 进程.signalCode !== null)
           throw new Error(`测试服务在就绪前退出，退出码：${String(进程.exitCode)}，信号：${String(进程.signalCode)}`)
-        if (开放) return 服务地址
+        if (开放) {
+          当前.已就绪 = true
+          return 服务地址
+        }
         await 等待(250)
       }
       throw new Error(`等待测试服务端口 ${String(端口)} 就绪超时（120000ms）`)
     } catch (错误) {
       try {
-        await this.关闭()
+        await this.停止当前进程()
       } catch (关闭错误) {
         throw new AggregateError([错误, 关闭错误], '测试服务启动失败，且未能正常关闭')
       }
@@ -106,16 +176,19 @@ export class 测试服务 {
     }
   }
 
-  public 关闭(): Promise<void> {
-    this.关闭任务 ??= this.结束服务进程()
-    return this.关闭任务
-  }
-
-  public async 等待退出(): Promise<void> {
-    let 进程 = this.进程
-    if (进程 === undefined) throw new Error('测试服务尚未启动')
-    if (进程.exitCode !== null || 进程.signalCode !== null) return
-    await new Promise<void>((完成) => 进程.once('exit', (): void => 完成()))
+  private 获得启动命令(环境文件: string): { 参数: string[]; 环境变量: NodeJS.ProcessEnv } {
+    if (this.启动任务 === 'run:service:test:watch') {
+      // 监听器和它派生的服务留在同一进程组，重置时可一起关闭。
+      let 任务 = 开发任务表[this.启动任务]
+      return {
+        参数: [fileURLToPath(import.meta.resolve('tsx/cli')), ...任务.运行.参数],
+        环境变量: { ...process.env, ...任务.环境变量, ENV_FILE_PATH: 环境文件 },
+      }
+    }
+    return {
+      参数: ['--import', 'tsx', 'scripts/task/index.ts', this.启动任务, '--env', 环境文件],
+      环境变量: process.env,
+    }
   }
 
   private 获得配置(): { 端口: number; 服务地址: string } {
@@ -124,7 +197,7 @@ export class 测试服务 {
   }
 
   private 检查未关闭(): void {
-    if (this.关闭任务 !== undefined) throw new Error('测试服务已关闭')
+    this.取消.signal.throwIfAborted()
   }
 
   private 端口已开放(端口: number): Promise<boolean> {
@@ -141,52 +214,29 @@ export class 测试服务 {
     })
   }
 
-  private 等待进程退出(进程: ChildProcess, 超时毫秒: number): Promise<boolean> {
-    if (进程.exitCode !== null || 进程.signalCode !== null) return Promise.resolve(true)
-    return new Promise<boolean>((完成) => {
-      let 结束 = (): void => {
-        clearTimeout(定时器)
-        完成(true)
-      }
-      let 定时器 = setTimeout((): void => {
-        进程.off('exit', 结束)
-        完成(false)
-      }, 超时毫秒)
-      进程.once('exit', 结束)
-    })
+  private async 停止当前进程(): Promise<void> {
+    let 当前 = this.进程
+    if (当前 === undefined) return
+    当前.已就绪 = false
+    当前.停止任务 ??= this.结束服务进程(当前)
+    try {
+      await 当前.停止任务
+    } finally {
+      当前.停止任务 = undefined
+    }
   }
 
-  private async 结束服务进程(): Promise<void> {
-    let 进程 = this.进程
-    if (进程?.pid !== undefined && 进程.exitCode === null && 进程.signalCode === null) {
-      if (process.platform === 'win32') {
-        let 终止 = crossSpawn('taskkill', ['/pid', String(进程.pid), '/T', '/F'], { stdio: 'ignore' })
-        await new Promise<void>((完成, 失败) => {
-          终止.once('close', (退出码): void => {
-            if (退出码 === 0 || 进程.exitCode !== null || 进程.signalCode !== null) 完成()
-            else 失败(new Error(`taskkill 未能关闭测试服务进程，退出码：${String(退出码)}`))
-          })
-          终止.once('error', 失败)
-        })
-      } else process.kill(-进程.pid, 'SIGTERM')
-      // POSIX 任务入口需要先通知独立子进程组，并给它们最多 11 秒完成退出。
-      let 退出期限 = process.platform === 'win32' ? 10_000 : 15_000
-      if ((await this.等待进程退出(进程, 退出期限)) === false) {
-        if (process.platform === 'win32') 进程.kill('SIGKILL')
-        else process.kill(-进程.pid, 'SIGKILL')
-        if ((await this.等待进程退出(进程, 1_000)) === false) throw new Error('测试服务进程未在关闭期限内退出')
-      }
-    }
-
-    if (this.日志任务 === undefined) return
+  private async 结束服务进程(当前: 后端进程): Promise<void> {
+    let 退出期限 = this.启动任务 === 'run:service:test:watch' ? 5_000 : 15_000
+    await 停止测试进程(当前.子进程, 退出期限)
     // 任务入口异常退出时，仍在运行的子进程可能继续占用输出管道。
-    let 定时器 = setTimeout((): void => this.日志控制器.abort(), 5_000)
+    let 定时器 = setTimeout((): void => 当前.日志控制器.abort(), 3_000)
     try {
-      let 日志结果们 = await this.日志任务
-      for (let 结果 of 日志结果们)
+      for (let 结果 of (await 当前.日志任务) ?? [])
         if (结果.status === 'rejected') throw new Error('保存测试服务日志失败', { cause: 结果.reason })
     } finally {
       clearTimeout(定时器)
+      if (this.进程 === 当前) this.进程 = undefined
     }
   }
 }

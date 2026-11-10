@@ -96,6 +96,12 @@ export class 需求测试浏览器组 {
     return [...this.附件们]
   }
 
+  public async 归档并关闭当前会话(): Promise<void> {
+    let 结果们 = await Promise.allSettled([...this.会话们.keys()].map((名称) => this.关闭(名称)))
+    let 错误们 = 结果们.filter((结果) => 结果.status === 'rejected').map((结果) => 结果.reason)
+    if (错误们.length > 0) throw new AggregateError(错误们, '关闭当前测试浏览器失败')
+  }
+
   public 关闭全部(): Promise<void> {
     this.关闭任务 ??= this.结束会话们()
     return this.关闭任务

@@ -86,6 +86,11 @@ export class 测试运行工具 {
     return await this.浏览器.收集附件(记录错误)
   }
 
+  public async 关闭当前现场(): Promise<void> {
+    await this.浏览器.归档并关闭当前会话()
+    this.数据库.重置连接()
+  }
+
   public async 关闭(): Promise<void> {
     try {
       this.数据库.关闭()

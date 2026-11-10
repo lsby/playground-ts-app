@@ -19,6 +19,8 @@ import {
 
 export type MCP测试工具宿主 = {
   readonly 操作记录: 测试操作记录
+  执行工具: <T>(调用: () => Promise<T>, 重置?: boolean) => Promise<T>
+  重置数据库: (清空记录: boolean) => Promise<{ reset: true; recordCleared: boolean }>
   执行: <T>(调用: (工具: 需求测试工具, 提交: 提交步骤附件) => Promise<T>) => Promise<MCP执行结果<T>>
   获得测试地址: () => { 前端: string; 后端: string }
   读取后端日志: () => 测试服务日志内容
@@ -26,8 +28,17 @@ export type MCP测试工具宿主 = {
 }
 
 export function 注册测试工具(server: McpServer, 宿主: MCP测试工具宿主): void {
-  let 注册 = 创建工具注册器(server, 宿主.操作记录)
-  注册操作记录工具(server, 宿主.操作记录, () => 宿主.获得测试地址())
+  let 注册 = 创建工具注册器(server, (调用) => 宿主.执行工具(调用), 宿主.操作记录)
+  let 注册无记录工具 = 创建工具注册器(server, (调用) => 宿主.执行工具(调用))
+  注册操作记录工具(注册无记录工具, 宿主.操作记录, () => 宿主.获得测试地址())
+  let 注册重置工具 = 创建工具注册器(server, (调用) => 宿主.执行工具(调用, true))
+  注册重置工具(
+    'database_reset',
+    'Reset the local test database and restart its backend. Closes all named browsers and preserves the operation record unless clearRecord is true.',
+    z.strictObject({ clearRecord: z.boolean().optional() }),
+    async ({ clearRecord = false }) => 直接返回(await 宿主.重置数据库(clearRecord)),
+    { destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  )
   let 本地只读: ToolAnnotations = { readOnlyHint: true, openWorldHint: false }
   let 页面只读: ToolAnnotations = { readOnlyHint: true, openWorldHint: true }
 

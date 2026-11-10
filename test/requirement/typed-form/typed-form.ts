@@ -1,18 +1,11 @@
-import { 流程, 行为, 观察, 需求, 需求测试, 验收点, type 需求测试工具 } from '../../src/model/test-requirement'
-import { 切换演示标签, 登录演示页 } from './helper/browser-demo-helper'
+import { 流程, 行为, 观察, 需求测试, type 需求测试工具 } from '../../../src/model/test-requirement'
+import { 业务需求, 验收点们 } from './typed-form.requirement'
 
 /**
  * 验证强类型表单的填写与数据提交。
  * 准备演示账号后操作表单控件，检查提交弹窗显示的数据。
  */
 type 测试上下文 = { 工具: 需求测试工具 }
-
-let 验收 = new 验收点({ 描述: '提交结果显示正确的文本、数字、选项和开关值。' })
-let 业务需求 = new 需求({
-  名称: '强类型表单提交',
-  描述: '用户填写不同类型的字段后，可以在弹窗中查看表单提交的数据。',
-  验收点们: [验收],
-})
 
 class 强类型表单测试 extends 需求测试 {
   private static 获得主流程步骤(): (行为<测试上下文> | 观察<测试上下文>)[] {
@@ -31,8 +24,16 @@ class 强类型表单测试 extends 需求测试 {
             跳过操作动画: true,
           },
           async () => {
-            await 登录演示页(引擎)
-            await 切换演示标签(引擎, '表单组件')
+            if (引擎.获得地址().includes('/demo/login.html') === false) await 引擎.导航('/demo/login.html')
+            let 用户名输入框 = 引擎.按角色('textbox', { name: '用户名' })
+            await 引擎.说明('正在进入演示系统登录页，准备执行自动登录', 用户名输入框)
+            await 引擎.输入(用户名输入框, 'admin')
+            await 引擎.输入(引擎.按角色('textbox', { name: '密码' }), '123456')
+            await 引擎.点击(引擎.按角色('button', { name: '登录演示系统' }))
+            await 引擎.等待地址('**/demo/index.html')
+            let 目标标签 = 引擎.按角色('tab', { name: '表单组件', exact: true })
+            await 引擎.说明('切换演示标签页至：“表单组件”', 目标标签)
+            await 引擎.点击(目标标签)
           },
         )
         return 当前状态
@@ -105,7 +106,7 @@ class 强类型表单测试 extends 需求测试 {
           名称: '填写多种控件并核对提交结果',
           测试思路: '给不同类型的控件填入固定值并提交，逐项比对结果弹窗中的数据，再关闭弹窗。',
           步骤们: 强类型表单测试.获得主流程步骤(),
-          覆盖验收点们: [验收],
+          覆盖验收点们: [验收点们.提交结果],
         }),
       ],
       { 使用测试服务: true },

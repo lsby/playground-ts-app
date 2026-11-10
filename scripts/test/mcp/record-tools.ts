@@ -1,18 +1,17 @@
-import type { McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod-mcp'
 
 import type { 流程说明 } from '../../../src/model/test-requirement'
 import type { 测试操作记录 } from '../../../src/test-tools/operation-record'
 import { 项目根目录 } from '../../task/model/task-common'
-import { 创建工具注册器, 直接返回 } from './register-tool'
+import { 需求描述文件名格式, 需求流程文件名格式 } from '../requirement/requirement-file'
+import { 直接返回, type 工具注册函数 } from './register-tool'
 import { 无参数模型 } from './tool-input'
 
 export function 注册操作记录工具(
-  server: McpServer,
+  注册: 工具注册函数,
   记录: 测试操作记录,
   获得测试地址: () => { 前端: string; 后端: string },
 ): void {
-  let 注册 = 创建工具注册器(server)
   let 编号模型 = z.int().positive()
   let 只读 = { readOnlyHint: true, openWorldHint: false }
 
@@ -100,7 +99,7 @@ export function 注册操作记录工具(
   )
   注册(
     'record_export',
-    'Generate a requirement test. Use steps for new exports and write concise Chinese business titles for the requirement, scenario, and every step. Combine consecutive calls that serve the same business action into one step. For example, opening the login page, filling credentials, submitting and waiting for navigation can be grouped as “管理员登录”. Keep distinct verification outcomes as separate observations, such as “确认重名提示” and “核对新账号权限”. Do not use tool names such as browser_fill as step titles. For asynchronous UI outcomes, record and replay a targeted browser_wait or browser_wait_url for the expected result. Use whole-page snapshots to explore the UI. Keep actions and checks in replay order, include the earlier tool call for each assertion, and omit exploratory calls unnecessary for replay. Describe how the steps prove the acceptance criterion in scenarioApproach.',
+    'Generate one requirement test scenario from a previously created requirement description file. Use steps for new exports and write concise Chinese business titles for the scenario and every step. Combine consecutive calls that serve the same business action into one step. For example, opening the login page, filling credentials, submitting and waiting for navigation can be grouped as “管理员登录”. Keep distinct verification outcomes as separate observations, such as “确认重名提示” and “核对新账号权限”. Do not use tool names such as browser_fill as step titles. For asynchronous UI outcomes, record and replay a targeted browser_wait or browser_wait_url for the expected result. Use whole-page snapshots to explore the UI. Keep actions and checks in replay order, include the earlier tool call for each assertion, and omit exploratory calls unnecessary for replay. Describe how the steps prove the selected acceptance criteria in scenarioApproach.',
     z
       .strictObject({
         steps: z
@@ -120,11 +119,21 @@ export function 注册操作记录工具(
           .describe('Legacy ungrouped export, with one step per record. Use steps for new exports.'),
         fileName: z
           .string()
-          .regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.ts$/u)
-          .describe('A lowercase kebab-case .ts file name.'),
-        requirementName: z.string().trim().min(1).describe('The requirement title in Chinese.'),
-        requirementDescription: z.string().trim().min(1).optional(),
-        acceptanceCriterion: z.string().trim().min(1).describe('What this test must prove.'),
+          .regex(需求流程文件名格式)
+          .describe('A lowercase kebab-case .ts file name for the new scenario, written beside the requirement file.'),
+        requirementFile: z
+          .string()
+          .regex(需求描述文件名格式)
+          .describe(
+            'An existing lowercase kebab-case .requirement.ts file name. For example, checkout.requirement.ts is read from test/requirement/checkout/.',
+          ),
+        acceptanceCriteriaKeys: z
+          .array(z.string().min(1))
+          .min(1)
+          .optional()
+          .describe(
+            'Exact keys in the exported acceptance criteria dictionary. Required for a requirement with multiple criteria.',
+          ),
         scenarioName: z.string().trim().min(1).describe('The scenario title in Chinese.'),
         scenarioApproach: z
           .string()
@@ -142,9 +151,8 @@ export function 注册操作记录工具(
       ids,
       steps,
       fileName,
-      requirementName,
-      requirementDescription,
-      acceptanceCriterion,
+      requirementFile,
+      acceptanceCriteriaKeys,
       scenarioName,
       scenarioApproach,
       conclusionNotes,
@@ -161,9 +169,8 @@ export function 注册操作记录工具(
       let { 写出需求测试 } = await import('../requirement/export-file')
       let 路径 = await 写出需求测试(项目根目录, {
         文件名: fileName,
-        需求名称: requirementName,
-        ...(requirementDescription === undefined ? {} : { 需求描述: requirementDescription }),
-        验收点描述: acceptanceCriterion,
+        需求文件名: requirementFile,
+        覆盖验收点键们: acceptanceCriteriaKeys,
         流程名称: scenarioName,
         ...说明,
         步骤组,

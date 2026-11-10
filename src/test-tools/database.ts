@@ -40,6 +40,10 @@ export class 需求测试数据库 {
 
   public 关闭(): void {
     this.已关闭 = true
+    this.重置连接()
+  }
+
+  public 重置连接(): void {
     this.数据库?.close()
     this.数据库 = undefined
   }

@@ -3,9 +3,8 @@ import type { JSON值, 操作断言条目, 操作记录条目, 操作调用条�
 import { 生成调用代码, 生成重放地址, type 重放地址配置 } from './operation-code'
 
 type 导出参数 = 流程说明 & {
-  需求名称: string
-  需求描述?: string
-  验收点描述: string
+  需求模块路径: string
+  覆盖验收点键们: readonly string[]
   流程名称: string
   步骤组: readonly { 名称?: string | undefined; 条目们: readonly 操作记录条目[] }[]
   测试地址: 重放地址配置
@@ -94,12 +93,9 @@ function 生成断言期望(断言: 操作断言条目, 来源: 操作调用条�
 }
 
 export function 生成需求测试代码(参数: 导出参数): string {
-  let 需求名称 = 参数.需求名称.trim()
-  let 验收点描述 = 参数.验收点描述.trim()
-  let 需求描述 = 参数.需求描述?.trim() ?? 验收点描述
   let 流程名称 = 参数.流程名称.trim()
-  if (需求名称 === '' || 需求描述 === '' || 验收点描述 === '' || 流程名称 === '')
-    throw new Error('需求名称、需求描述、验收点描述和流程名称均需非空')
+  if (流程名称 === '') throw new Error('流程名称不能为空')
+  let 覆盖验收点代码 = 参数.覆盖验收点键们.map((键) => `验收点们[${代码字面量(键)}]`).join(', ')
   let 流程说明代码 = Object.entries(流程说明模型.parse(参数)).flatMap(([字段, 值]) =>
     值 === undefined ? [] : [`  ${代码字面量(字段)}: ${代码字面量(值)},`],
   )
@@ -158,16 +154,17 @@ export function 生成需求测试代码(参数: 导出参数): string {
   if (有断言) 导入们.push("import { deepStrictEqual } from 'node:assert/strict'", '')
   let 行为导入 = 步骤们.some((步骤) => 步骤.类型 === '行为') ? '行为, ' : ''
   导入们.push(
-    `import { 流程, ${行为导入}观察, 需求, 需求测试, 验收点, type 需求测试上下文 } from '../../src/model/test-requirement'`,
+    `import { 流程, ${行为导入}观察, 需求测试, 验收点, type 需求测试上下文 } from '../../../src/model/test-requirement'`,
   )
   if (有断言) {
     导入们.push(
-      "import { 读取操作结果字段 } from '../../src/test-tools/operation-assertion'",
-      "import type { JSON对象 } from '../../src/test-tools/operation-record'",
+      "import { 读取操作结果字段 } from '../../../src/test-tools/operation-assertion'",
+      "import type { JSON对象 } from '../../../src/test-tools/operation-record'",
     )
   }
   if (步骤们.some((步骤) => 步骤.需要查询结果工具 === true))
-    导入们.push("import { 整理数据库查询结果 } from '../../src/test-tools/operation-values'")
+    导入们.push("import { 整理数据库查询结果 } from '../../../src/test-tools/operation-values'")
+  导入们.push(`import { 业务需求, 验收点们 } from ${代码字面量(参数.需求模块路径)}`)
 
   let 数据泛型 = 有断言 ? '<测试数据>' : ''
   let 数据类型 = 有断言 ? '测试数据' : 'object'
@@ -178,20 +175,17 @@ export function 生成需求测试代码(参数: 导出参数): string {
     ...(有断言 ? ['type 测试数据 = { 结果们: Map<number, JSON对象> }'] : []),
     `type 测试上下文 = 需求测试上下文${数据泛型}`,
     '',
-    `let 验收 = new 验收点({ 描述: ${代码字面量(验收点描述)} })`,
-    'let 业务需求 = new 需求({',
-    `  名称: ${代码字面量(需求名称)},`,
-    `  描述: ${代码字面量(需求描述)},`,
-    '  验收点们: [验收],',
-    '})',
-    '',
     'let 业务流程 = new 流程<测试上下文>({',
     `  名称: ${代码字面量(流程名称)},`,
     ...流程说明代码,
     '  步骤们: [',
     ...分组代码们.map(({ 名称, 代码们 }) => 生成步骤(名称, 代码们)),
     '  ],',
-    '  覆盖验收点们: [验收],',
+    `  覆盖验收点们: [${覆盖验收点代码}].map((点: 验收点 | undefined): 验收点 => {`,
+    '    if (点 instanceof 验收点 === false || 业务需求.包含(点) === false)',
+    `      throw new Error(${代码字面量(`流程“${流程名称}”引用了无效的验收点`)})`,
+    '    return 点',
+    '  }),',
     '})',
     '',
     `export default class 导出的需求测试 extends 需求测试${数据泛型} {`,
