@@ -32,6 +32,8 @@
 - **入口与命令**:
   - 由 `scripts/test/requirement/run-requirement.ts` 驱动。
   - 运行 `npm run test:requirement`。可交互选择，或指定 `--all`、`--scenario=<流程名>`、`--requirement=<需求名>`、`--list`、`--auto` 或 `--demo`。可重复传入 `--scenario` 选择多个流程。任务参数 `--prepare-only` 可预览计划。
+  - 需求、验收点、流程均可声明 `标签们: ['标签一', '标签二']`。可用 `--exclude-tag=<标签>` 排除命中的流程，或用 `--include-tag=<标签>` 仅执行命中的流程。两种模式互斥，同一选项可重复传入。标签区分大小写，流程自身、所覆盖的任一验收点或其所属需求命中任一标签，都视为整条流程命中。未知标签会报错。示例：`npm run test:requirement -- --all --include-tag=注册`。
+  - 报告右上角记录本次包括和排除标签，条目的标签只在详情展示。目录默认隐藏被标签规则排除的条目，可打开「显示已排除」查看原因。排除的流程在测试服务和数据库准备前移出执行清单。
   - HTML 和 JSON 报告按运行范围生成：指定需求只列该需求；指定流程列出这些流程覆盖的验收点所属的所有需求；全量运行列出所有需求。默认隐藏没有执行的验收点和流程，仍汇总其状态及数量。加 `--show-unexecuted` 可以查看同一范围内的未执行流程，以及未执行或未实现的验收点。
   - 每个需求的定义和流程放在独立目录，描述文件统一命名为 `index.requirement.ts`。可在 `test/requirement/` 下按多层文件夹分组，例如 `test/requirement/shopping/checkout/index.requirement.ts` 在报告中显示为 `shopping → 需求标题`。列出流程和选定流程回放时允许缺少覆盖。全量运行遇到未覆盖的验收点时，会生成报告并返回失败，数据库准备和流程执行都不会开始。
   - 自动模式在 CI 中每条流程最多尝试三次。报告输出至 `test-outputs/requirement-report/`。状态规则、步骤证据和建议可在 HTML 报告中查看。

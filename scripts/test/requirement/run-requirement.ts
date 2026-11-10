@@ -13,6 +13,7 @@ import { 测试服务 } from '../test-server'
 import { 格式化需求测试错误 } from './format-error'
 import { 保存需求测试报告, type 需求测试尝试记录, type 需求测试附件记录 } from './report'
 import { 读取需求描述文件, 需求描述文件名 } from './requirement-file'
+import { 匹配标签, 解析标签过滤, 过滤需求流程, 验证标签存在, type 标签过滤 } from './tag-filter'
 
 type 需求测试实例 = Pick<需求测试, '获得需求们' | '获得流程们' | '需要测试服务' | '运行'>
 type 需求测试入口 = { 实例: 需求测试实例; 文件: string; 流程: 需求测试流程; 需求们: readonly 需求[] }
@@ -28,6 +29,7 @@ type 需求测试运行选项 = {
   模式: 浏览器测试模式
   仅列出: boolean
   显示未执行: boolean
+  标签过滤: 标签过滤 | undefined
 }
 type 尝试参数 = {
   模式: 浏览器测试模式
@@ -58,9 +60,11 @@ export class 需求测试运行器 {
     this.报告目录 = path.join(根目录, 'test-outputs/requirement-report')
   }
 
-  public async 发现测试(): Promise<readonly 需求测试入口[]> {
-    let { 流程们 } = await this.发现登记()
-    return 流程们
+  public async 发现测试(参数们: readonly string[] = []): Promise<readonly 需求测试入口[]> {
+    let 选项 = this.解析运行选项(参数们)
+    let 登记 = await this.发现登记()
+    this.验证过滤标签(登记, 选项.标签过滤)
+    return 过滤需求流程(登记.流程们, 选项.标签过滤).选中流程们
   }
 
   public async 发现登记(): Promise<需求测试登记> {
@@ -116,24 +120,26 @@ export class 需求测试运行器 {
     let 选项 = this.解析运行选项(参数们)
     let 登记 = await this.发现登记()
     let { 流程们, 需求们 } = 登记
-    let 选中流程们 = this.选择流程(登记, 选项)
+    this.验证过滤标签(登记, 选项.标签过滤)
+    let 候选流程们 = this.选择流程(登记, 选项)
+    let { 选中流程们, 排除流程们 } = 过滤需求流程(候选流程们, 选项.标签过滤)
     if (选项.仅列出) {
       for (let { 文件, 流程 } of 选中流程们) console.log(`${流程.获得名称()} · ${文件}`)
       return 0
     }
     let 检查完整覆盖 = 选项.指定流程名称们.length === 0 && 选项.指定需求名称 === undefined
-    let 选中需求集合 = new Set(选中流程们.flatMap((测试) => 测试.需求们))
+    let 选中需求集合 = new Set(候选流程们.flatMap((测试) => 测试.需求们))
     let 报告需求们 = 需求们.filter((需求) =>
       选项.指定需求名称 === undefined ? 检查完整覆盖 || 选中需求集合.has(需求) : 需求.获得名称() === 选项.指定需求名称,
     )
     let 待检查需求们 = 需求们.filter(
-      (需求) => 检查完整覆盖 || (选中流程们.length === 0 && 需求.获得名称() === 选项.指定需求名称),
+      (需求) => 检查完整覆盖 || (候选流程们.length === 0 && 需求.获得名称() === 选项.指定需求名称),
     )
     let 已覆盖 = 流程们.flatMap(({ 流程 }) => [...流程.获得覆盖验收点们()])
     let 覆盖错误们: string[] = []
     for (let 需求 of 待检查需求们) {
       try {
-        需求.检查覆盖(已覆盖)
+        需求.检查覆盖(已覆盖, (点) => 匹配标签(选项.标签过滤, [...需求.获得标签们(), ...点.获得标签们()]))
       } catch (错误) {
         覆盖错误们.push(错误 instanceof Error ? 错误.message : String(错误))
       }
@@ -143,6 +149,7 @@ export class 需求测试运行器 {
         `将执行 ${String(选中流程们.length)} 个需求流程：${选中流程们.map(({ 流程 }) => 流程.获得名称()).join('、')}`,
       )
     else for (let 错误 of 覆盖错误们) console.error(错误)
+    if (排除流程们.size > 0) console.log(`标签规则排除 ${String(排除流程们.size)} 个需求流程`)
 
     let 开始时间 = Date.now()
     await mkdir(this.报告目录, { recursive: true })
@@ -238,6 +245,8 @@ export class 需求测试运行器 {
       需求们: 报告需求们,
       需求描述路径们: 登记.需求描述路径们,
       显示未执行: 选项.显示未执行,
+      标签过滤: 选项.标签过滤,
+      排除流程们,
       流程们,
       选中流程们,
       记录们,
@@ -327,6 +336,8 @@ export class 需求测试运行器 {
         requirement: { type: 'string' },
         list: { type: 'boolean' },
         'show-unexecuted': { type: 'boolean' },
+        'exclude-tag': { type: 'string', multiple: true },
+        'include-tag': { type: 'string', multiple: true },
         auto: { type: 'boolean' },
         demo: { type: 'boolean' },
         mode: { type: 'string' },
@@ -351,7 +362,16 @@ export class 需求测试运行器 {
       模式: 演示模式 ? '演示' : '自动',
       仅列出: values.list === true,
       显示未执行: values['show-unexecuted'] === true,
+      标签过滤: 解析标签过滤(values['exclude-tag'], values['include-tag']),
     }
+  }
+
+  private 验证过滤标签({ 流程们, 需求们 }: 需求测试登记, 过滤: 标签过滤 | undefined): void {
+    验证标签存在(过滤, [
+      ...需求们,
+      ...需求们.flatMap((需求) => [...需求.获得验收点们()]),
+      ...流程们.map(({ 流程 }) => 流程),
+    ])
   }
 
   private 选择流程({ 流程们, 需求们 }: 需求测试登记, 选项: 需求测试运行选项): readonly 需求测试入口[] {

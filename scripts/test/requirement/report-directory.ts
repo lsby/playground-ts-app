@@ -1,6 +1,7 @@
 import type { 需求, 需求测试流程, 验收点 } from '../../../src/model/test-requirement'
 import { 转义Html } from './report-evidence'
 import { 汇总需求状态, 汇总验收点状态, type 流程状态, type 验收状态 } from './report-status'
+import { 匹配标签, type 标签来源, type 标签过滤 } from './tag-filter'
 
 export type 需求测试登记 = { 流程: 需求测试流程; 需求们: readonly 需求[]; 文件: string }
 export type 报告范围 = {
@@ -9,6 +10,8 @@ export type 报告范围 = {
   流程们: readonly 需求测试登记[]
   选中流程们: readonly 需求测试登记[]
   显示未执行: boolean
+  标签过滤: 标签过滤 | undefined
+  排除流程们: ReadonlyMap<需求测试流程, readonly 标签来源[]>
 }
 export type 目录流程 = { id: string; 测试: 需求测试登记; 状态: 流程状态; 有建议: boolean }
 export type 验收目录项 = {
@@ -18,6 +21,7 @@ export type 验收目录项 = {
   有建议: boolean
   关联流程们: readonly 目录流程[]
   隐藏流程数: number
+  仅展示排除: boolean
 }
 type 需求目录项 = {
   需求: 需求
@@ -38,15 +42,21 @@ export function 生成报告目录(
   let 点索引 = new Map<验收点, { 关联流程们: 目录流程[]; 隐藏流程数: number }>()
   let 流程编号们: 目录流程[] = []
   for (let 测试 of 范围.流程们) {
-    if (选中流程集合.has(测试.流程) === false && 测试.需求们.some((需求) => 需求集合.has(需求)) === false) continue
-    let 状态 = 已执行状态.get(测试.流程) ?? '未执行'
+    let 已排除 = 范围.排除流程们.has(测试.流程)
+    if (
+      已排除 === false &&
+      选中流程集合.has(测试.流程) === false &&
+      测试.需求们.some((需求) => 需求集合.has(需求)) === false
+    )
+      continue
+    let 状态 = 已排除 ? '已排除' : (已执行状态.get(测试.流程) ?? '未执行')
     let 目录项 =
       范围.显示未执行 || 状态 !== '未执行'
         ? {
             id: `flow-${String(流程编号们.length + 1)}`,
             测试,
             状态,
-            有建议: 测试.流程.获得步骤们().some((步骤) => 步骤.获得建议们().length > 0),
+            有建议: 已排除 === false && 测试.流程.获得步骤们().some((步骤) => 步骤.获得建议们().length > 0),
           }
         : undefined
     if (目录项 !== undefined) 流程编号们.push(目录项)
@@ -66,9 +76,12 @@ export function 生成报告目录(
       let { 关联流程们, 隐藏流程数 } = 点索引.get(点) ?? { 关联流程们: [], 隐藏流程数: 0 }
       let 流程状态们 = 关联流程们.map((流程) => 流程.状态)
       if (隐藏流程数 > 0) 流程状态们.push('未执行')
-      let 状态 = 汇总验收点状态(流程状态们)
+      let 在标签范围内 = 匹配标签(范围.标签过滤, [...需求.获得标签们(), ...点.获得标签们()])
+      let 状态 = 流程状态们.length === 0 && 在标签范围内 === false ? '已排除' : 汇总验收点状态(流程状态们)
       状态们.push(状态)
-      if (范围.显示未执行 === false && (状态 === '未执行' || 状态 === '未实现')) continue
+      let 默认隐藏 = 范围.显示未执行 === false && (状态 === '未执行' || 状态 === '未实现')
+      let 有排除流程 = 流程状态们.includes('已排除')
+      if (默认隐藏 && 有排除流程 === false) continue
       可见验收点集合.add(点)
       点序号 += 1
       条目们.push({
@@ -78,6 +91,7 @@ export function 生成报告目录(
         有建议: 关联流程们.some((流程) => 流程.有建议),
         关联流程们,
         隐藏流程数,
+        仅展示排除: 状态 === '已排除' || 默认隐藏,
       })
     }
     return {

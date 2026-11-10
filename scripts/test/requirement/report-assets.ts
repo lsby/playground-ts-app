@@ -107,6 +107,10 @@ export let 交互脚本 = `
     if (flowId !== undefined && !point?.dataset.flowIds.split(' ').includes(flowId)) return false
     let selected = panels.find(panel => panel.id === (flowId ?? id))
     if (selected === undefined) return false
+    if (selected.hasAttribute('data-excluded')) {
+      let showExcluded = directory.querySelector('[data-show-excluded]')
+      if (showExcluded !== null) showExcluded.checked = true
+    }
     let group = requirementGroups.find(group => group.dataset.requirementGroup === requirementId)
     if (group) {
       group.open = true
@@ -320,7 +324,7 @@ header{background:light-dark(#183d34,#122c23);color:light-dark(#fff,#e5f0ea)}
 .directory-resizer::before{content:"";width:2px;height:100%;background:light-dark(#cbd8d1,#40564c);border-radius:2px}
 .directory-resizer:hover::before,.directory-resizer:focus-visible::before{background:light-dark(#367b68,#7bc7a8)}
 .directory-resizer:focus-visible{outline:2px solid light-dark(#367b68,#7bc7a8);outline-offset:-2px}
-.navhead{padding:14px 19px 8px}
+.navhead{padding:14px 19px 8px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 8px}
 .label{font-size:12px;letter-spacing:.1em;font-weight:700;color:light-dark(#526d63,#a8c6b8)}
 .requirement-group{margin:0 12px 2px}
 .requirement-folder{margin:0 12px 2px}

@@ -10,6 +10,10 @@ function 解析领域文本(名称: string, 值: string): string {
 
 export type 可等待结果<结果> = 结果 | Promise<结果>
 
+function 规整标签(标签们: readonly string[] | undefined): readonly string[] {
+  return [...new Set((标签们 ?? []).map((标签) => 解析领域文本('标签', 标签)))]
+}
+
 /**
  * 验收点是需求中可以被独立判定是否成立的最小承诺。
  * 它持有名称和验收描述，并供流程声明自己准备证明哪项承诺。
@@ -17,15 +21,20 @@ export type 可等待结果<结果> = 结果 | Promise<结果>
 export class 验收点 {
   private readonly 名称: string
   private readonly 描述: string
-  public constructor(参数: { 名称: string; 描述: string }) {
+  private readonly 标签们: readonly string[]
+  public constructor(参数: { 名称: string; 描述: string; 标签们?: readonly string[] }) {
     this.名称 = 解析领域文本('验收点名称', 参数.名称)
     this.描述 = 解析领域文本('验收点描述', 参数.描述)
+    this.标签们 = 规整标签(参数.标签们)
   }
   public 获得名称(): string {
     return this.名称
   }
   public 获得描述(): string {
     return this.描述
+  }
+  public 获得标签们(): readonly string[] {
+    return [...this.标签们]
   }
 }
 
@@ -37,9 +46,11 @@ export class 需求 {
   private readonly 名称: string
   private readonly 描述: string
   private readonly 验收点们: readonly 验收点[]
-  public constructor(参数: { 名称: string; 描述: string; 验收点们: readonly 验收点[] }) {
+  private readonly 标签们: readonly string[]
+  public constructor(参数: { 名称: string; 描述: string; 验收点们: readonly 验收点[]; 标签们?: readonly string[] }) {
     this.名称 = 解析领域文本('需求名称', 参数.名称)
     this.描述 = 解析领域文本('需求描述', 参数.描述)
+    this.标签们 = 规整标签(参数.标签们)
     if (参数.验收点们.length === 0) throw new Error(`需求“${this.名称}”至少需要一个验收点`)
     if (new Set(参数.验收点们).size !== 参数.验收点们.length) throw new Error(`需求“${this.名称}”重复引用了验收点`)
     this.验收点们 = [...参数.验收点们]
@@ -53,11 +64,14 @@ export class 需求 {
   public 获得验收点们(): readonly 验收点[] {
     return [...this.验收点们]
   }
+  public 获得标签们(): readonly string[] {
+    return [...this.标签们]
+  }
   public 包含(验收点值: 验收点): boolean {
     return this.验收点们.includes(验收点值)
   }
-  public 检查覆盖(已覆盖验收点们: readonly 验收点[]): void {
-    let 未覆盖 = this.验收点们.filter((验收点值) => 已覆盖验收点们.includes(验收点值) === false)
+  public 检查覆盖(已覆盖验收点们: readonly 验收点[], 需检查: (点: 验收点) => boolean = () => true): void {
+    let 未覆盖 = this.验收点们.filter((验收点值) => 需检查(验收点值) && 已覆盖验收点们.includes(验收点值) === false)
     if (未覆盖.length > 0)
       throw new Error(`需求“${this.名称}”存在未覆盖验收点：${未覆盖.map((验收点值) => 验收点值.获得名称()).join('、')}`)
   }
@@ -191,6 +205,7 @@ export type 流程说明 = z.infer<typeof 流程说明模型>
  */
 export class 流程<系统状态 extends object> {
   private readonly 名称: string
+  private readonly 标签们: readonly string[]
   private readonly 说明: 流程说明
   private readonly 步骤们: ReadonlyArray<行为<系统状态> | 观察<系统状态>>
   private readonly 覆盖验收点们: readonly 验收点[]
@@ -199,6 +214,7 @@ export class 流程<系统状态 extends object> {
   public constructor(
     参数: 流程说明 & {
       名称: string
+      标签们?: readonly string[]
       步骤们: ReadonlyArray<行为<系统状态> | 观察<系统状态>>
       覆盖验收点们: readonly 验收点[]
       选择结果?: 选择结果 | undefined
@@ -206,6 +222,7 @@ export class 流程<系统状态 extends object> {
     },
   ) {
     this.名称 = 解析领域文本('流程名称', 参数.名称)
+    this.标签们 = 规整标签(参数.标签们)
     this.说明 = 流程说明模型.parse(参数)
     if (参数.步骤们.length === 0 || 参数.步骤们.some((步骤) => 步骤 instanceof 观察) === false)
       throw new Error(`流程“${this.名称}”至少需要一个观察`)
@@ -224,6 +241,9 @@ export class 流程<系统状态 extends object> {
   }
   public 获得说明(): 流程说明 {
     return { ...this.说明 }
+  }
+  public 获得标签们(): readonly string[] {
+    return [...this.标签们]
   }
   public 获得步骤们(): ReadonlyArray<行为<系统状态> | 观察<系统状态>> {
     return [...this.步骤们]
