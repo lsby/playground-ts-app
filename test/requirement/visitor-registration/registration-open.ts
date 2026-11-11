@@ -1,7 +1,7 @@
 import { deepStrictEqual } from 'node:assert/strict'
 import { z } from 'zod'
 
-import { 获得环境变量 } from '../../../src/global/env'
+import { 获得环境变量 } from '../../../src/global/env/env'
 import {
   流程,
   行为,

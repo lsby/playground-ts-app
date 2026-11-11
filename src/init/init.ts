@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs'
 import { randomBytes, randomUUID } from 'crypto'
 import { version } from '../app/meta-info'
 import { 系统配置ID } from '../global/const'
-import { 获得环境变量 } from '../global/env'
+import { 获得环境变量 } from '../global/env/env'
 import { 全局资源, 检查数据库是否可用 } from '../global/global'
 
 export async function init(): Promise<void> {

@@ -4,7 +4,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import { z } from 'zod'
 import { 系统配置ID } from '../../../global/const'
-import { 获得环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env/env'
 import { kysely插件 } from '../../../global/plugin'
 
 let 接口路径 = '/api/system/get-interface-type' as const

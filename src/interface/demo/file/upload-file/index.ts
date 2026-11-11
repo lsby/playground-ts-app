@@ -8,7 +8,7 @@ import {
 } from '@lsby/net-core'
 import { Right, Task } from '@lsby/ts-fp-data'
 import { z } from 'zod'
-import { 获得环境变量 } from '../../../../global/env'
+import { 获得环境变量 } from '../../../../global/env/env'
 import { 检查登录 } from '../../../../interface-logic/check/check-login-jwt'
 
 let 接口路径 = '/api/demo/file/upload-file' as const

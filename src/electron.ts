@@ -5,7 +5,7 @@ import { 应用单例 } from './app/app'
 import { 计算补偿后的窗口配置, 验证并修正窗口 } from './electron/multi-display'
 import { 检查端口可用, 等待端口就绪, 获取随机可用端口 } from './electron/port-utils'
 import { 保存窗口状态, 检查窗口是否在可见区域内, 获取默认窗口位置, 读取窗口状态 } from './electron/window-state'
-import { 获得环境变量 } from './global/env'
+import { 获得环境变量 } from './global/env/env'
 import { 全局资源 } from './global/global'
 import { 启动异常兜底 } from './tools/fallback'
 

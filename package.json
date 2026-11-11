@@ -10,7 +10,7 @@
   "main": "./dist/src/electron.js",
   "browser": {
     "./src/global/db/db-dialect.ts": "./src/web/mock/db-dialect-mock.ts",
-    "./src/global/env-provider.ts": "./src/web/mock/env-provider-mock.ts",
+    "./src/global/env/env-provider.ts": "./src/web/mock/env-provider-mock.ts",
     "./src/global/plugin.ts": "./src/web/mock/plugin-mock.ts"
   },
   "bin": {

@@ -3,7 +3,7 @@ import assert from 'assert'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
 import { cleanDB } from '../../../../scripts/db/clean-db'
-import { 获得环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env/env'
 import { 全局资源, 系统配置ID } from '../../../global/global'
 import 接口 from './index'
 

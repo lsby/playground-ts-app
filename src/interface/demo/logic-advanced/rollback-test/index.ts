@@ -10,7 +10,7 @@ import {
 import { Left } from '@lsby/ts-fp-data'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
-import { 获得环境变量 } from '../../../../global/env'
+import { 获得环境变量 } from '../../../../global/env/env'
 import { kysely插件 } from '../../../../global/plugin'
 
 let 接口路径 = '/api/demo/logic-advanced/rollback-test' as const

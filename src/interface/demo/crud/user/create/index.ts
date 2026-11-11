@@ -10,7 +10,7 @@ import {
 import { Right } from '@lsby/ts-fp-data'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
-import { 获得环境变量 } from '../../../../../global/env'
+import { 获得环境变量 } from '../../../../../global/env/env'
 import { kysely插件 } from '../../../../../global/plugin'
 import { 检查管理员登录 } from '../../../../../interface-logic/check/check-login-jwt-admin'
 

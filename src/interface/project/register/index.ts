@@ -12,7 +12,7 @@ import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { 系统配置ID } from '../../../global/const'
-import { 获得环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env/env'
 import { kysely插件 } from '../../../global/plugin'
 import { 验证密码, 验证用户名 } from '../../../model/user/user-validation'
 

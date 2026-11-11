@@ -3,7 +3,7 @@ import { Kysely插件 } from '@lsby/net-core-kysely'
 import { Task } from '@lsby/ts-fp-data'
 import { z } from 'zod'
 import { 项目标识 } from '../../app/meta-info'
-import { 获得环境变量 } from '../../global/env'
+import { 获得环境变量 } from '../../global/env/env'
 import { 全局资源 } from '../../global/global'
 
 let 用户模式 = z.object({ userId: z.string().or(z.undefined()) }).strict()

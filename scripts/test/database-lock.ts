@@ -1,7 +1,7 @@
 import { access, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 
-import { 获得环境变量 } from '../../src/global/env'
+import { 获得环境变量 } from '../../src/global/env/env'
 
 async function 确认没有旧锁(锁路径: string): Promise<void> {
   try {

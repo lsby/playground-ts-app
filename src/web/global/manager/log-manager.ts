@@ -1,5 +1,5 @@
 import { Log } from '@lsby/ts-log'
-import { 获得环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env/env'
 
 let 网页日志: Log | null = null
 export function 获得网页日志(): Log {

@@ -8,7 +8,7 @@ import { 日志模型 } from '../model/log/log-model'
 import type { DB } from '../types/db'
 import { 系统配置ID } from './const'
 import { 创建sqlite数据库适配器 } from './db/db-dialect'
-import { 获得环境变量 } from './env'
+import { 获得环境变量 } from './env/env'
 
 export { 系统配置ID } from './const'
 

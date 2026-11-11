@@ -1,4 +1,4 @@
-import { 获得环境变量 } from '../../../../global/env'
+import { 获得环境变量 } from '../../../../global/env/env'
 import { 组件基类 } from '../../../base/base'
 import { API管理器 } from '../../../global/manager/api-manager'
 import { 创建元素 } from '../../../global/tools/create-element'

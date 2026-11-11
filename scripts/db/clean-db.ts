@@ -1,5 +1,5 @@
 import { CompiledQuery, Kysely } from 'kysely'
-import { 获得环境变量 } from '../../src/global/env'
+import { 获得环境变量 } from '../../src/global/env/env'
 import { DB } from '../../src/types/db'
 
 export async function cleanDB(db: Kysely<DB>): Promise<void> {

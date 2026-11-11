@@ -1,4 +1,4 @@
-import { 获得环境变量 } from '../../../src/global/env'
+import { 获得环境变量 } from '../../../src/global/env/env'
 import { 全局资源 } from '../../../src/global/global'
 import { init } from '../../../src/init/init'
 import { cleanDB } from '../../db/clean-db'

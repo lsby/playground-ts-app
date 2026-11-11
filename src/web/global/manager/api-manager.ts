@@ -1,7 +1,7 @@
 import { web请求 } from '@lsby/ts-http-extend'
 import { z } from 'zod'
 import { 项目标识 } from '../../../app/meta-info'
-import { 获得环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env/env'
 import { JSON对象模式 } from '../../../model/data/json-value'
 import { 已审阅的any } from '../../../tools/types'
 import { InterfaceType } from '../../../types/interface-type'

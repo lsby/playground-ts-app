@@ -1,4 +1,4 @@
-import { 获得环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env/env'
 import { 组件基类 } from '../../base/base'
 import { 获得网页日志 } from '../../global/manager/log-manager'
 

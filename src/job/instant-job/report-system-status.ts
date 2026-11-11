@@ -1,5 +1,5 @@
 import { CompiledQuery } from 'kysely'
-import { 获得环境变量 } from '../../global/env'
+import { 获得环境变量 } from '../../global/env/env'
 import { 全局资源 } from '../../global/global'
 import { 即时任务抽象类 } from '../../model/job-instant/instant-job'
 

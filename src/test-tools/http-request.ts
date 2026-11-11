@@ -3,7 +3,7 @@ import { request } from 'node:http'
 
 import { z } from 'zod-mcp'
 
-import { 获得环境变量 } from '../global/env'
+import { 获得环境变量 } from '../global/env/env'
 import { JSON值模式, type JSON值 } from '../model/data/json-value'
 import type { 测试HTTP结果, 测试HTTP请求 } from '../model/test-requirement'
 

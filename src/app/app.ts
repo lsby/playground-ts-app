@@ -10,7 +10,7 @@ import {
 import { Right } from '@lsby/ts-fp-data'
 import path from 'path'
 import { z } from 'zod'
-import { 获得环境变量 } from '../global/env'
+import { 获得环境变量 } from '../global/env/env'
 import { syncLogCallBack, 全局资源 } from '../global/global'
 import { init } from '../init/init'
 import { interfaceApiList } from '../interface/interface-list'

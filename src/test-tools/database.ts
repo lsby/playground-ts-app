@@ -2,7 +2,7 @@ import SQLite from 'node-sqlite3-wasm'
 import { resolve } from 'node:path'
 import { z } from 'zod'
 
-import { 获得环境变量 } from '../global/env'
+import { 获得环境变量 } from '../global/env/env'
 import type { 测试数据库值 } from '../model/test-requirement'
 
 let 查询结果模型 = z.array(z.record(z.union([z.string(), z.number(), z.bigint(), z.instanceof(Uint8Array), z.null()])))

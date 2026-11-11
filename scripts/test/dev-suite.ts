@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, open } from 'node:fs/promises'
 import path from 'node:path'
 import { z } from 'zod'
 
-import { 获得测试MCP配置, 获得环境变量 } from '../../src/global/env'
+import { 获得测试MCP配置, 获得环境变量 } from '../../src/global/env/env'
 import { 项目根目录 } from '../task/model/task-common'
 import { 开发任务表 } from '../task/taskfile/taskfile-dev'
 import { 独占测试数据库 } from './database-lock'

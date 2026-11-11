@@ -13,7 +13,7 @@ import fs from 'fs'
 import { CompiledQuery } from 'kysely'
 import path from 'path'
 import { z } from 'zod'
-import { 获得环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env/env'
 import { kysely插件 } from '../../../global/plugin'
 import { 检查管理员登录 } from '../../../interface-logic/check/check-login-jwt-admin'
 

@@ -4,7 +4,7 @@ import { 任意接口, 执行已匹配接口, 默认请求附加参数 } from '@
 import bcrypt from 'bcryptjs'
 import { Request, Response } from 'express'
 import { sql } from 'kysely'
-import { 获得环境变量 } from '../../global/env'
+import { 获得环境变量 } from '../../global/env/env'
 import { 全局资源 } from '../../global/global'
 import { init } from '../../init/init'
 import { 验证密码 } from '../../model/user/user-validation'

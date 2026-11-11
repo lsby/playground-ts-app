@@ -9,7 +9,7 @@ import {
 } from '@lsby/net-core'
 import { Left, Right } from '@lsby/ts-fp-data'
 import { z } from 'zod'
-import { 获得环境变量 } from '../../../global/env'
+import { 获得环境变量 } from '../../../global/env/env'
 import { jwt插件, kysely插件 } from '../../../global/plugin'
 
 let 接口路径 = '/api/project/local-login' as const

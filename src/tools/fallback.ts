@@ -1,4 +1,4 @@
-import { 获得环境变量 } from '../global/env'
+import { 获得环境变量 } from '../global/env/env'
 import { 全局资源 } from '../global/global'
 
 /**

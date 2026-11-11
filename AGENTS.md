@@ -173,7 +173,7 @@
 ### 环境变量与路径
 
 - **环境变量机制**:
-  - 环境变量的模型被定义在 `src/global/env.ts` 中, 而加载它的机制位于 `src/global/env-provider.ts`
+  - 环境变量的模型被定义在 `src/global/env/env.ts` 中, 而加载它的机制位于 `src/global/env/env-provider.ts`
   - 工程任务直接指定入库的正式环境文件. `CONFIG_ENCRYPTION` 控制明文或逐项加密模式, 加密模式的项目密钥位于根目录 `.project-config.key` 并严禁入库. `NODE_ENV` 与 `BUILD_TARGET` 在加载时校验运行环境, `LOCAL_MODE` 控制本地免登录
   - `DEPLOY_ALLOW_DIRTY_GIT` 控制部署脚本是否允许工作区、暂存区或未跟踪文件不干净. 它只放宽 dirty 检查, 发布信息中的提交哈希必须始终由发布脚本直接从当前 Git 仓库计算
   - 人工修改加密配置时先运行 `env:decode` 生成 `.decode`, 修改后运行 `env:encode` 写回正式文件并清理全部 `.decode`; 程序运行、构建和发布过程只在内存中解密
