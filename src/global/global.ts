@@ -21,6 +21,13 @@ type JWT插件类型 = JWT异步插件<z.ZodObject<{ userId: z.ZodUnion<[z.ZodSt
  * 获取资源会复用已有实例，关闭时等待任务结束并释放已经创建的数据库。
  */
 export class 全局资源集 {
+  private static 唯一单例: 全局资源集 | null = null
+
+  public static 获得实例(): 全局资源集 {
+    if (全局资源集.唯一单例 === null) 全局资源集.唯一单例 = new 全局资源集()
+    return 全局资源集.唯一单例
+  }
+
   private 数据库: Kysely管理器<DB> | null = null
   private 日志: Log | null = null
   private 日志数据: 日志模型 | null = null
@@ -29,6 +36,14 @@ export class 全局资源集 {
   private JWT插件Promise: Promise<JWT插件类型> | null = null
   private 状态: '开放' | '关闭中' | '已关闭' = '开放'
   private 关闭Promise: Promise<void> | null = null
+
+  /**
+   * 构造函数保持纯净，严禁在此执行任何副作用或初始化外部资源。
+   * 所有底层资源（数据库、日志、任务管理器等）必须在对应的获取方法中按需惰性创建。
+   */
+  private constructor() {
+    // 构造函数严禁包含副作用，所有资源均按需惰性创建
+  }
 
   private 确认可获取(已创建: boolean): void {
     if (this.状态 === '已关闭') throw new Error('全局资源已关闭')
@@ -150,7 +165,7 @@ export class 全局资源集 {
   }
 }
 
-export let 全局资源 = new 全局资源集()
+export let 全局资源 = 全局资源集.获得实例()
 
 export let syncLogCallBack = async (level: string, namespace: string, content: string): Promise<void> => {
   if (content.includes('WebSocket 未打开，无法发送消息')) return // 避免无限循环
