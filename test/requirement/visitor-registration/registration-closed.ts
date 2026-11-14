@@ -8,10 +8,11 @@ import { 整理数据库查询结果 } from '../../../src/test-tools/operation-v
 import { 业务需求, 验收点们 } from './index.requirement'
 
 type 测试数据 = { 结果们: Map<number, JSON对象> }
-type 测试上下文 = 需求测试上下文<测试数据>
+type 测试上下文 = 需求测试上下文 & 测试数据
 let 待注册用户名 = 'blocked-e2e'
 
-let 业务流程 = new 流程<测试上下文>({
+let 业务流程 = new 流程({
+  初始化: (工具): 测试上下文 => ({ 工具, 结果们: new Map<number, JSON对象>() }),
   名称: '关闭注册时拦截访客',
   测试思路: '注册关闭时，从登录页和注册直达地址检查入口，再直接提交注册请求并查库。',
   步骤们: [
@@ -81,12 +82,8 @@ let 业务流程 = new 流程<测试上下文>({
   }),
 })
 
-export default class 导出的需求测试 extends 需求测试<测试数据> {
+export default class 导出的需求测试 extends 需求测试 {
   public constructor() {
     super([业务需求], [业务流程], { 使用测试服务: true })
-  }
-
-  protected override 准备数据(): 测试数据 {
-    return { 结果们: new Map<number, JSON对象>() }
   }
 }

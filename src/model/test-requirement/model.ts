@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import type { 选择条件, 选择结果 } from './choice'
+import type { 需求测试工具 } from './tools'
 
 function 解析领域文本(名称: string, 值: string): string {
   let 结果 = 值.trim()
@@ -201,9 +202,10 @@ export type 流程说明 = z.infer<typeof 流程说明模型>
 
 /**
  * 流程是为了证明一组验收点而声明的有序运行过程。
- * 它持有名称、行为或观察步骤以及目标验收点。
+ * 它持有初始化函数、名称、行为或观察步骤以及目标验收点。
  */
 export class 流程<系统状态 extends object> {
+  private readonly 初始化函数: (工具: 需求测试工具) => 可等待结果<系统状态>
   private readonly 名称: string
   private readonly 标签们: readonly string[]
   private readonly 说明: 流程说明
@@ -214,6 +216,7 @@ export class 流程<系统状态 extends object> {
   public constructor(
     参数: 流程说明 & {
       名称: string
+      初始化: (工具: 需求测试工具) => 可等待结果<系统状态>
       标签们?: readonly string[]
       步骤们: ReadonlyArray<行为<系统状态> | 观察<系统状态>>
       覆盖验收点们: readonly 验收点[]
@@ -222,6 +225,7 @@ export class 流程<系统状态 extends object> {
     },
   ) {
     this.名称 = 解析领域文本('流程名称', 参数.名称)
+    this.初始化函数 = 参数.初始化
     this.标签们 = 规整标签(参数.标签们)
     this.说明 = 流程说明模型.parse(参数)
     if (参数.步骤们.length === 0 || 参数.步骤们.some((步骤) => 步骤 instanceof 观察) === false)
@@ -235,6 +239,12 @@ export class 流程<系统状态 extends object> {
     if (this.选择条件们.length > 0 && this.选择结果值 === undefined)
       throw new Error(`流程“${this.名称}”声明了选择条件但没有选择结果`)
     this.选择结果值?.验证(...this.选择条件们)
+  }
+  public 初始化(工具: 需求测试工具): 可等待结果<系统状态> {
+    return this.初始化函数(工具)
+  }
+  public 执行<结果>(执行器: { 运行<状态值 extends object>(流程值: 流程<状态值>): Promise<结果> }): Promise<结果> {
+    return 执行器.运行(this)
   }
   public 获得名称(): string {
     return this.名称

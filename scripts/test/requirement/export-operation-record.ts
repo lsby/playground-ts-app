@@ -169,16 +169,16 @@ export function 生成需求测试代码(参数: 导出参数): string {
     导入们.push(`import { 整理数据库查询结果 } from '${参数.源码目录路径}/test-tools/operation-values'`)
   导入们.push(`import { 业务需求, 验收点们 } from ${代码字面量(参数.需求模块路径)}`)
 
-  let 数据泛型 = 有断言 ? '<测试数据>' : ''
-  let 数据类型 = 有断言 ? '测试数据' : 'object'
-  let 准备结果 = 有断言 ? '{ 结果们: new Map<number, JSON对象>() }' : '{}'
+  let 数据类型 = 有断言 ? ' & 测试数据' : ''
+  let 初始状态 = 有断言 ? '{ 工具, 结果们: new Map<number, JSON对象>() }' : '{ 工具 }'
   return [
     ...导入们,
     '',
     ...(有断言 ? ['type 测试数据 = { 结果们: Map<number, JSON对象> }'] : []),
-    `type 测试上下文 = 需求测试上下文${数据泛型}`,
+    `type 测试上下文 = 需求测试上下文${数据类型}`,
     '',
-    'let 业务流程 = new 流程<测试上下文>({',
+    'let 业务流程 = new 流程({',
+    `  初始化: (工具): 测试上下文 => (${初始状态}),`,
     `  名称: ${代码字面量(流程名称)},`,
     ...流程说明代码,
     '  步骤们: [',
@@ -191,13 +191,9 @@ export function 生成需求测试代码(参数: 导出参数): string {
     '  }),',
     '})',
     '',
-    `export default class 导出的需求测试 extends 需求测试${数据泛型} {`,
+    'export default class 导出的需求测试 extends 需求测试 {',
     '  public constructor() {',
     '    super([业务需求], [业务流程], { 使用测试服务: true })',
-    '  }',
-    '',
-    `  protected override 准备数据(): ${数据类型} {`,
-    `    return ${准备结果}`,
     '  }',
     '}',
     '',

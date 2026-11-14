@@ -2,24 +2,38 @@ import { deepStrictEqual } from 'node:assert/strict'
 import { z } from 'zod'
 
 import { 获得环境变量 } from '../../../src/global/env/env'
-import {
-  流程,
-  行为,
-  观察,
-  需求测试,
-  验收点,
-  type 需求测试上下文,
-  type 需求测试工具,
-} from '../../../src/model/test-requirement'
+import { 流程, 行为, 观察, 需求测试, 验收点, type 需求测试上下文 } from '../../../src/model/test-requirement'
 import { 读取操作结果字段 } from '../../../src/test-tools/operation-assertion'
 import type { JSON对象 } from '../../../src/test-tools/operation-record'
 import { 整理数据库查询结果 } from '../../../src/test-tools/operation-values'
 import { 业务需求, 验收点们 } from './index.requirement'
 
 type 测试数据 = { 结果们: Map<number, JSON对象> }
-type 测试上下文 = 需求测试上下文<测试数据>
+type 测试上下文 = 需求测试上下文 & 测试数据
 
-let 业务流程 = new 流程<测试上下文>({
+let 业务流程 = new 流程({
+  初始化: async (工具): Promise<测试上下文> => {
+    let { DEFAULT_SYSTEM_USER, DEFAULT_SYSTEM_PWD } = 获得环境变量()
+    let 登录响应 = await fetch(new URL('/api/project/login', 工具.服务地址()), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ userName: DEFAULT_SYSTEM_USER, userPassword: DEFAULT_SYSTEM_PWD }),
+      signal: 工具.取消信号,
+    })
+    if (登录响应.ok === false) throw new Error(`测试管理员登录请求失败，HTTP ${String(登录响应.status)}`)
+    let { data } = z
+      .object({ status: z.literal('success'), data: z.object({ token: z.string().min(1) }) })
+      .parse(await 登录响应.json())
+    let 配置响应 = await fetch(new URL('/api/system/update-system-config', 工具.服务地址()), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${data.token}` },
+      body: JSON.stringify({ enable_register: true }),
+      signal: 工具.取消信号,
+    })
+    if (配置响应.ok === false) throw new Error(`开启测试环境注册请求失败，HTTP ${String(配置响应.status)}`)
+    z.object({ status: z.literal('success') }).parse(await 配置响应.json())
+    return { 工具, 结果们: new Map<number, JSON对象>() }
+  },
   名称: '开放注册时创建并使用访客账号',
   标签们: ['开放注册', '浏览器'],
   测试思路: '访客提交两次不同的密码并查库，改正后完成注册。再由独立访客尝试重名注册，核对原账号并验证它仍能登录。',
@@ -196,31 +210,8 @@ let 业务流程 = new 流程<测试上下文>({
   ),
 })
 
-export default class 导出的需求测试 extends 需求测试<测试数据> {
+export default class 导出的需求测试 extends 需求测试 {
   public constructor() {
     super([业务需求], [业务流程], { 使用测试服务: true })
-  }
-
-  protected override async 准备数据(工具: 需求测试工具): Promise<测试数据> {
-    let { DEFAULT_SYSTEM_USER, DEFAULT_SYSTEM_PWD } = 获得环境变量()
-    let 登录响应 = await fetch(new URL('/api/project/login', 工具.服务地址()), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ userName: DEFAULT_SYSTEM_USER, userPassword: DEFAULT_SYSTEM_PWD }),
-      signal: 工具.取消信号,
-    })
-    if (登录响应.ok === false) throw new Error(`测试管理员登录请求失败，HTTP ${String(登录响应.status)}`)
-    let { data } = z
-      .object({ status: z.literal('success'), data: z.object({ token: z.string().min(1) }) })
-      .parse(await 登录响应.json())
-    let 配置响应 = await fetch(new URL('/api/system/update-system-config', 工具.服务地址()), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${data.token}` },
-      body: JSON.stringify({ enable_register: true }),
-      signal: 工具.取消信号,
-    })
-    if (配置响应.ok === false) throw new Error(`开启测试环境注册请求失败，HTTP ${String(配置响应.status)}`)
-    z.object({ status: z.literal('success') }).parse(await 配置响应.json())
-    return { 结果们: new Map<number, JSON对象>() }
   }
 }

@@ -9,6 +9,7 @@ import {
   type 流程步骤附件,
   type 验收点,
 } from './model'
+import type { 需求测试工具 } from './tools'
 
 export type 流程运行错误 = {
   文本: string
@@ -19,7 +20,7 @@ export type 流程运行错误 = {
 }
 
 type 执行时段 = { 开始时间: string; 结束时间: string; 耗时毫秒: number }
-type 步骤标识 = { 名称: string; 类型: '准备' | '行为' | '观察'; 建议们: readonly 流程建议[] }
+type 步骤标识 = { 名称: string; 类型: '初始化' | '行为' | '观察'; 建议们: readonly 流程建议[] }
 type 执行步骤函数<结果> = (提交: 提交步骤附件, 执行操作: 执行回放操作) => Promise<结果>
 type 已执行步骤 = 步骤标识 &
   执行时段 & {
@@ -55,17 +56,17 @@ function 计算时段(开始: number): 执行时段 {
 /**
  * 运行器在每次尝试时准备初始状态，依次执行行为和观察，并记录步骤的结果与附件。
  */
-export class 运行器<系统状态 extends object> {
+export class 运行器 {
   public constructor(
-    private readonly 准备初始状态: () => Promise<状态<系统状态>>,
+    private readonly 初始化参数: 需求测试工具,
     private readonly 配置: 流程运行配置,
   ) {}
 
-  public async 运行(当前流程: 流程<系统状态>): Promise<流程运行描述<系统状态>> {
+  public async 运行<系统状态 extends object>(当前流程: 流程<系统状态>): Promise<流程运行描述<系统状态>> {
     let 开始 = Date.now()
     let 流程步骤们 = 当前流程.获得步骤们()
     let 步骤们: 运行步骤描述[] = [
-      { 名称: '准备数据', 类型: '准备', 状态: '未执行', 建议们: [] },
+      { 名称: '初始化', 类型: '初始化', 状态: '未执行', 建议们: [] },
       ...流程步骤们.map(
         (步骤): 运行步骤描述 => ({
           名称: 步骤.获得描述(),
@@ -92,7 +93,7 @@ export class 运行器<系统状态 extends object> {
       })
     }
     try {
-      let 已知状态 = await 运行步骤(0, this.准备初始状态)
+      let 已知状态 = await 运行步骤(0, async () => new 状态<系统状态>(await 当前流程.初始化(this.初始化参数)))
       当前状态 = 已知状态
       for (let [索引, 步骤] of 流程步骤们.entries()) {
         if (步骤 instanceof 行为) {
