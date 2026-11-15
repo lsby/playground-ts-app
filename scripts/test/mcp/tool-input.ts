@@ -4,6 +4,23 @@ import { z } from 'zod-mcp'
 import type { 浏览器测试引擎 } from '../../../src/model/browser-test'
 import type { 测试数据库值 } from '../../../src/model/test-requirement'
 
+export let 浏览器环境模型 = z.object({
+  width: z.number().int().min(240).max(3840),
+  height: z.number().int().min(320).max(2160),
+  colorScheme: z.enum(['light', 'dark']),
+  reducedMotion: z.enum(['reduce', 'no-preference']),
+})
+
+export let 画面观察字段 = {
+  observe: z
+    .boolean()
+    .default(true)
+    .describe(
+      'Sample the screen until stable or six seconds and return up to three selected WebP images proportionally resized toward 2MP with logical-pixel readability floors (and a 720px short-edge floor on phones). Default true; false skips observation. Use explicit waits for business readiness.',
+    ),
+}
+export let 浏览器观察参数模型 = z.strictObject({ ...画面观察字段 })
+
 let 角色模型 = z.enum([
   'alert',
   'alertdialog',
@@ -102,6 +119,18 @@ export let 无参数模型 = z.strictObject({})
 export let 会话模型 = z.strictObject({ name: z.string().trim().min(1).max(100).describe('Named browser session.') })
 let 超时模型 = z.int().min(1).default(5_000).describe('Timeout in milliseconds. Defaults to 5000.')
 export let 页面模型 = 会话模型.extend({ timeoutMs: 超时模型 })
+export let 浏览器请求标识模型 = 会话模型.extend({ requestId: z.string().trim().min(1).max(100) })
+export let 浏览器挂起请求模型 = 浏览器请求标识模型.extend({
+  path: z.string().trim().min(1),
+  bodyMatch: z
+    .record(z.string().min(1), z.string())
+    .refine((值) => Object.keys(值).length > 0, 'bodyMatch requires at least one exact string field.'),
+})
+export let 浏览器等待请求模型 = 浏览器请求标识模型.extend({
+  state: z.enum(['captured', 'response-ready', 'finished']),
+  timeoutMs: 超时模型,
+})
+export let 浏览器释放请求模型 = 浏览器请求标识模型.extend({ timeoutMs: 超时模型 })
 export let 目标操作模型 = 页面模型.extend({ target: 目标模型 })
 export let 页面地址模型 = z
   .string()
@@ -156,7 +185,7 @@ let 数据库参数模型 = z.union([
   }),
   z.strictObject({ type: z.literal('blob'), value: z.base64() }),
 ])
-type 数据库参数 = z.infer<typeof 数据库参数模型>
+export type 数据库参数 = z.infer<typeof 数据库参数模型>
 
 export let 查询模型 = z.strictObject({
   sql: z.string().trim().min(1).describe('A single read-only SQL query. Use ? placeholders for data.'),
@@ -169,6 +198,21 @@ export let 查询模型 = z.strictObject({
     .array(z.string().min(1))
     .optional()
     .describe('Public column names to include in the saved evidence.'),
+})
+
+export let 写入模型 = z.strictObject({
+  sql: z
+    .string()
+    .trim()
+    .min(1)
+    .describe(
+      'A single INSERT, UPDATE or DELETE statement for the test database. Use ? placeholders for data. It must be deterministic: no random values and no current time for key data; derive dates from the business day.',
+    ),
+  parameters: 查询模型.shape.parameters,
+})
+
+export let 表结构模型 = z.strictObject({
+  tables: z.array(z.string().min(1)).min(1).optional().describe('Only these tables. Omit to list every table.'),
 })
 
 export function 解码数据库参数(值: 数据库参数): 测试数据库值 {

@@ -8,11 +8,34 @@ export type JSON对象 = { [键: string]: JSON值 }
 
 type 证据文件 = { path: string; description?: string }
 type 调用结论 = { status: 'passed'; result: JSON对象 } | { status: 'failed'; error: string }
-export type 操作调用结果 = 调用结论 & { artifacts: readonly 证据文件[]; evidenceErrors: readonly string[] }
+export type 操作调用结果 = 调用结论 & {
+  artifacts: readonly 证据文件[]
+  evidenceErrors: readonly string[]
+  增强?: 录制增强
+}
 
 type 记录建议 = Omit<测试建议, '改进方向'> & { 改进方向?: string }
+/**
+ * 录制时 MCP 自动补充的回放信息：坐标点击识别出的元素定位、动作前后的页面地址变化、没有 DOM 时的图片模板。
+ * 导出时据此生成按元素点击、等地址或等图片后点击的代码。
+ */
+export type 录制增强 = {
+  定位?: { 种类: '选择器' | '文字'; 值: string; 说明: string }
+  /** 动作前后页面地址（pathname 加 hash）发生了变化。 */
+  地址变化?: { 前: string; 后: string }
+  /** 动作前后读取页面地址失败时的原因（动作本身仍算成功），方便排查为什么没有生成等地址。 */
+  地址读取错误?: string
+  模板?: {
+    /** 模板图片路径；录制文件里是相对于记录目录的路径，导出时已换成绝对路径。 */
+    文件: string
+    /** 截图像素与操作坐标单位之比。 */
+    比例: number
+    原坐标: { x: number; y: number }
+    落点: { x: number; y: number }
+  }
+}
 type 基本条目 = { id: number; notes: string | null; decision?: string | null; suggestions?: 记录建议[] }
-type 调用条目主体 = 基本条目 & { kind: 'call'; tool: string; arguments: JSON对象; start: string }
+type 调用条目主体 = 基本条目 & { kind: 'call'; tool: string; arguments: JSON对象; start: string; 增强?: 录制增强 }
 type 完成字段 = 调用结论 & { end: string; artifacts: 证据文件[]; evidenceErrors: string[] }
 export type 操作调用条目 = 调用条目主体 & ({ status: 'pending' } | 完成字段)
 export type 断言期望来源 = { sourceId: number; path: Array<string | number> }
@@ -138,7 +161,11 @@ export class 测试录制 {
   public 完成(id: number, 结果: 操作调用结果, end: string): void {
     let 当前 = this.查找条目(id)
     if (当前.kind !== 'call' || 当前.status !== 'pending') throw new Error(`操作 #${String(id)} 不在运行中`)
-    let 证据 = { artifacts: 结果.artifacts.map((文件) => ({ ...文件 })), evidenceErrors: [...结果.evidenceErrors] }
+    let 证据 = {
+      artifacts: 结果.artifacts.map((文件) => ({ ...文件 })),
+      evidenceErrors: [...结果.evidenceErrors],
+      ...(结果.增强 === undefined ? {} : { 增强: structuredClone(结果.增强) }),
+    }
     let 完成内容: 完成字段
     switch (结果.status) {
       case 'passed':

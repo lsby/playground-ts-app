@@ -6,6 +6,7 @@ import type {
   操作断言条目,
   操作调用条目,
 } from '../../../src/model/test-requirement/recording'
+import { 模板资源相对路径, type 模板资源 } from './enhanced-click-code'
 import { 生成调用代码, 生成重放地址, type 重放地址配置 } from './operation-code'
 
 type 导出参数 = 流程说明 & {
@@ -15,6 +16,8 @@ type 导出参数 = 流程说明 & {
   流程名称: string
   步骤组: readonly 导出回放步骤[]
   测试地址: 重放地址配置
+  /** 流程文件名（如 gift-flow.ts），图片模板复制到需求目录 assets/ 时用它命名。 */
+  文件名?: string
 }
 type 步骤代码 = ReturnType<typeof 生成调用代码> & {
   操作编号: number
@@ -26,9 +29,25 @@ let 返回浏览器地址的操作 = new Set([
   'browser_open',
   'browser_navigate',
   'browser_reload',
+  'browser_history',
   'browser_inspect_page',
   'browser_wait_url',
 ])
+
+function 获得流程文件名前缀(文件名: string | undefined): string {
+  return (文件名 ?? 'template').replace(/\.ts$/u, '')
+}
+
+/** 导出的代码引用的图片模板：写出流程文件时要把它们复制到需求目录的 assets/。 */
+export function 列出模板资源(步骤组: readonly 导出回放步骤[], 文件名: string | undefined): 模板资源[] {
+  let 前缀 = 获得流程文件名前缀(文件名)
+  return 步骤组.flatMap(({ 条目们 }) =>
+    条目们.flatMap((条目): 模板资源[] => {
+      if (条目.kind !== 'call' || 条目.增强?.模板 === undefined || 条目.增强.定位 !== undefined) return []
+      return [{ 操作编号: 条目.id, 来源路径: 条目.增强.模板.文件, 相对路径: 模板资源相对路径(前缀, 条目.id) }]
+    }),
+  )
+}
 
 function 代码字面量(值: JSON值): string {
   if (Array.isArray(值)) return `[${值.map(代码字面量).join(', ')}]`
@@ -110,6 +129,7 @@ export function 生成需求测试代码(参数: 导出参数): string {
   let 断言来源们 = new Map<number, 操作调用条目>()
   for (let 条目 of 条目们) if (条目.kind === 'call' && 引用编号们.has(条目.id)) 断言来源们.set(条目.id, 条目)
   let 有断言 = 引用编号们.size > 0
+  let 流程文件名前缀 = 获得流程文件名前缀(参数.文件名)
   let 生成条目代码 = (条目: 回放条目): 步骤代码 => {
     let 记录说明 = { 操作编号: 条目.id, 建议们: 条目.suggestions ?? [], 决策说明: 条目.decision ?? null }
     switch (条目.kind) {
@@ -135,10 +155,38 @@ export function 生成需求测试代码(参数: 导出参数): string {
         }
       }
       case 'call':
-        return { ...生成调用代码(条目, { 需要结果: 断言来源们.has(条目.id), 测试地址: 参数.测试地址 }), ...记录说明 }
+        return {
+          ...生成调用代码(条目, { 需要结果: 断言来源们.has(条目.id), 测试地址: 参数.测试地址, 流程文件名前缀 }),
+          ...记录说明,
+        }
     }
   }
-  let 分组代码们 = 参数.步骤组.map(({ 名称, 条目们, 备注们 }) => {
+  // 排在第一个界面或设备操作之前、连续的 database_execute 步骤，生成到流程的初始化里（回放每次都从清库加初始化开始）。
+  // 其余的 database_execute 保持原来的位置，成为行为步骤；这样回放执行写入的顺序与录制时完全一致。
+  let 初始化步骤数 = 0
+  while (初始化步骤数 < 参数.步骤组.length) {
+    let 分组 = 参数.步骤组[初始化步骤数]
+    if (
+      分组 === undefined ||
+      分组.条目们.every((条目) => 条目.kind === 'call' && 条目.tool === 'database_execute') === false
+    )
+      break
+    初始化步骤数 += 1
+  }
+  let 初始化分组们 = 参数.步骤组.slice(0, 初始化步骤数)
+  let 初始化条目们 = 初始化分组们.flatMap(({ 条目们 }) => 条目们)
+  for (let 分组 of 初始化分组们) {
+    let 带说明条目 = 分组.条目们.find((条目) => (条目.decision ?? null) !== null || (条目.suggestions ?? []).length > 0)
+    if (带说明条目 !== undefined || 分组.备注们.length > 0)
+      throw new Error(
+        `操作 ${String((带说明条目 ?? 分组.条目们[0])?.id)} 排在界面操作之前，会生成到流程的初始化里，不能带决策说明、建议或步骤备注；请把说明放到后面的步骤`,
+      )
+  }
+  let 初始化代码们 = 初始化条目们.map((条目) => {
+    if (条目.kind !== 'call') throw new Error(`操作 ${String(条目.id)} 不能生成到初始化`)
+    return 生成调用代码(条目, { 需要结果: 断言来源们.has(条目.id), 测试地址: 参数.测试地址, 流程文件名前缀 })
+  })
+  let 分组代码们 = 参数.步骤组.slice(初始化步骤数).map(({ 名称, 条目们, 备注们 }) => {
     let 代码们 = 条目们.map(生成条目代码)
     let 第一项 = 代码们[0]
     if (第一项 === undefined) throw new Error('导出步骤至少需要一条记录')
@@ -150,9 +198,10 @@ export function 生成需求测试代码(参数: 导出参数): string {
     return { 名称: 步骤名称, 代码们, 含验收检查, 备注们 }
   })
   if (分组代码们.some(({ 代码们, 含验收检查 }) => 含验收检查 && 代码们.every(({ 类型 }) => 类型 === '观察')) === false)
-    throw new Error('导出流程至少需要一个独立的验收观察，请将断言或浏览器等待放在只含检查的步骤中')
+    throw new Error('导出流程至少需要一个独立的验收观察，请将断言或界面等待放在只含检查的步骤中')
 
   let 步骤们 = 分组代码们.flatMap(({ 代码们 }) => 代码们)
+  let 全部代码们 = [...初始化代码们, ...步骤们]
   let 导入们: string[] = []
   if (有断言) 导入们.push("import { deepStrictEqual } from 'node:assert/strict'", '')
   let 行为导入 = 步骤们.some((步骤) => 步骤.类型 === '行为') ? '行为, ' : ''
@@ -165,12 +214,27 @@ export function 生成需求测试代码(参数: 导出参数): string {
       `import type { JSON对象 } from '${参数.源码目录路径}/test-tools/operation-record'`,
     )
   }
-  if (步骤们.some((步骤) => 步骤.需要查询结果工具 === true))
-    导入们.push(`import { 整理数据库查询结果 } from '${参数.源码目录路径}/test-tools/operation-values'`)
+  let 数据库结果导入 = [
+    ...(全部代码们.some((步骤) => 步骤.需要写入结果工具 === true) ? ['整理数据库写入结果'] : []),
+    ...(全部代码们.some((步骤) => 步骤.需要查询结果工具 === true) ? ['整理数据库查询结果'] : []),
+  ]
+  if (数据库结果导入.length > 0)
+    导入们.push(`import { ${数据库结果导入.join(', ')} } from '${参数.源码目录路径}/test-tools/operation-values'`)
   导入们.push(`import { 业务需求, 验收点们 } from ${代码字面量(参数.需求模块路径)}`)
 
   let 数据类型 = 有断言 ? ' & 测试数据' : ''
   let 初始状态 = 有断言 ? '{ 工具, 结果们: new Map<number, JSON对象>() }' : '{ 工具 }'
+  let 初始化语句们 = 初始化代码们.flatMap(({ 语句们 }) => 语句们)
+  let 初始化代码 =
+    初始化语句们.length === 0
+      ? [`  初始化: (工具): 测试上下文 => (${初始状态}),`]
+      : [
+          '  初始化: (工具): 测试上下文 => {',
+          `    let 当前状态: 测试上下文 = ${初始状态}`,
+          ...初始化语句们.flatMap((行) => 行.split('\n').map((子行) => `    ${子行}`)),
+          '    return 当前状态',
+          '  },',
+        ]
   return [
     ...导入们,
     '',
@@ -178,7 +242,7 @@ export function 生成需求测试代码(参数: 导出参数): string {
     `type 测试上下文 = 需求测试上下文${数据类型}`,
     '',
     'let 业务流程 = new 流程({',
-    `  初始化: (工具): 测试上下文 => (${初始状态}),`,
+    ...初始化代码,
     `  名称: ${代码字面量(流程名称)},`,
     ...流程说明代码,
     '  步骤们: [',
@@ -193,7 +257,7 @@ export function 生成需求测试代码(参数: 导出参数): string {
     '',
     'export default class 导出的需求测试 extends 需求测试 {',
     '  public constructor() {',
-    '    super([业务需求], [业务流程], { 使用测试服务: true })',
+    `    super([业务需求], [业务流程], { 使用测试服务: true })`,
     '  }',
     '}',
     '',

@@ -115,6 +115,7 @@
     "prisma": "7.2.0",
     "prisma-kysely": "^1.8.0",
     "process": "^0.11.10",
+    "sharp": "0.35.5",
     "stream-to-blob": "^2.0.1",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.21.0",

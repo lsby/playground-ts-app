@@ -6,6 +6,8 @@ import type {
   提交步骤附件,
   流程步骤附件,
   测试数据库值,
+  测试数据库写入结果,
+  测试数据库表结构,
   测试服务日志内容,
   需求测试工具,
   需求测试附件,
@@ -62,6 +64,14 @@ export class 测试运行工具 {
           let 步骤 = this.获得当前步骤()
           return this.数据库.查询(语句, 参数, 报告列, (生成文本): void => this.记录文本(步骤, 生成文本))
         },
+        执行: (语句, 参数 = []): 测试数据库写入结果 => {
+          let 步骤 = this.获得当前步骤()
+          return this.数据库.执行(语句, 参数, (生成文本): void => this.记录文本(步骤, 生成文本))
+        },
+        表结构: (表们): 测试数据库表结构[] => {
+          this.获得当前步骤()
+          return this.数据库.表结构(表们)
+        },
       },
       HTTP: {
         请求: (请求参数, 请求取消信号): ReturnType<typeof 请求测试后端> => {
@@ -74,12 +84,22 @@ export class 测试运行工具 {
     }
   }
 
-  public async 执行步骤<T>(提交: 提交步骤附件, 记录错误: (错误: unknown) => void, 执行: () => Promise<T>): Promise<T> {
+  public async 执行步骤<T>(
+    提交: 提交步骤附件,
+    记录错误: (错误: unknown) => void,
+    执行: (提交附件: 提交步骤附件) => Promise<T>,
+  ): Promise<T> {
+    let 已提供图片 = false
+    let 提交附件: 提交步骤附件 = (附件们, 选项) => {
+      if (附件们.some((附件) => 附件.类型 === '图片')) 已提供图片 = true
+      提交(附件们, 选项)
+    }
+    let 需要收尾截图 = (): boolean => 已提供图片 === false
     let 日志起点 = this.参数.服务?.获得日志位置()
     let 步骤 = { 提交, 记录错误, 日志起点, 已结束: false }
     return await this.步骤.run(步骤, async (): Promise<T> => {
       try {
-        return await this.浏览器.执行步骤(提交, 记录错误, 执行)
+        return await this.浏览器.执行步骤(提交, 记录错误, () => 执行(提交附件), '步骤', 需要收尾截图)
       } finally {
         let 服务 = this.参数.服务
         if (服务 !== undefined && 日志起点 !== undefined) {
@@ -101,8 +121,11 @@ export class 测试运行工具 {
   }
 
   public async 关闭当前现场(): Promise<void> {
-    await this.浏览器.归档并关闭当前会话()
-    this.数据库.重置连接()
+    try {
+      await this.浏览器.归档并关闭当前会话()
+    } finally {
+      this.数据库.重置连接()
+    }
   }
 
   public async 关闭(): Promise<void> {

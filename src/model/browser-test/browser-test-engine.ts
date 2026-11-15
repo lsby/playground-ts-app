@@ -1,10 +1,21 @@
 import { chromium, expect, type BrowserContext, type Locator, type Page } from '@playwright/test'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { addAbortListener } from 'node:events'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
 
+import { 等待模板后点击, type 模板点击选项 } from '../../test-tools/template-match'
+import type { 落点探测结果 } from '../web-locate/candidates'
+import { 地址一致 } from '../web-locate/page-url'
+import { 探测页面落点 } from '../web-locate/playwright'
+import { 转换浏览器启动错误 } from './browser-install'
+import {
+  浏览器请求挂起,
+  type 浏览器请求挂起规则,
+  type 浏览器请求状态,
+  type 浏览器请求等待阶段,
+} from './browser-request-hold'
 import { 测试提示卡片 } from './prompt-card'
 import { 标注截图 } from './screenshot'
 import { 浏览器步骤证据记录器, type 浏览器会话取证 } from './step-evidence'
@@ -34,7 +45,11 @@ export class 浏览器测试引擎 {
     let 取消信号 = 参数.取消信号
     取消信号?.throwIfAborted()
     await mkdir(参数.附件目录, { recursive: true })
-    let 浏览器 = await chromium.launch({ headless: 模式 === '自动', handleSIGINT: 取消信号 === undefined })
+    let 浏览器 = await chromium
+      .launch({ headless: 模式 === '自动', handleSIGINT: 取消信号 === undefined })
+      .catch((错误: unknown): never => {
+        throw 转换浏览器启动错误(错误)
+      })
     let 浏览器上下文: BrowserContext | undefined
     let 关闭任务: Promise<void> | undefined
     let 取消监听: ReturnType<typeof addAbortListener> | undefined
@@ -101,6 +116,8 @@ export class 浏览器测试引擎 {
   private 提示卡片: 测试提示卡片
   private 证据: 浏览器步骤证据记录器
   private 步骤作用域 = new AsyncLocalStorage<浏览器测试作用域配置>()
+  private 请求挂起: 浏览器请求挂起
+  private 取消信号: AbortSignal
 
   public constructor(参数: 浏览器测试参数, 取证?: 浏览器会话取证) {
     if (参数.页面.isClosed() === true) throw new Error('浏览器测试页面已关闭')
@@ -108,6 +125,23 @@ export class 浏览器测试引擎 {
     this.模式 = z.enum(['自动', '演示']).parse(参数.模式)
     this.提示卡片 = new 测试提示卡片(参数.页面)
     this.证据 = new 浏览器步骤证据记录器(参数.页面, 参数.取消信号, 取证)
+    this.请求挂起 = new 浏览器请求挂起(参数.页面, 参数.取消信号)
+    this.取消信号 = 参数.取消信号 ?? new AbortController().signal
+  }
+
+  public async 挂起请求(规则: 浏览器请求挂起规则): Promise<浏览器请求状态> {
+    this.检查页面()
+    return await this.请求挂起.安装(规则)
+  }
+
+  public async 等待挂起请求(标识: string, 阶段: 浏览器请求等待阶段, 超时: number): Promise<浏览器请求状态> {
+    this.检查页面()
+    return await this.请求挂起.等待(标识, 阶段, 超时)
+  }
+
+  public async 释放挂起请求(标识: string, 超时: number): Promise<浏览器请求状态> {
+    this.检查页面()
+    return await this.请求挂起.放行(标识, 超时)
   }
 
   public get 断言(): typeof expect {
@@ -153,6 +187,12 @@ export class 浏览器测试引擎 {
     return 结果
   }
 
+  /** 页面此刻的真实地址（location.href）。hash 路由刚变化时，获得地址 返回的 page.url() 可能还没更新。 */
+  public async 读取实时地址(): Promise<string> {
+    this.检查页面()
+    return await this.页面.evaluate(() => location.href)
+  }
+
   public 获得地址(): string {
     this.检查页面()
     return this.页面.url()
@@ -181,7 +221,10 @@ export class 浏览器测试引擎 {
     参数?: Parameters<Page['waitForURL']>[1],
   ): Promise<void> {
     this.检查页面()
-    await this.页面.waitForURL(地址, 参数)
+    // 以 / 或 # 开头的字符串是路由地址，按规范地址比较（忽略 origin、查询串、随机编号），和 iOS、Android 一致；其他写法交给 Playwright
+    let 条件 =
+      typeof 地址 === 'string' && /^[/#]/u.test(地址) ? (实际: URL): boolean => 地址一致(实际.href, 地址) : 地址
+    await this.页面.waitForURL(条件, 参数)
     if (this.证据.启用 === true) await this.证据.采集('等待达成', '已到达预期地址')
   }
 
@@ -208,6 +251,29 @@ export class 浏览器测试引擎 {
   public 视口大小(): ReturnType<Page['viewportSize']> {
     this.检查页面()
     return this.页面.viewportSize()
+  }
+
+  public async 设置显示环境(参数: {
+    width: number
+    height: number
+    colorScheme: 'light' | 'dark'
+    reducedMotion: 'reduce' | 'no-preference'
+  }): Promise<void> {
+    this.检查页面()
+    await this.页面.setViewportSize({ width: 参数.width, height: 参数.height })
+    await this.页面.emulateMedia({ colorScheme: 参数.colorScheme, reducedMotion: 参数.reducedMotion })
+  }
+
+  public async 移动浏览器历史(方向: 'back' | 'forward'): Promise<void> {
+    this.检查页面()
+    switch (方向) {
+      case 'back':
+        await this.页面.goBack({ waitUntil: 'domcontentloaded' })
+        break
+      case 'forward':
+        await this.页面.goForward({ waitUntil: 'domcontentloaded' })
+        break
+    }
   }
 
   /** 截取当前视口，可标注视口坐标或目标元素可见区域的中心。 */
@@ -242,6 +308,41 @@ export class 浏览器测试引擎 {
     this.检查页面()
     if (this.证据.启用 === true) await this.证据.采集('操作前', '点击坐标前', { x: 水平位置, y: 垂直位置 })
     await this.页面.mouse.click(水平位置, 垂直位置, 参数)
+  }
+
+  /**
+   * 坐标点击的落点识别：浏览器的操作坐标就是 CSS 视口坐标，穿透 Shadow DOM 找到落点元素，
+   * 生成定位并用 Playwright 定位器当场验证唯一。
+   */
+  public async 探测落点(x: number, y: number): Promise<落点探测结果> {
+    this.检查页面()
+    return await 探测页面落点(this.页面, { x, y })
+  }
+
+  /**
+   * 没有 DOM 可定位的点击（Canvas）：回放时在原坐标附近用图片模板找目标，找到再点击。
+   * 模板路径可以是绝对路径，也可以是相对流程文件的 URL（new URL('assets/x.png', import.meta.url)）。
+   */
+  public async 等待图片后点击(
+    模板: string | URL,
+    选项: 模板点击选项,
+    超时毫秒 = 15_000,
+  ): Promise<{ x: number; y: number }> {
+    this.检查页面()
+    let 模板图片 = await readFile(模板)
+    return await 等待模板后点击({
+      模板图片,
+      选项,
+      超时毫秒,
+      取消信号: this.取消信号,
+      截图: async (): Promise<{ 图片: Buffer; 坐标宽: number }> => {
+        let 视口 = this.页面.viewportSize()
+        let 图片 = await this.截图(undefined, { timeout: 超时毫秒 })
+        return { 图片, 坐标宽: 视口?.width ?? 图片.readUInt32BE(16) }
+      },
+      点击: async (x, y): Promise<void> => await this.点击坐标(x, y),
+      说明: '浏览器',
+    })
   }
 
   public async 开场(说明: string, 标题?: string): Promise<void> {

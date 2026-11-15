@@ -2,11 +2,39 @@ import { z } from 'zod-mcp'
 
 import { HTTP请求模型 } from '../../../src/test-tools/http-request'
 import type { 操作调用条目 } from '../../../src/test-tools/operation-record'
-import { 会话模型, 无参数模型, 查询模型, 目标操作模型, 页面地址模型, 页面模型, type 目标描述 } from '../mcp/tool-input'
+import {
+  会话模型,
+  写入模型,
+  无参数模型,
+  查询模型,
+  浏览器环境模型,
+  浏览器观察参数模型,
+  目标操作模型,
+  页面地址模型,
+  页面模型,
+  type 数据库参数,
+  type 目标描述,
+} from '../mcp/tool-input'
+import { 生成增强点击语句, 生成等地址语句, type 模板资源 } from './enhanced-click-code'
+import { 生成请求调用代码 } from './request-operation-code'
 
 export type 重放地址配置 = { 前端: string; 后端: string; 目录首页?: ReadonlyMap<string, string> }
-type 生成选项 = { 需要结果: boolean; 测试地址: 重放地址配置 }
-type 生成结果 = { 名称: string; 类型: '行为' | '观察'; 语句们: string[]; 需要查询结果工具?: true; 异步?: true }
+type 生成选项 = {
+  需要结果: boolean
+  测试地址: 重放地址配置
+  /** 流程文件名（不含 .ts），图片模板复制到 assets/ 时用它命名。 */
+  流程文件名前缀?: string
+}
+type 生成结果 = {
+  名称: string
+  类型: '行为' | '观察'
+  语句们: string[]
+  需要查询结果工具?: true
+  需要写入结果工具?: true
+  异步?: true
+  /** 录制时为坐标点击裁的图片模板，导出时要复制到需求目录的 assets/。 */
+  模板资源?: 模板资源
+}
 
 function 生成名称(条目: 操作调用条目): string {
   let 名称 = 条目.notes?.trim()
@@ -66,6 +94,22 @@ function 生成页面操作(条目: 操作调用条目, 选项: 生成选项): �
   let 基本 = { 名称: 生成名称(条目), 类型: '行为' as const }
   let 参数 = 条目.arguments
   switch (条目.tool) {
+    case 'browser_environment': {
+      let { name, ...参数 } = 会话模型.extend(浏览器环境模型.shape).parse(条目.arguments)
+      let 环境 = JSON.stringify(参数)
+      return { ...基本, 语句们: [获得引擎(name), `await 引擎.设置显示环境(${环境})`, ...保存结果(条目, 选项, 环境)] }
+    }
+    case 'browser_history': {
+      let { name, direction } = 会话模型.extend({ direction: z.enum(['back', 'forward']) }).parse(条目.arguments)
+      return {
+        ...基本,
+        语句们: [
+          获得引擎(name),
+          `await 引擎.移动浏览器历史(${字面量(direction)})`,
+          ...保存结果(条目, 选项, '{ url: 引擎.获得地址() }'),
+        ],
+      }
+    }
     case 'browser_open': {
       let { name, url, timeoutMs } = 页面模型.extend({ url: 页面地址模型.optional() }).parse(参数)
       let 语句们 = [`let 引擎 = await 当前状态.工具.浏览器.打开(${字面量(name)})`]
@@ -146,13 +190,16 @@ function 生成页面操作(条目: 操作调用条目, 选项: 生成选项): �
     }
     case 'browser_click_at': {
       let { name, x, y } = 会话模型.extend({ x: z.number().nonnegative(), y: z.number().nonnegative() }).parse(参数)
+      // 录制时认出了落点元素就按元素点击，没有元素有截图模板就等图片后点击，都没有才点坐标
+      let 增强点击 = 生成增强点击语句(条目, 选项.流程文件名前缀 ?? 'template')
       return {
         ...基本,
         语句们: [
           获得引擎(name),
-          `await 引擎.点击坐标(${String(x)}, ${String(y)})`,
+          ...(增强点击?.语句们 ?? [`await 引擎.点击坐标(${String(x)}, ${String(y)})`]),
           ...保存结果(条目, 选项, '{ clicked: true }'),
         ],
+        ...(增强点击?.模板资源 === undefined ? {} : { 模板资源: 增强点击.模板资源 }),
       }
     }
     case 'browser_press': {
@@ -242,9 +289,8 @@ function 生成目标操作(条目: 操作调用条目, 选项: 生成选项): �
   return undefined
 }
 
-function 生成数据库操作(条目: 操作调用条目, 选项: 生成选项): 生成结果 {
-  let { sql, parameters, maxRows, evidenceColumns } = 查询模型.parse(条目.arguments)
-  let 参数列表 = parameters.map((值): string => {
+function 生成数据库参数代码(参数们: readonly 数据库参数[]): string {
+  let 参数列表 = 参数们.map((值): string => {
     if (值 === null) return 'null'
     if (typeof 值 !== 'object') return JSON.stringify(值)
     switch (值.type) {
@@ -254,8 +300,27 @@ function 生成数据库操作(条目: 操作调用条目, 选项: 生成选项)
         return `Buffer.from(${字面量(值.value)}, 'base64')`
     }
   })
+  return `[${参数列表.join(', ')}]`
+}
+
+/** 回放执行的写入与录制时执行的完全一样：同一条 SQL，同一组解码后的参数。 */
+function 生成数据库写入(条目: 操作调用条目, 选项: 生成选项): 生成结果 {
+  let { sql, parameters } = 写入模型.parse(条目.arguments)
+  let 写入 = `当前状态.工具.数据库.执行(${字面量(sql)}, ${生成数据库参数代码(parameters)})`
+  if (选项.需要结果)
+    return {
+      名称: 生成名称(条目),
+      类型: '行为',
+      语句们: 保存结果(条目, 选项, `整理数据库写入结果(${写入})`),
+      需要写入结果工具: true,
+    }
+  return { 名称: 生成名称(条目), 类型: '行为', 语句们: [写入] }
+}
+
+function 生成数据库操作(条目: 操作调用条目, 选项: 生成选项): 生成结果 {
+  let { sql, parameters, maxRows, evidenceColumns } = 查询模型.parse(条目.arguments)
   let 报告列 = evidenceColumns === undefined ? '' : `, ${字面量(evidenceColumns)}`
-  let 查询 = `当前状态.工具.数据库.查询(${字面量(sql)}, [${参数列表.join(', ')}]${报告列})`
+  let 查询 = `当前状态.工具.数据库.查询(${字面量(sql)}, ${生成数据库参数代码(parameters)}${报告列})`
   if (选项.需要结果)
     return {
       名称: 生成名称(条目),
@@ -266,10 +331,23 @@ function 生成数据库操作(条目: 操作调用条目, 选项: 生成选项)
   return { 名称: 生成名称(条目), 类型: '观察', 语句们: [查询] }
 }
 
-export function 生成调用代码(条目: 操作调用条目, 选项: 生成选项): 生成结果 {
+function 生成原始调用代码(条目: 操作调用条目, 选项: 生成选项): 生成结果 {
   try {
     if (条目.status === 'pending') throw new Error('不能转换尚未完成的调用')
+    if (条目.tool.startsWith('browser_')) {
+      let { observe, ...业务参数 } = 条目.arguments
+      浏览器观察参数模型.shape.observe.parse(observe)
+      if (条目.tool.startsWith('browser_')) {
+        let { observation, ...原业务参数 } = 业务参数
+        z.enum(['instant', 'stable', 'none']).optional().parse(observation)
+        业务参数 = 原业务参数
+      }
+      条目 = { ...条目, arguments: 业务参数 }
+    }
+    let 请求代码 = 生成请求调用代码(条目, 选项.需要结果)
+    if (请求代码 !== undefined) return 请求代码
     if (条目.tool === 'database_query') return 生成数据库操作(条目, 选项)
+    if (条目.tool === 'database_execute') return 生成数据库写入(条目, 选项)
     if (条目.tool === 'http_request') {
       let 参数 = HTTP请求模型.parse(条目.arguments)
       let 请求 = `await 当前状态.工具.HTTP.请求(${JSON.stringify(参数)})`
@@ -287,4 +365,15 @@ export function 生成调用代码(条目: 操作调用条目, 选项: 生成选
     let 原因 = 错误 instanceof Error ? 错误.message : String(错误)
     throw new Error(`操作 ${String(条目.id)} 转换失败：${原因}`, { cause: 错误 })
   }
+}
+
+/**
+ * 把一条操作记录转成回放代码。录制时自动识别出的信息在这里生效：
+ * 坐标点击导出成按元素点击或等图片后点击（见各引擎的生成函数），动作前后页面地址变了就在动作后加等地址。
+ */
+export function 生成调用代码(条目: 操作调用条目, 选项: 生成选项): 生成结果 {
+  let 结果 = 生成原始调用代码(条目, 选项)
+  if (条目.tool.startsWith('browser_') === false) return 结果
+  let 等地址 = 生成等地址语句(条目)
+  return 等地址.length === 0 ? 结果 : { ...结果, 语句们: [...结果.语句们, ...等地址] }
 }

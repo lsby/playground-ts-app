@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { lstat, open, rename, rm } from 'node:fs/promises'
+import { lstat, mkdir, open, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { setTimeout as 等待 } from 'node:timers/promises'
 
@@ -10,6 +10,7 @@ import {
   type JSON对象,
   type 回放步骤选择,
   type 导出回放步骤,
+  type 录制增强,
   type 操作记录摘要,
   type 操作记录条目,
   type 操作调用结果,
@@ -18,6 +19,7 @@ import {
 export type {
   JSON值,
   JSON对象,
+  录制增强,
   操作断言条目,
   操作记录摘要,
   操作记录条目,
@@ -153,8 +155,32 @@ export class 测试操作记录 {
     return this.编辑((录制) => 录制.添加断言(来源ID, 结果路径, 期望, 选项, 时间))
   }
 
+  /** 保存坐标点击的图片模板，返回相对于记录目录的路径（写进录制），导出时再换成绝对路径。 */
+  public async 保存模板(操作编号: number, 图片: Buffer): Promise<string> {
+    let 相对路径 = `templates/op-${String(操作编号)}.png`
+    let 目录 = path.dirname(this.文件路径)
+    await mkdir(path.join(目录, 'templates'), { recursive: true })
+    await writeFile(path.join(目录, 相对路径), 图片)
+    return 相对路径
+  }
+
   public 准备导出(步骤组?: readonly 回放步骤选择[]): Promise<导出回放步骤[]> {
-    return this.排队(() => this.获得录制().准备导出(步骤组))
+    return this.排队(() => {
+      let 目录 = path.dirname(this.文件路径)
+      return this.获得录制()
+        .准备导出(步骤组)
+        .map((步骤) => ({
+          ...步骤,
+          条目们: 步骤.条目们.map((条目) => {
+            if (条目.kind !== 'call' || 条目.增强?.模板 === undefined) return 条目
+            let 增强: 录制增强 = {
+              ...条目.增强,
+              模板: { ...条目.增强.模板, 文件: path.resolve(目录, 条目.增强.模板.文件) },
+            }
+            return { ...条目, 增强 }
+          }),
+        }))
+    })
   }
 
   private 编辑<T>(应用: (录制: 测试录制) => T): Promise<T> {

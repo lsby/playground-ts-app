@@ -62,11 +62,25 @@ codex mcp add playground-test --url http://127.0.0.1:30006/mcp
 
 ### 工具与录制
 
-- `browser_*` 操作浏览器并检查页面，`database_query` 只读查询测试库，`backend_logs` 查看测试后端日志。
+- `browser_*` 操作浏览器并检查页面，`database_query` 只读查询测试库，`database_schema` 查看真实表结构，`database_execute` 确定性写入测试数据，`backend_logs` 查看测试后端日志。
+- 数据写入会进入录制；第一个界面操作前连续的写入步骤导出到流程的 `初始化`，其余写入保持原顺序。参数使用合成固定值，避免随机值或当前时间造成回放差异；先重置再造数据，重置前的旧操作用 `record_remove` 排除。
+- `browser_request_hold` 挂起一次精确匹配的后端响应，`browser_request_wait` 等待响应取得，再通过 `browser_request_release` 释放。离开页面后还需等待可见的业务完成信号；挂起不会撤销后端副作用。
 - `http_request` 请求当前测试后端的接口。管理员请求可用 `auth: 'test-admin'`，测试密码字段使用 `$test-password:<标签>`。
 - `database_reset` 关闭浏览器会话、重置测试库并重启后端。默认保留操作记录，传入 `clearRecord: true` 可一并清空。
 - `record_add_assertion` 用 `expected` 核对固定值，用 `expectedFrom: { sourceId, path }` 比较两次操作的结果。导出时，把断言引用的操作都放在断言前。
 - `record_add_suggestion` 为录制操作记录建议，导出后随对应步骤进入报告。
+
+### 操作后的图片观察与回放等待
+
+浏览器界面动作默认自动观察（`observe: false` 可关闭）：动作后每秒采样、最多六秒，连续两次变化像素占比低于 1% 时结束；最多选三张差异帧，最终帧必选，按时间顺序直接返回给模型。灰度比较使用 100×100 缩图，返回图片为彩色 WebP，约 200 万像素目标且至少保留 CSS 逻辑尺寸，小图不放大。四周的刻度数字就是 CSS 视口操作坐标；证据图保持干净，`frames` 仅含 `elapsedMs`、`final`。主动 `browser_screenshot` 返回加刻度的原分辨率 PNG，便于看小字。
+
+观察失败会返回 `observationError`，已经成功的动作仍记为成功，防止重复操作。采样只辅助判断下一步，回放使用明确的业务条件等待与断言；异步弹窗先等出现，关闭后再等隐藏。
+
+坐标点击在动作前穿透 Shadow DOM 识别可点击元素，依次验证 aria-label、短文字、稳定 id/data 属性和祖先组合，唯一命中才采用。导出时改为按元素点击；没有定位且画面有足够纹理时，裁出落点附近约 64×64 的图片模板，复制到需求目录 `assets/<流程文件名>-<操作编号>.png`，用 `等待图片后点击` 回放。模板只在原坐标 ±120 单位内搜索，匹配至少 0.85 且领先次高分 0.05，超时明确报错；纯色区域沿用坐标，并自动记录改善元素标签的建议。
+
+每个界面动作前后读取地址，变化时自动导出 `等待地址`。规范化保留 pathname 和 hash 路由，忽略 origin、查询串及 UUID/长随机编号，规则见 `src/model/web-locate/page-url.ts`。浏览器等待以 `/` 或 `#` 开头的地址时使用同一规则，其余写法继续交给 Playwright。图片观察不会导出成固定或稳定等待。
+
+浏览器缺失时，开发套件与启动错误会提示运行 `pnpm exec playwright install chromium`，使用项目安装的 Playwright 版本。
 
 ### 退出后再回放
 

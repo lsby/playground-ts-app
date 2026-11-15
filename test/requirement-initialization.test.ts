@@ -30,7 +30,7 @@ function 创建参数(): 需求测试运行参数 {
         列出: () => [],
         关闭: async (): Promise<void> => {},
       },
-      数据库: { 查询: () => [] },
+      数据库: { 查询: () => [], 执行: () => ({ 影响行数: 0, 最后插入编号: undefined }), 表结构: () => [] },
       HTTP: {
         请求: async (): Promise<never> => {
           throw new Error('未使用')

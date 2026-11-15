@@ -1,3 +1,4 @@
+import { chromium } from '@playwright/test'
 import { spawn, type SpawnOptions } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, open } from 'node:fs/promises'
@@ -5,6 +6,8 @@ import path from 'node:path'
 import { z } from 'zod'
 
 import { 获得测试MCP配置, 获得环境变量 } from '../../src/global/env/env'
+import { 检查浏览器已安装 } from '../../src/model/browser-test/browser-install'
+
 import { 项目根目录 } from '../task/model/task-common'
 import { 开发任务表 } from '../task/taskfile/taskfile-dev'
 import { 独占测试数据库 } from './database-lock'
@@ -87,6 +90,8 @@ async function 运行开发套件(回放构建: boolean): Promise<void> {
   let 关闭接口: Awaited<ReturnType<typeof 开放关闭接口>> | undefined
   let 子任务们: 子任务[] = []
   try {
+    let 浏览器提示 = 检查浏览器已安装(chromium.executablePath())
+    if (浏览器提示 !== undefined) console.warn(`[浏览器] ${浏览器提示}`)
     释放数据库 = await 独占测试数据库(项目根目录)
     if (已取消()) return
     let 报告根目录 = path.join(项目根目录, 'test-outputs', 'test-dev')

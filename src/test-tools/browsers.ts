@@ -1,9 +1,11 @@
 import { join } from 'node:path'
+
 import { z } from 'zod'
 
 import { 浏览器测试引擎, type 浏览器测试模式 } from '../model/browser-test'
 import { 浏览器步骤取证作用域 } from '../model/browser-test/step-evidence'
 import type { 提交步骤附件, 需求测试附件 } from '../model/test-requirement'
+import { 压缩步骤截图 } from './evidence-image'
 
 type 会话 = Awaited<ReturnType<typeof 浏览器测试引擎.打开会话>>
 type 会话记录 = { 打开任务: Promise<会话>; 会话?: 会话; 归档任务?: Promise<void> }
@@ -83,16 +85,19 @@ export class 需求测试浏览器组 {
     记录错误: (错误: unknown) => void,
     执行: () => Promise<T>,
     取证范围: '步骤' | '操作' = '步骤',
+    需要收尾截图: () => boolean = (): boolean => true,
   ): Promise<T> {
     return await this.取证.运行(
       (名称) => ({
         提交: async ({ 名称: 说明, 图片 }): Promise<void> => {
-          提交([{ 类型: '图片', 内容类型: 'image/png', 内容: 图片.toString('base64'), 说明: `${名称} · ${说明}` }])
+          let 压缩图片 = await 压缩步骤截图(图片)
+          提交([{ 类型: '图片', 内容类型: 'image/webp', 内容: 压缩图片.toString('base64'), 说明: `${名称} · ${说明}` }])
         },
         记录错误: (错误): void => 记录错误(new Error(`浏览器会话「${名称}」步骤取证失败`, { cause: 错误 })),
       }),
       执行,
       取证范围,
+      需要收尾截图,
     )
   }
 
