@@ -6,9 +6,11 @@ import { HTTP请求模型 } from '../../../src/test-tools/http-request'
 import { 添加刻度边框 } from '../../../src/test-tools/observation-image'
 import type { 测试操作记录 } from '../../../src/test-tools/operation-record'
 import { 整理数据库写入结果, 整理数据库查询结果 } from '../../../src/test-tools/operation-values'
+import { 注册安卓工具 } from './android-tools'
 import { 执行浏览器操作并观察 } from './browser-observation'
 import { 注册浏览器请求工具 } from './browser-request-tools'
 import { 识别坐标点击 } from './click-enhance'
+import { 注册苹果工具 } from './ios-tools'
 import { 注册操作记录工具 } from './record-tools'
 import { 创建工具注册器, 直接返回, type MCP执行结果, type 工具输出 } from './register-tool'
 import {
@@ -32,6 +34,7 @@ export type MCP测试工具宿主 = {
   重置数据库: (清空记录: boolean) => Promise<{ reset: true; recordCleared: boolean }>
   执行: (调用: (工具: 需求测试工具, 提交: 提交步骤附件) => Promise<工具输出>) => Promise<MCP执行结果<工具输出>>
   获得测试地址: () => { 前端: string; 后端: string }
+  获得设备: () => { 安卓: string | undefined; 苹果: string | undefined }
   读取后端日志: () => 测试服务日志内容
   获得输出目录: () => string
 }
@@ -39,7 +42,9 @@ export type MCP测试工具宿主 = {
 export function 注册测试工具(server: McpServer, 宿主: MCP测试工具宿主): void {
   let 注册 = 创建工具注册器(server, (调用) => 宿主.执行工具(调用), 宿主.操作记录)
   let 注册无记录工具 = 创建工具注册器(server, (调用) => 宿主.执行工具(调用))
+  注册安卓工具(注册, 宿主)
   注册浏览器请求工具(注册, 宿主)
+  注册苹果工具(注册, 宿主)
   注册操作记录工具(注册无记录工具, 宿主.操作记录, () => 宿主.获得测试地址())
   let 注册重置工具 = 创建工具注册器(server, (调用) => 宿主.执行工具(调用, true))
   注册重置工具(
@@ -65,6 +70,8 @@ export function 注册测试工具(server: McpServer, 宿主: MCP测试工具宿
         backendUrl: 后端,
         outputDirectory: 宿主.获得输出目录(),
         operationsPath: 宿主.操作记录.文件路径,
+        androidDevice: 宿主.获得设备().安卓 ?? null,
+        iosDevice: 宿主.获得设备().苹果 ?? null,
       })
     },
     本地只读,

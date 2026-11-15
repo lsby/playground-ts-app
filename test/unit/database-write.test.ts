@@ -13,7 +13,7 @@ import { 需求测试数据库 } from '../../src/test-tools/database'
 import { 测试操作记录 } from '../../src/test-tools/operation-record'
 
 let 环境 = vi.hoisted(() => ({ NODE_ENV: 'test', DB_PATH: '' }))
-vi.mock('../../src/global/env/env', () => ({ 获得环境变量: (): typeof 环境 => 环境 }))
+vi.mock('../../src/global/env', () => ({ 获得环境变量: (): typeof 环境 => 环境 }))
 
 let 执行命令 = promisify(execFile)
 let 项目根目录 = path.resolve(import.meta.dirname, '../..')
@@ -144,6 +144,7 @@ async function 搭建录制(): Promise<{ 调用: (名称: string, 参数: unknow
     },
     执行: async (执行) => ({ 结果: { 成功: true, 值: await 执行(工具, 无记录) }, 附件们: [], 取证错误们: [] }),
     获得测试地址: () => ({ 前端: 'http://localhost', 后端: 'http://localhost' }),
+    获得设备: () => ({ 安卓: undefined, 苹果: undefined }),
     读取后端日志: () => ({ 标准输出: '', 错误输出: '' }),
     获得输出目录: () => 记录目录,
   }

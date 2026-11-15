@@ -120,6 +120,9 @@ export function 生成需求测试代码(参数: 导出参数): string {
     值 === undefined ? [] : [`  ${代码字面量(字段)}: ${代码字面量(值)},`],
   )
   let 条目们 = 参数.步骤组.flatMap((分组) => 分组.条目们)
+  let 使用安卓设备 = 条目们.some((条目) => 条目.kind === 'call' && 条目.tool.startsWith('android_'))
+  let 使用苹果设备 = 条目们.some((条目) => 条目.kind === 'call' && 条目.tool.startsWith('ios_'))
+  if (使用安卓设备 && 使用苹果设备) throw new Error('一条流程不能同时录制 Android 和 iOS 操作')
   let 引用编号们 = new Set(
     条目们.flatMap((条目) => {
       if (条目.kind !== 'assertion') return []
@@ -193,7 +196,12 @@ export function 生成需求测试代码(参数: 导出参数): string {
     let 步骤名称 = 名称?.trim() ?? 第一项.名称
     if (步骤名称 === '') throw new Error('导出步骤名称不能为空')
     let 含验收检查 = 条目们.some(
-      (条目) => 条目.kind === 'assertion' || 条目.tool === 'browser_wait' || 条目.tool === 'browser_wait_url',
+      (条目) =>
+        条目.kind === 'assertion' ||
+        条目.tool === 'browser_wait' ||
+        条目.tool === 'browser_wait_url' ||
+        条目.tool === 'android_wait' ||
+        条目.tool === 'ios_wait',
     )
     return { 名称: 步骤名称, 代码们, 含验收检查, 备注们 }
   })
@@ -257,7 +265,7 @@ export function 生成需求测试代码(参数: 导出参数): string {
     '',
     'export default class 导出的需求测试 extends 需求测试 {',
     '  public constructor() {',
-    `    super([业务需求], [业务流程], { 使用测试服务: true })`,
+    `    super([业务需求], [业务流程], { 使用测试服务: true${使用安卓设备 ? ', 使用安卓设备: true' : ''}${使用苹果设备 ? ', 使用苹果设备: true' : ''} })`,
     '  }',
     '}',
     '',

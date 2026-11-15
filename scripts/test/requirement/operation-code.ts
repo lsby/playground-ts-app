@@ -15,7 +15,9 @@ import {
   type 数据库参数,
   type 目标描述,
 } from '../mcp/tool-input'
-import { 生成增强点击语句, 生成等地址语句, type 模板资源 } from './enhanced-click-code'
+import { 生成安卓调用代码 } from './android-operation-code'
+import { 生成增强点击语句, 生成等地址语句, type 引擎种类, type 模板资源 } from './enhanced-click-code'
+import { 生成苹果调用代码 } from './ios-operation-code'
 import { 生成请求调用代码 } from './request-operation-code'
 
 export type 重放地址配置 = { 前端: string; 后端: string; 目录首页?: ReadonlyMap<string, string> }
@@ -191,7 +193,7 @@ function 生成页面操作(条目: 操作调用条目, 选项: 生成选项): �
     case 'browser_click_at': {
       let { name, x, y } = 会话模型.extend({ x: z.number().nonnegative(), y: z.number().nonnegative() }).parse(参数)
       // 录制时认出了落点元素就按元素点击，没有元素有截图模板就等图片后点击，都没有才点坐标
-      let 增强点击 = 生成增强点击语句(条目, 选项.流程文件名前缀 ?? 'template')
+      let 增强点击 = 生成增强点击语句(条目, '浏览器', 选项.流程文件名前缀 ?? 'template')
       return {
         ...基本,
         语句们: [
@@ -334,7 +336,7 @@ function 生成数据库操作(条目: 操作调用条目, 选项: 生成选项)
 function 生成原始调用代码(条目: 操作调用条目, 选项: 生成选项): 生成结果 {
   try {
     if (条目.status === 'pending') throw new Error('不能转换尚未完成的调用')
-    if (条目.tool.startsWith('browser_')) {
+    if (条目.tool.startsWith('browser_') || 条目.tool.startsWith('android_')) {
       let { observe, ...业务参数 } = 条目.arguments
       浏览器观察参数模型.shape.observe.parse(observe)
       if (条目.tool.startsWith('browser_')) {
@@ -344,8 +346,12 @@ function 生成原始调用代码(条目: 操作调用条目, 选项: 生成选�
       }
       条目 = { ...条目, arguments: 业务参数 }
     }
+    let 安卓代码 = 生成安卓调用代码(条目, 选项.需要结果, 选项.流程文件名前缀)
     let 请求代码 = 生成请求调用代码(条目, 选项.需要结果)
     if (请求代码 !== undefined) return 请求代码
+    if (安卓代码 !== undefined) return 安卓代码
+    let 苹果代码 = 生成苹果调用代码(条目, 选项.需要结果, 选项.流程文件名前缀)
+    if (苹果代码 !== undefined) return 苹果代码
     if (条目.tool === 'database_query') return 生成数据库操作(条目, 选项)
     if (条目.tool === 'database_execute') return 生成数据库写入(条目, 选项)
     if (条目.tool === 'http_request') {
@@ -367,13 +373,21 @@ function 生成原始调用代码(条目: 操作调用条目, 选项: 生成选�
   }
 }
 
+function 获得引擎种类(工具: string): 引擎种类 | undefined {
+  if (工具.startsWith('ios_')) return '苹果'
+  if (工具.startsWith('android_')) return '安卓'
+  if (工具.startsWith('browser_')) return '浏览器'
+  return undefined
+}
+
 /**
  * 把一条操作记录转成回放代码。录制时自动识别出的信息在这里生效：
  * 坐标点击导出成按元素点击或等图片后点击（见各引擎的生成函数），动作前后页面地址变了就在动作后加等地址。
  */
 export function 生成调用代码(条目: 操作调用条目, 选项: 生成选项): 生成结果 {
   let 结果 = 生成原始调用代码(条目, 选项)
-  if (条目.tool.startsWith('browser_') === false) return 结果
-  let 等地址 = 生成等地址语句(条目)
+  let 引擎 = 获得引擎种类(条目.tool)
+  if (引擎 === undefined) return 结果
+  let 等地址 = 生成等地址语句(条目, 引擎)
   return 等地址.length === 0 ? 结果 : { ...结果, 语句们: [...结果.语句们, ...等地址] }
 }

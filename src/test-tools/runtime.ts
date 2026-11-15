@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 
 import type { 浏览器测试模式 } from '../model/browser-test'
+import type { 苹果网络中转 } from '../model/ios-test'
 import type {
   可等待结果,
   提交步骤附件,
@@ -12,9 +13,11 @@ import type {
   需求测试工具,
   需求测试附件,
 } from '../model/test-requirement'
+import { 需求测试安卓设备 } from './android'
 import { 需求测试浏览器组 } from './browsers'
 import { 需求测试数据库 } from './database'
 import { 请求测试后端 } from './http-request'
+import { 需求测试苹果设备 } from './ios'
 
 export type 测试服务日志位置 = { 标准输出: number; 错误输出: number }
 
@@ -36,6 +39,8 @@ type 步骤取证 = {
 export class 测试运行工具 {
   public readonly 工具: 需求测试工具
   private readonly 浏览器: 需求测试浏览器组
+  private readonly 安卓设备: 需求测试安卓设备
+  private readonly 苹果设备: 需求测试苹果设备
   private readonly 数据库: 需求测试数据库
   private readonly 步骤 = new AsyncLocalStorage<步骤取证>()
 
@@ -46,6 +51,11 @@ export class 测试运行工具 {
       附件目录: string
       模式: 浏览器测试模式
       取消信号: AbortSignal
+      安卓设备?: string | undefined
+      苹果设备?: string | undefined
+      苹果热重载前端地址?: string | undefined
+      苹果网络中转?: 苹果网络中转 | undefined
+      安卓热重载?: { 前端地址: string; HMR端口: number } | undefined
     },
   ) {
     this.数据库 = new 需求测试数据库(参数.项目根目录)
@@ -55,10 +65,27 @@ export class 测试运行工具 {
       模式: 参数.模式,
       取消信号: 参数.取消信号,
     })
+    this.安卓设备 = new 需求测试安卓设备({
+      项目根目录: 参数.项目根目录,
+      设备: 参数.安卓设备,
+      热重载: 参数.安卓热重载,
+      获得后端地址: (): string => this.获得服务().获得后端地址?.() ?? this.获得服务().获得服务地址(),
+      取消信号: 参数.取消信号,
+    })
+    this.苹果设备 = new 需求测试苹果设备({
+      项目根目录: 参数.项目根目录,
+      设备: 参数.苹果设备,
+      热重载前端地址: 参数.苹果热重载前端地址,
+      网络中转: 参数.苹果网络中转,
+      获得后端地址: (): string => this.获得服务().获得后端地址?.() ?? this.获得服务().获得服务地址(),
+      取消信号: 参数.取消信号,
+    })
     this.工具 = {
       取消信号: 参数.取消信号,
       服务地址: (): string => this.获得服务().获得服务地址(),
       浏览器: this.浏览器,
+      Android: this.安卓设备,
+      iOS: this.苹果设备,
       数据库: {
         查询: (语句, 参数 = [], 报告列 = []): Record<string, 测试数据库值>[] => {
           let 步骤 = this.获得当前步骤()
@@ -99,7 +126,20 @@ export class 测试运行工具 {
     let 步骤 = { 提交, 记录错误, 日志起点, 已结束: false }
     return await this.步骤.run(步骤, async (): Promise<T> => {
       try {
-        return await this.浏览器.执行步骤(提交, 记录错误, () => 执行(提交附件), '步骤', 需要收尾截图)
+        return await this.安卓设备.执行步骤(
+          提交,
+          记录错误,
+          () =>
+            this.苹果设备.执行步骤(
+              提交,
+              记录错误,
+              () => this.浏览器.执行步骤(提交, 记录错误, () => 执行(提交附件), '步骤', 需要收尾截图),
+              '步骤',
+              需要收尾截图,
+            ),
+          '步骤',
+          需要收尾截图,
+        )
       } finally {
         let 服务 = this.参数.服务
         if (服务 !== undefined && 日志起点 !== undefined) {
@@ -117,14 +157,33 @@ export class 测试运行工具 {
   }
 
   public 执行操作(提交: 提交步骤附件, 记录错误: (错误: unknown) => void, 执行: () => 可等待结果<void>): Promise<void> {
-    return this.浏览器.执行步骤(提交, 记录错误, async (): Promise<void> => await 执行(), '操作')
+    return this.安卓设备.执行步骤(
+      提交,
+      记录错误,
+      () =>
+        this.苹果设备.执行步骤(
+          提交,
+          记录错误,
+          () => this.浏览器.执行步骤(提交, 记录错误, async (): Promise<void> => await 执行(), '操作'),
+          '操作',
+        ),
+      '操作',
+    )
   }
 
   public async 关闭当前现场(): Promise<void> {
     try {
       await this.浏览器.归档并关闭当前会话()
     } finally {
-      this.数据库.重置连接()
+      try {
+        await this.安卓设备.关闭当前会话()
+      } finally {
+        try {
+          await this.苹果设备.关闭当前会话()
+        } finally {
+          this.数据库.重置连接()
+        }
+      }
     }
   }
 
@@ -132,7 +191,15 @@ export class 测试运行工具 {
     try {
       this.数据库.关闭()
     } finally {
-      await this.浏览器.关闭全部()
+      try {
+        await this.浏览器.关闭全部()
+      } finally {
+        try {
+          await this.安卓设备.关闭()
+        } finally {
+          await this.苹果设备.关闭()
+        }
+      }
     }
   }
 

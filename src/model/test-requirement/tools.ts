@@ -1,5 +1,7 @@
+import type { 安卓启动选项, 安卓测试引擎 } from '../android-test'
 import type { 浏览器测试引擎 } from '../browser-test'
 import type { JSON值 } from '../data/json-value'
+import type { 苹果测试引擎 } from '../ios-test'
 
 export type 测试数据库值 = string | number | bigint | Uint8Array | null
 export type 测试数据库写入结果 = { 影响行数: number; 最后插入编号: number | bigint | undefined }
@@ -29,6 +31,13 @@ export type 需求测试工具 = {
     获得: (名称: string) => 浏览器测试引擎
     列出: () => readonly string[]
     关闭: (名称: string) => Promise<void>
+  }
+  Android: { 打开: (选项?: 安卓启动选项) => Promise<安卓测试引擎>; 获得: () => 安卓测试引擎 }
+  iOS: {
+    打开: (选项?: { 语言?: 'zh-CN' | 'en-US' }) => Promise<苹果测试引擎>
+    获得: () => 苹果测试引擎
+    // 已打开但会话已被 Appium 回收时清掉旧会话并重建，返回是否重建
+    确保会话可用: () => Promise<boolean>
   }
   数据库: {
     查询: (语句: string, 参数?: readonly 测试数据库值[], 报告列?: readonly string[]) => Record<string, 测试数据库值>[]

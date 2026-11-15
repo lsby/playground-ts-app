@@ -14,7 +14,7 @@ let 错误Schema = z.object({
 let 断言值Schema = z.object({}).passthrough()
 
 function 格式化值(值: unknown): string {
-  return stripVTControlCharacters(inspect(值))
+  return stripVTControlCharacters(inspect(值, { depth: null }))
 }
 
 function 查找位置(调用栈: string, 用例文件绝对路径: string): 流程运行错误['位置'] {

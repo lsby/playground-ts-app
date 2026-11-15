@@ -8,6 +8,7 @@ import { z } from 'zod'
 
 import type { 浏览器测试模式 } from '../../../src/model/browser-test'
 import { 需求测试, type 需求, type 需求测试流程 } from '../../../src/model/test-requirement'
+import { 读取移动测试配置 } from '../../../src/test-tools/mobile-config'
 import { 独占测试数据库 } from '../database-lock'
 import { 测试服务 } from '../test-server'
 import { 格式化需求测试错误 } from './format-error'
@@ -15,7 +16,10 @@ import { 保存需求测试报告, type 需求测试尝试记录, type 需求测
 import { 读取需求描述文件, 需求描述文件名 } from './requirement-file'
 import { 匹配标签, 解析标签过滤, 过滤需求流程, 验证标签存在, type 标签过滤 } from './tag-filter'
 
-type 需求测试实例 = Pick<需求测试, '获得需求们' | '获得流程们' | '需要测试服务' | '运行'>
+type 需求测试实例 = Pick<
+  需求测试,
+  '获得需求们' | '获得流程们' | '需要测试服务' | '需要安卓设备' | '需要苹果设备' | '运行'
+>
 type 需求测试入口 = { 实例: 需求测试实例; 文件: string; 流程: 需求测试流程; 需求们: readonly 需求[] }
 type 需求测试登记 = {
   流程们: readonly 需求测试入口[]
@@ -30,6 +34,8 @@ type 需求测试运行选项 = {
   仅列出: boolean
   显示未执行: boolean
   标签过滤: 标签过滤 | undefined
+  安卓设备: string | undefined
+  苹果设备: string | undefined
 }
 type 尝试参数 = {
   模式: 浏览器测试模式
@@ -37,6 +43,8 @@ type 尝试参数 = {
   报告目录: string
   附件目录: string
   取消信号: AbortSignal
+  安卓设备: string | undefined
+  苹果设备: string | undefined
 }
 
 /**
@@ -127,6 +135,18 @@ export class 需求测试运行器 {
       for (let { 文件, 流程 } of 选中流程们) console.log(`${流程.获得名称()} · ${文件}`)
       return 0
     }
+    if (选中流程们.some(({ 实例 }) => 实例.需要安卓设备())) {
+      if (选项.安卓设备 === undefined) throw new Error('选中的需求流程需要 Android 设备，请使用 --device <serial>')
+    }
+    if (选中流程们.some(({ 实例 }) => 实例.需要苹果设备()) && 选项.苹果设备 === undefined)
+      throw new Error('选中的需求流程需要 iOS 模拟器，请使用 --ios-device <UDID>')
+    if (选中流程们.some(({ 实例 }) => 实例.需要安卓设备() || 实例.需要苹果设备())) {
+      let 配置 = await 读取移动测试配置(this.根目录)
+      if (选中流程们.some(({ 实例 }) => 实例.需要安卓设备()) && 配置.Android === undefined)
+        throw new Error('项目未配置 Android 测试能力')
+      if (选中流程们.some(({ 实例 }) => 实例.需要苹果设备()) && 配置.iOS === undefined)
+        throw new Error('项目未配置 iOS 测试能力')
+    }
     let 检查完整覆盖 = 选项.指定流程名称们.length === 0 && 选项.指定需求名称 === undefined
     let 选中需求集合 = new Set(候选流程们.flatMap((测试) => 测试.需求们))
     let 报告需求们 = 需求们.filter((需求) =>
@@ -209,7 +229,15 @@ export class 需求测试运行器 {
               服务地址 = await 服务.启动()
               正在启动服务 = false
             }
-            尝试 = await this.执行尝试(测试, 尝试序号, { 模式: 选项.模式, 服务, 报告目录, 附件目录, 取消信号 })
+            尝试 = await this.执行尝试(测试, 尝试序号, {
+              模式: 选项.模式,
+              服务,
+              报告目录,
+              附件目录,
+              取消信号,
+              安卓设备: 选项.安卓设备,
+              苹果设备: 选项.苹果设备,
+            })
             尝试们.push(尝试)
           } finally {
             正在启动服务 = false
@@ -341,6 +369,8 @@ export class 需求测试运行器 {
         auto: { type: 'boolean' },
         demo: { type: 'boolean' },
         mode: { type: 'string' },
+        device: { type: 'string' },
+        'ios-device': { type: 'string' },
       },
     })
     if (values.mode !== undefined && values.mode !== 'auto' && values.mode !== 'demo')
@@ -352,6 +382,10 @@ export class 需求测试运行器 {
     let 指定需求名称 = values.requirement?.trim()
     if (指定流程名称们.includes('')) throw new Error('--scenario 后必须提供流程名称')
     if (指定需求名称 === '') throw new Error('--requirement 后必须提供需求名称')
+    let 安卓设备 = values.device?.trim()
+    if (安卓设备 === '') throw new Error('--device 后必须提供 Android 设备序号')
+    let 苹果设备 = values['ios-device']?.trim()
+    if (苹果设备 === '') throw new Error('--ios-device 后必须提供 iOS 模拟器 UDID')
     let 全部运行 = values.all === true
     if ([全部运行, 指定流程名称们.length > 0, 指定需求名称 !== undefined].filter(Boolean).length > 1)
       throw new Error('--all、--scenario、--requirement 只能选择一种')
@@ -363,6 +397,8 @@ export class 需求测试运行器 {
       仅列出: values.list === true,
       显示未执行: values['show-unexecuted'] === true,
       标签过滤: 解析标签过滤(values['exclude-tag'], values['include-tag']),
+      安卓设备,
+      苹果设备,
     }
   }
 
@@ -374,8 +410,18 @@ export class 需求测试运行器 {
     ])
   }
 
+  /** 没指定对应设备时，跳过需要 Android 或 iOS 设备的流程，不影响其他测试。 */
+  private 过滤缺少设备的流程(流程们: readonly 需求测试入口[], 选项: 需求测试运行选项): readonly 需求测试入口[] {
+    if (选项.仅列出) return 流程们
+    return 流程们.filter(
+      ({ 实例 }) =>
+        (实例.需要安卓设备() === false || 选项.安卓设备 !== undefined) &&
+        (实例.需要苹果设备() === false || 选项.苹果设备 !== undefined),
+    )
+  }
+
   private 选择流程({ 流程们, 需求们 }: 需求测试登记, 选项: 需求测试运行选项): readonly 需求测试入口[] {
-    if (选项.全部运行) return 流程们
+    if (选项.全部运行) return this.过滤缺少设备的流程(流程们, 选项)
     if (选项.指定流程名称们.length > 0)
       return 选项.指定流程名称们.map((名称) => {
         let 流程项 = 流程们.find((候选) => 候选.流程.获得名称() === 名称)
@@ -383,7 +429,7 @@ export class 需求测试运行器 {
         return 流程项
       })
     let 需求名称 = 选项.指定需求名称
-    if (需求名称 === undefined) return 流程们
+    if (需求名称 === undefined) return this.过滤缺少设备的流程(流程们, 选项)
     if (需求们.some((值) => 值.获得名称() === 需求名称) === false) throw new Error(`找不到需求“${需求名称}”`)
     return 流程们.filter((流程项) => 流程项.需求们.some((值) => 值.获得名称() === 需求名称))
   }
@@ -395,7 +441,17 @@ if (入口文件 !== undefined && pathToFileURL(path.resolve(入口文件)).href
     let 根目录 = path.resolve(import.meta.dirname, '../../../')
     process.exitCode = await new 需求测试运行器(根目录).运行(process.argv.slice(2))
   } catch (错误) {
-    console.error(错误 instanceof Error ? (错误.stack ?? 错误.message) : String(错误))
+    console.error(格式化需求测试错误(错误, import.meta.filename).文本)
     process.exitCode = 1
+  } finally {
+    try {
+      let { 全局资源 } = await import('../../../src/global/global')
+      await 全局资源.关闭()
+    } catch (错误) {
+      console.error(
+        格式化需求测试错误(new Error('关闭需求测试全局资源失败', { cause: 错误 }), import.meta.filename).文本,
+      )
+      process.exitCode = 1
+    }
   }
 }

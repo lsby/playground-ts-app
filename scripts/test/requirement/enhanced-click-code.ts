@@ -3,6 +3,7 @@ import type { 操作调用条目 } from '../../../src/test-tools/operation-recor
 
 /** 导出的回放里，等元素出现再点击、等地址变化的最长等待时间。 */
 export let 元素等待毫秒 = 15_000
+export type 引擎种类 = '苹果' | '安卓' | '浏览器'
 export type 模板资源 = { 操作编号: number; 来源路径: string; 相对路径: string }
 export type 增强点击代码 = { 语句们: string[]; 模板资源?: 模板资源 }
 
@@ -19,14 +20,23 @@ export function 模板资源相对路径(流程文件名前缀: string, 操作�
  * 坐标点击在录制时被识别出元素或截图模板时，生成取代坐标点击的代码：
  * 有元素定位就按元素点击（先等元素出现、可点再点）；没有定位但有模板就等图片后点击；都没有返回 undefined，由调用方退回坐标。
  */
-export function 生成增强点击语句(条目: 操作调用条目, 流程文件名前缀: string): 增强点击代码 | undefined {
+export function 生成增强点击语句(条目: 操作调用条目, 引擎: 引擎种类, 流程文件名前缀: string): 增强点击代码 | undefined {
   let 增强 = 条目.增强
   if (增强 === undefined) return undefined
   let 定位 = 增强.定位
   if (定位 !== undefined) {
-    let 目标 =
-      定位.种类 === '选择器' ? `引擎.定位(${字面量(定位.值)})` : `引擎.按文本(${字面量(定位.值)}, { exact: true })`
-    return { 语句们: [`await 引擎.点击(${目标}, { timeout: ${String(元素等待毫秒)} })`] }
+    switch (引擎) {
+      case '苹果':
+      case '安卓': {
+        let 目标 = { 按: 定位.种类 === '选择器' ? '网页选择器' : '网页文字', 值: 定位.值 }
+        return { 语句们: [`await 引擎.点击(${字面量(目标)}, ${String(元素等待毫秒)})`] }
+      }
+      case '浏览器': {
+        let 目标 =
+          定位.种类 === '选择器' ? `引擎.定位(${字面量(定位.值)})` : `引擎.按文本(${字面量(定位.值)}, { exact: true })`
+        return { 语句们: [`await 引擎.点击(${目标}, { timeout: ${String(元素等待毫秒)} })`] }
+      }
+    }
   }
   let 模板 = 增强.模板
   if (模板 === undefined) return undefined
@@ -40,12 +50,18 @@ export function 生成增强点击语句(条目: 操作调用条目, 流程文�
   }
 }
 
-/** 录制时动作前后页面地址变了，回放在动作后等地址（按规范地址比较：忽略 origin、查询串和随机编号）。 */
-export function 生成等地址语句(条目: 操作调用条目): string[] {
+/** 录制时动作前后页面地址变了，回放在动作后等地址（按规范地址比较：忽略 origin、查询串和随机编号，三端相同）。 */
+export function 生成等地址语句(条目: 操作调用条目, 引擎: 引擎种类): string[] {
   let 变化 = 条目.增强?.地址变化
   if (变化 === undefined) return []
   // 旧录制里的地址可能还带随机编号，导出时再规范一次
   let 目标 = 字面量(规范地址(变化.后))
-  // 以 / 或 # 开头的字符串由浏览器引擎按规范地址比较
-  return [`await 引擎.等待地址(${目标}, { timeout: ${String(元素等待毫秒)}, waitUntil: 'domcontentloaded' })`]
+  switch (引擎) {
+    case '苹果':
+    case '安卓':
+      return [`await 引擎.等待地址(${目标}, ${String(元素等待毫秒)})`]
+    case '浏览器':
+      // 以 / 或 # 开头的字符串由浏览器引擎按规范地址比较
+      return [`await 引擎.等待地址(${目标}, { timeout: ${String(元素等待毫秒)}, waitUntil: 'domcontentloaded' })`]
+  }
 }

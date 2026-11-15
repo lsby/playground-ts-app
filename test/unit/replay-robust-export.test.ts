@@ -9,7 +9,7 @@ import { 列出模板资源, 生成需求测试代码 } from '../../scripts/test
 import { 生成调用代码 } from '../../scripts/test/requirement/operation-code'
 import type { JSON对象, 录制增强, 操作调用条目 } from '../../src/test-tools/operation-record'
 
-vi.mock('../../src/global/env/env', () => ({
+vi.mock('../../src/global/env', () => ({
   获得环境变量: (): never => {
     throw new Error('本测试不使用后端环境')
   },
@@ -49,6 +49,37 @@ let 模板增强: 录制增强 = {
 let 地址增强: 录制增强 = { 地址变化: { 前: '/#/home', 后: '/#/gift' } }
 
 describe('坐标点击导出成按元素点击', () => {
+  it('iOS：有定位时按元素点击并等元素，不再点坐标', () => {
+    let 结果 = 代码(条目(1, 'ios_tap_at', { x: 200, y: 300, observe: true }, { clicked: true }, 定位))
+    expect(结果).toContain('await 引擎.点击({"按":"网页选择器","值":"button[aria-label=\\"收下礼物\\"]"}, 15000)')
+    expect(结果).not.toContain('点击坐标')
+    expect(结果).not.toContain('等待画面稳定')
+  })
+
+  it('iOS：文字定位用网页文字', () => {
+    let 结果 = 代码(条目(1, 'ios_tap_at', { x: 200, y: 300, observe: true }, { clicked: true }, 文字定位))
+    expect(结果).toContain('await 引擎.点击({"按":"网页文字","值":"收下礼物"}, 15000)')
+  })
+
+  it('iOS：OCR 点击有定位时不再回放 OCR，断言要用的坐标取录制值', () => {
+    let 结果 = 代码(
+      条目(1, 'ios_tap_ocr', { text: '收下礼物', observe: true }, { clicked: true, x: 201, y: 305 }, 文字定位),
+      true,
+    )
+    expect(结果).toContain('引擎.点击(')
+    expect(结果).not.toContain('点击截图文字')
+    expect(结果).toContain('{ clicked: true, x: 201, y: 305 }')
+  })
+
+  it('Android：坐标点击和 OCR 点击都按元素点击', () => {
+    expect(代码(条目(1, 'android_tap_at', { x: 540, y: 1100 }, { clicked: true }, 定位))).toContain(
+      'await 引擎.点击({"按":"网页选择器","值":"button[aria-label=\\"收下礼物\\"]"}, 15000)',
+    )
+    expect(
+      代码(条目(2, 'android_tap_ocr', { text: '收下礼物' }, { clicked: true, x: 1, y: 2 }, 文字定位)),
+    ).not.toContain('点击截图文字')
+  })
+
   it('浏览器：选择器用 引擎.定位，文字用 引擎.按文本，都带超时', () => {
     expect(代码(条目(1, 'browser_click_at', { name: 'a', x: 50, y: 30 }, { clicked: true }, 定位))).toContain(
       'await 引擎.点击(引擎.定位("button[aria-label=\\"收下礼物\\"]"), { timeout: 15000 })',
@@ -58,7 +89,11 @@ describe('坐标点击导出成按元素点击', () => {
     )
   })
 
-  it('没有任何识别信息时浏览器仍点原坐标（旧录制兼容）', () => {
+  it('没有任何识别信息时三端仍点原坐标（旧录制兼容）', () => {
+    expect(代码(条目(1, 'ios_tap_at', { x: 200, y: 300, observe: true }, { clicked: true }))).toContain(
+      'await 引擎.点击坐标(200, 300)',
+    )
+    expect(代码(条目(1, 'android_tap_at', { x: 5, y: 6 }, { clicked: true }))).toContain('await 引擎.点击坐标(5, 6)')
     expect(代码(条目(1, 'browser_click_at', { name: 'a', x: 5, y: 6 }, { clicked: true }))).toContain(
       'await 引擎.点击坐标(5, 6)',
     )
@@ -66,6 +101,23 @@ describe('坐标点击导出成按元素点击', () => {
 })
 
 describe('地址变化导出成等地址', () => {
+  it('iOS 和 Android 在动作后等规范地址', () => {
+    let 苹果 = 代码(
+      条目(
+        1,
+        'ios_tap',
+        { target: { by: 'webText', value: '去礼物页' }, timeoutMs: 5000, observe: true },
+        { clicked: true },
+        地址增强,
+      ),
+    )
+    expect(苹果).toContain('await 引擎.等待地址("/#/gift", 15000)')
+    expect(苹果.indexOf('引擎.点击(')).toBeLessThan(苹果.indexOf('等待地址'))
+    expect(代码(条目(1, 'android_tap_at', { x: 1, y: 2 }, { clicked: true }, { ...地址增强, ...定位 }))).toContain(
+      'await 引擎.等待地址("/#/gift", 15000)',
+    )
+  })
+
   it('浏览器按路由地址等待，由引擎按规范地址比较，忽略 origin', () => {
     let 结果 = 代码(
       条目(
@@ -79,10 +131,21 @@ describe('地址变化导出成等地址', () => {
     expect(结果).toContain('await 引擎.等待地址("/#/gift", { timeout: 15000, waitUntil: \'domcontentloaded\' })')
   })
 
-  it('旧录制里带随机 flow 编号的地址，导出时去掉', () => {
+  it('旧录制里带随机 flow 编号的地址，导出时去掉，三端一致', () => {
     let 带编号: 录制增强 = {
       地址变化: { 前: '/#home', 后: '/#protocol?flow=7c9e6679-7425-40de-944b-e07fc1f90ae7&step=2' },
     }
+    let 苹果 = 代码(
+      条目(
+        1,
+        'ios_tap',
+        { target: { by: 'webText', value: 'x' }, timeoutMs: 5000, observe: true },
+        { clicked: true },
+        带编号,
+      ),
+    )
+    expect(苹果).toContain('await 引擎.等待地址("/#protocol", 15000)')
+    expect(苹果).not.toContain('flow=')
     let 浏览器 = 代码(
       条目(
         1,
@@ -101,8 +164,8 @@ describe('地址变化导出成等地址', () => {
       代码(
         条目(
           1,
-          'browser_click',
-          { name: 'a', target: { by: 'text', text: 'x' }, timeoutMs: 5000, observe: true },
+          'ios_tap',
+          { target: { by: 'webText', value: 'x' }, timeoutMs: 5000, observe: true },
           { clicked: true },
         ),
       ),
@@ -110,12 +173,34 @@ describe('地址变化导出成等地址', () => {
   })
 })
 
+describe('不再导出等待画面稳定', () => {
+  it('iOS 所有会改变画面的操作导出后都不含等待画面稳定', () => {
+    let 条目们: 操作调用条目[] = [
+      条目(1, 'ios_open', { observe: true }, { opened: true }),
+      条目(2, 'ios_tap', { target: { by: 'webText', value: 'x' }, timeoutMs: 5000, observe: true }, { clicked: true }),
+      条目(3, 'ios_tap_at', { x: 1, y: 2, observe: true }, { clicked: true }),
+      条目(4, 'ios_tap_ocr', { text: 'x', observe: true }, { clicked: true, x: 1, y: 2 }),
+      条目(5, 'ios_swipe', { x1: 1, y1: 2, x2: 3, y2: 4, durationMs: 300, observe: true }, { swiped: true }),
+      条目(6, 'ios_back', { observe: true }, { swiped: true }),
+      条目(7, 'ios_restart', { observe: true }, { restarted: true }),
+      条目(8, 'ios_fill', { value: 'abc', observe: true }, { filled: true }),
+      条目(9, 'ios_observe', {}, {}),
+    ]
+    for (let 一条 of 条目们) expect(代码(一条, true)).not.toContain('等待画面稳定')
+  })
+
+  it('ios_observe 导出为一张截图证据', () => {
+    expect(代码(条目(9, 'ios_observe', {}, {}))).toContain('await 引擎.截图()')
+  })
+})
+
 describe('没有 DOM 的点击导出成等图片后点击', () => {
   it('带模板时生成等待图片后点击，路径相对流程文件，并登记要复制的资源', () => {
-    let 结果 = 生成调用代码(
-      条目(4, 'browser_click_at', { name: 'a', x: 200, y: 300, observe: true }, { clicked: true }, 模板增强),
-      { 需要结果: false, 测试地址, 流程文件名前缀: 'gift-flow' },
-    )
+    let 结果 = 生成调用代码(条目(4, 'ios_tap_at', { x: 200, y: 300, observe: true }, { clicked: true }, 模板增强), {
+      需要结果: false,
+      测试地址,
+      流程文件名前缀: 'gift-flow',
+    })
     let 语句 = 结果.语句们.join('\n')
     expect(语句).toContain(
       'await 引擎.等待图片后点击(new URL("assets/gift-flow-4.png", import.meta.url), {"x":200,"y":300,"比例":3,"落点":{"x":32,"y":32}}, 15000)',
@@ -125,15 +210,16 @@ describe('没有 DOM 的点击导出成等图片后点击', () => {
   })
 
   it('有定位时优先按元素点击，不再使用模板', () => {
-    let 结果 = 生成调用代码(
-      条目(4, 'browser_click_at', { name: 'a', x: 1, y: 2 }, { clicked: true }, { ...定位, ...模板增强 }),
-      { 需要结果: false, 测试地址 },
-    )
+    let 结果 = 生成调用代码(条目(4, 'android_tap_at', { x: 1, y: 2 }, { clicked: true }, { ...定位, ...模板增强 }), {
+      需要结果: false,
+      测试地址,
+    })
     expect(结果.语句们.join('\n')).not.toContain('等待图片后点击')
     expect(结果.模板资源).toBeUndefined()
   })
 
-  it('浏览器支持图片模板', () => {
+  it('Android 和浏览器同样支持', () => {
+    expect(代码(条目(4, 'android_tap_at', { x: 200, y: 300 }, { clicked: true }, 模板增强))).toContain('等待图片后点击')
     expect(代码(条目(4, 'browser_click_at', { name: 'a', x: 200, y: 300 }, { clicked: true }, 模板增强))).toContain(
       '等待图片后点击',
     )
@@ -212,6 +298,47 @@ export let 业务需求 = new 需求({ 名称: '收下礼物', 描述: '可以�
     await writeFile(模板源, Buffer.from('changed'))
     await expect(复制模板资源(目录, 模板们)).rejects.toThrow(/不同内容/u)
     expect((await readFile(path.join(目录, 'assets/gift-flow-3.png'))).toString()).toBe('fake-png')
+
+    // iOS 和 Android 的流程同样要通过类型检查：引擎上必须有 等待图片后点击、等待地址、点击(目标, 超时)
+    for (let [名称, 前缀, 等待工具, 点击工具] of [
+      ['ios-flow', 'ios', 'ios_wait', 'ios_tap_ocr'],
+      ['android-flow', 'android', 'android_wait', 'android_tap_ocr'],
+    ] as const) {
+      let 设备条目们 = [
+        条目(1, `${前缀}_tap_at`, { x: 50, y: 30, observe: true }, { clicked: true }, { ...定位, ...地址增强 }),
+        条目(
+          2,
+          `${前缀}_tap_at`,
+          { x: 200, y: 300, observe: true },
+          { clicked: true },
+          { 模板: { 文件: 模板源, 比例: 3, 原坐标: { x: 200, y: 300 }, 落点: { x: 32, y: 32 } } },
+        ),
+        条目(3, 点击工具, { text: '收下礼物', observe: true }, { clicked: true, x: 1, y: 2 }, 文字定位),
+        条目(
+          4,
+          等待工具,
+          { target: { by: 'webText', value: '收下成功' }, state: 'visible', timeoutMs: 5000 },
+          { state: 'visible' },
+        ),
+      ]
+      let 设备步骤组 = [
+        { 名称: '点击', 条目们: 设备条目们.slice(0, 3), 备注们: [] },
+        { 名称: '验收', 条目们: 设备条目们.slice(3), 备注们: [] },
+      ]
+      let 设备源码 = 生成需求测试代码({
+        流程名称: `${前缀}收礼物`,
+        需求模块路径: './index.requirement',
+        源码目录路径: path.relative(目录, path.join(项目根目录, 'src')).replaceAll('\\', '/'),
+        覆盖验收点键们: ['收下'],
+        步骤组: 设备步骤组,
+        测试地址,
+        文件名: `${名称}.ts`,
+      })
+      expect(设备源码).not.toContain('等待画面稳定')
+      expect(设备源码).toContain('await 引擎.等待图片后点击(')
+      expect(设备源码).toContain('await 引擎.等待地址("/#/gift", 15000)')
+      await writeFile(path.join(目录, `${名称}.ts`), 设备源码)
+    }
 
     await writeFile(
       path.join(目录, 'tsconfig.json'),

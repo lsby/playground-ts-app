@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { 定位脚本, 落点验证脚本 } from '../../src/model/ios-test/web-script'
 import {
   屏幕转网页坐标,
   描述元素,
@@ -165,8 +166,9 @@ describe('落点识别结果整理', () => {
 })
 
 describe('页面脚本语法', () => {
-  it('落点脚本、清理脚本、视口脚本都是合法的函数体', () => {
-    for (let 脚本 of [落点脚本, 清理脚本, 读取视口脚本]) expect(() => new Function(脚本)).not.toThrow()
+  it('落点脚本、验证脚本、清理脚本、视口脚本、定位脚本都是合法的函数体', () => {
+    for (let 脚本 of [落点脚本, 落点验证脚本, 清理脚本, 读取视口脚本, 定位脚本])
+      expect(() => new Function(脚本)).not.toThrow()
   })
 })
 

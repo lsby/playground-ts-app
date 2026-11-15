@@ -14,7 +14,7 @@ import { JSON对象模式 } from '../../src/model/data/json-value'
 import type { 需求测试工具 } from '../../src/model/test-requirement'
 import { 测试操作记录, type JSON对象 } from '../../src/test-tools/operation-record'
 
-vi.mock('../../src/global/env/env', () => ({
+vi.mock('../../src/global/env', () => ({
   获得环境变量: (): never => {
     throw new Error('本测试不使用后端环境')
   },
@@ -117,6 +117,8 @@ beforeAll(async () => {
     取消信号: new AbortController().signal,
     服务地址: (): string => 'http://127.0.0.1',
     浏览器: { 打开: async () => 引擎, 获得: () => 引擎, 列出: () => ['a'], 关闭: async () => {} },
+    Android: { 打开: 不使用, 获得: 不使用 },
+    iOS: { 打开: 不使用, 获得: 不使用, 确保会话可用: 不使用 },
     数据库: { 查询: 不使用, 执行: 不使用, 表结构: 不使用 },
     HTTP: { 请求: 不使用 },
     后端日志: { 读取: () => ({ 标准输出: '', 错误输出: '' }) },
@@ -127,6 +129,7 @@ beforeAll(async () => {
     重置数据库: 不使用,
     执行: async (执行) => ({ 结果: { 成功: true, 值: await 执行(工具, (): void => {}) }, 附件们: [], 取证错误们: [] }),
     获得测试地址: () => 测试地址,
+    获得设备: () => ({ 安卓: undefined, 苹果: undefined }),
     读取后端日志: () => ({ 标准输出: '', 错误输出: '' }),
     获得输出目录: () => 目录,
   }

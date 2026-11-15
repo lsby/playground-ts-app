@@ -19,8 +19,14 @@ export abstract class 需求测试 {
   private readonly 需求们: readonly 需求[]
   private readonly 流程们: readonly 需求测试流程[]
   private readonly 使用测试服务: boolean
+  private readonly 使用安卓设备: boolean
+  private readonly 使用苹果设备: boolean
 
-  protected constructor(需求们: readonly 需求[], 流程们: readonly 需求测试流程[], 配置: { 使用测试服务: boolean }) {
+  protected constructor(
+    需求们: readonly 需求[],
+    流程们: readonly 需求测试流程[],
+    配置: { 使用测试服务: boolean; 使用安卓设备?: boolean; 使用苹果设备?: boolean },
+  ) {
     if (需求们.length === 0 || 需求们.some((值) => 值 instanceof 需求 === false))
       throw new Error('需求测试必须登记有效的需求')
     if (流程们.length === 0 || 流程们.some((值) => 值 instanceof 流程 === false))
@@ -29,6 +35,11 @@ export abstract class 需求测试 {
     this.需求们 = [...需求们]
     this.流程们 = [...流程们]
     this.使用测试服务 = 配置.使用测试服务
+    this.使用安卓设备 = 配置.使用安卓设备 === true
+    this.使用苹果设备 = 配置.使用苹果设备 === true
+    if (this.使用安卓设备 && this.使用测试服务 === false) throw new Error('Android 需求流程必须声明使用测试服务')
+    if (this.使用苹果设备 && this.使用测试服务 === false) throw new Error('iOS 需求流程必须声明使用测试服务')
+    if (this.使用苹果设备 && this.使用安卓设备) throw new Error('需求流程不能同时使用 Android 和 iOS 设备')
   }
 
   public 获得需求们(): readonly 需求[] {
@@ -41,6 +52,14 @@ export abstract class 需求测试 {
 
   public 需要测试服务(): boolean {
     return this.使用测试服务
+  }
+
+  public 需要安卓设备(): boolean {
+    return this.使用安卓设备
+  }
+
+  public 需要苹果设备(): boolean {
+    return this.使用苹果设备
   }
 
   public async 运行(流程名称: string, 参数: 需求测试运行参数): Promise<需求测试结果> {

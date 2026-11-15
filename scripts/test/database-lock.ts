@@ -1,8 +1,6 @@
 import { access, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 
-import { 获得环境变量 } from '../../src/global/env/env'
-
 async function 确认没有旧锁(锁路径: string): Promise<void> {
   try {
     await access(锁路径)
@@ -14,6 +12,7 @@ async function 确认没有旧锁(锁路径: string): Promise<void> {
 }
 
 export async function 独占测试数据库(项目根目录: string): Promise<() => void> {
+  let { 获得环境变量 } = await import('../../src/global/env')
   let 配置 = 获得环境变量()
   if (配置.NODE_ENV !== 'test' || 配置.BUILD_TARGET !== 'web') throw new Error('仅允许独占 Web 测试数据库')
   let 锁路径 = `${path.resolve(项目根目录, 配置.DB_PATH)}.test.lock`

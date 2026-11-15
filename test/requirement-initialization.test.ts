@@ -30,6 +30,25 @@ function 创建参数(): 需求测试运行参数 {
         列出: () => [],
         关闭: async (): Promise<void> => {},
       },
+      Android: {
+        打开: async (): Promise<never> => {
+          throw new Error('未使用')
+        },
+        获得: (): never => {
+          throw new Error('未使用')
+        },
+      },
+      iOS: {
+        打开: async (): Promise<never> => {
+          throw new Error('未使用')
+        },
+        获得: (): never => {
+          throw new Error('未使用')
+        },
+        确保会话可用: async (): Promise<never> => {
+          throw new Error('未使用')
+        },
+      },
       数据库: { 查询: () => [], 执行: () => ({ 影响行数: 0, 最后插入编号: undefined }), 表结构: () => [] },
       HTTP: {
         请求: async (): Promise<never> => {
@@ -63,7 +82,10 @@ describe('流程初始化', () => {
     type 数字状态 = { 工具: typeof 参数.工具; 数字: number }
     let 数字流程 = new 流程({
       名称: '数字',
-      初始化: (工具): 数字状态 => ({ 工具, 数字: ++次数 }),
+      初始化: async (工具): Promise<数字状态> => {
+        await Promise.resolve()
+        return { 工具, 数字: ++次数 }
+      },
       覆盖验收点们: [验收],
       步骤们: [
         new 行为<数字状态>('增加', async (状态) => ({ ...状态, 数字: 状态.数字 + 1 })),

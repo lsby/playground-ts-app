@@ -87,6 +87,7 @@
     "@types/node-schedule": "^2.1.8",
     "@types/stream-to-blob": "^2.0.0",
     "@vitest/coverage-v8": "^2.1.1",
+    "@xmldom/xmldom": "0.9.12",
     "ali-oss": "^6",
     "archiver": "^7.0.1",
     "bumpp": "^10.3.1",
