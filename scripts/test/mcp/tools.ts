@@ -7,6 +7,7 @@ import { 添加刻度边框 } from '../../../src/test-tools/observation-image'
 import type { 测试操作记录 } from '../../../src/test-tools/operation-record'
 import { 整理数据库写入结果, 整理数据库查询结果 } from '../../../src/test-tools/operation-values'
 import { 注册安卓工具 } from './android-tools'
+import { 注册浏览器拖动工具 } from './browser-drag-tool'
 import { 执行浏览器操作并观察 } from './browser-observation'
 import { 注册浏览器请求工具 } from './browser-request-tools'
 import { 识别坐标点击 } from './click-enhance'
@@ -44,6 +45,7 @@ export function 注册测试工具(server: McpServer, 宿主: MCP测试工具宿
   let 注册无记录工具 = 创建工具注册器(server, (调用) => 宿主.执行工具(调用))
   注册安卓工具(注册, 宿主)
   注册浏览器请求工具(注册, 宿主)
+  注册浏览器拖动工具(注册, 宿主)
   注册苹果工具(注册, 宿主)
   注册操作记录工具(注册无记录工具, 宿主.操作记录, () => 宿主.获得测试地址())
   let 注册重置工具 = 创建工具注册器(server, (调用) => 宿主.执行工具(调用, true))

@@ -10,6 +10,7 @@
   "scripts/test/mcp/android-input.ts",
   "scripts/test/mcp/android-observation.ts",
   "scripts/test/mcp/android-tools.ts",
+  "scripts/test/mcp/browser-drag-tool.ts",
   "scripts/test/mcp/browser-observation.ts",
   "scripts/test/mcp/browser-request-tools.ts",
   "scripts/test/mcp/click-enhance.ts",

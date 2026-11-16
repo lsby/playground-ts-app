@@ -310,6 +310,44 @@ export class 浏览器测试引擎 {
     await this.页面.mouse.click(水平位置, 垂直位置, 参数)
   }
 
+  public async 拖动画布(
+    目标: Locator,
+    起点: { x: number; y: number },
+    终点: { x: number; y: number },
+    超时毫秒: number,
+  ): Promise<void> {
+    this.检查操作目标(目标)
+    await expect(目标).toBeVisible({ timeout: 超时毫秒 })
+    if ((await 目标.evaluate((元素): string => 元素.tagName)) !== 'CANVAS') throw new Error('拖动目标必须是 canvas')
+    let 范围 = await 目标.boundingBox({ timeout: 超时毫秒 })
+    if (范围 === null) throw new Error('画布没有可见范围')
+    let 视口 = this.页面.viewportSize()
+    if (视口 === null) throw new Error('浏览器视口不可用')
+    for (let 点 of [起点, 终点]) {
+      if (
+        Number.isFinite(点.x) === false ||
+        Number.isFinite(点.y) === false ||
+        点.x < 范围.x ||
+        点.x >= 范围.x + 范围.width ||
+        点.y < 范围.y ||
+        点.y >= 范围.y + 范围.height ||
+        点.x < 0 ||
+        点.x >= 视口.width ||
+        点.y < 0 ||
+        点.y >= 视口.height
+      )
+        throw new Error('拖动起点和终点必须位于可见画布和视口内')
+    }
+    if (this.证据.启用 === true) await this.证据.采集('操作前', '拖动画布前', 目标)
+    await this.页面.mouse.move(起点.x, 起点.y)
+    await this.页面.mouse.down()
+    try {
+      await this.页面.mouse.move(终点.x, 终点.y, { steps: 20 })
+    } finally {
+      await this.页面.mouse.up()
+    }
+  }
+
   /**
    * 坐标点击的落点识别：浏览器的操作坐标就是 CSS 视口坐标，穿透 Shadow DOM 找到落点元素，
    * 生成定位并用 Playwright 定位器当场验证唯一。

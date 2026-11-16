@@ -66,6 +66,7 @@ codex mcp add playground-test --url http://127.0.0.1:30006/mcp
 
 - `browser_*` 操作浏览器并检查页面，`database_query` 只读查询测试库，`database_schema` 查看真实表结构，`database_execute` 确定性写入测试数据，`backend_logs` 查看测试后端日志。
 - 数据写入会进入录制；第一个界面操作前连续的写入步骤导出到流程的 `初始化`，其余写入保持原顺序。参数使用合成固定值，避免随机值或当前时间造成回放差异；先重置再造数据，重置前的旧操作用 `record_remove` 排除。
+- `browser_drag` 使用唯一 canvas 的定位及起点、终点 CSS 视口坐标拖动；两点必须落在画布和视口内。录制回放使用同一定位和坐标，布局或视口变化时需重新录制。
 - `browser_request_hold` 挂起一次精确匹配的后端响应，`browser_request_wait` 等待响应取得，再通过 `browser_request_release` 释放。离开页面后还需等待可见的业务完成信号；挂起不会撤销后端副作用。
 - `http_request` 请求当前测试后端的接口。管理员请求可用 `auth: 'test-admin'`，测试密码字段使用 `$test-password:<标签>`。
 - `database_reset` 关闭浏览器会话、重置测试库并重启后端。默认保留操作记录，传入 `clearRecord: true` 可一并清空。

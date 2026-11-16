@@ -7,6 +7,7 @@ import {
   写入模型,
   无参数模型,
   查询模型,
+  浏览器拖动模型,
   浏览器环境模型,
   浏览器观察参数模型,
   目标操作模型,
@@ -202,6 +203,17 @@ function 生成页面操作(条目: 操作调用条目, 选项: 生成选项): �
           ...保存结果(条目, 选项, '{ clicked: true }'),
         ],
         ...(增强点击?.模板资源 === undefined ? {} : { 模板资源: 增强点击.模板资源 }),
+      }
+    }
+    case 'browser_drag': {
+      let { name, target, source, destination, timeoutMs } = 浏览器拖动模型.extend(浏览器观察参数模型.shape).parse(参数)
+      return {
+        ...基本,
+        语句们: [
+          获得引擎(name),
+          `await 引擎.拖动画布(${生成目标(target)}, ${JSON.stringify(source)}, ${JSON.stringify(destination)}, ${String(timeoutMs)})`,
+          ...保存结果(条目, 选项, '{ dragged: true }'),
+        ],
       }
     }
     case 'browser_press': {

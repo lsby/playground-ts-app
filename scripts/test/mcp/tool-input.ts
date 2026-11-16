@@ -132,6 +132,8 @@ export let 浏览器等待请求模型 = 浏览器请求标识模型.extend({
 })
 export let 浏览器释放请求模型 = 浏览器请求标识模型.extend({ timeoutMs: 超时模型 })
 export let 目标操作模型 = 页面模型.extend({ target: 目标模型 })
+let 拖动坐标模型 = z.strictObject({ x: z.number().finite().nonnegative(), y: z.number().finite().nonnegative() })
+export let 浏览器拖动模型 = 目标操作模型.extend({ source: 拖动坐标模型, destination: 拖动坐标模型 })
 export let 页面地址模型 = z
   .string()
   .trim()
