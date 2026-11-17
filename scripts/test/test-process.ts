@@ -4,6 +4,68 @@ import { createInterface } from 'node:readline'
 import { stripVTControlCharacters } from 'node:util'
 
 import crossSpawn from 'cross-spawn'
+import { 测试服务关闭消息 } from '../../src/test-tools/test-service-protocol'
+
+export type 测试进程关闭结果 = { 退出码: number | null; 信号: NodeJS.Signals | null; 错误?: Error }
+
+/** 创建子进程后立即登记，等待真实 close 而非仅 exit；不留下提前拒绝的 Promise。 */
+export function 观察测试进程关闭(进程: ChildProcess): Promise<测试进程关闭结果> {
+  return new Promise((完成): void => {
+    let 错误: Error | undefined
+    let 记录错误 = (原因: Error): void => {
+      错误 = 原因
+    }
+    进程.on('error', 记录错误)
+    进程.once('close', (退出码, 信号): void => {
+      进程.off('error', 记录错误)
+      完成({ 退出码, 信号, ...(错误 === undefined ? {} : { 错误 }) })
+    })
+  })
+}
+
+async function 限时等待关闭(关闭任务: Promise<测试进程关闭结果>, 毫秒: number): Promise<测试进程关闭结果> {
+  let 定时器: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      关闭任务,
+      new Promise<never>((_完成, 拒绝): void => {
+        定时器 = setTimeout((): void => 拒绝(new Error(`测试服务关闭超时（${String(毫秒)}ms）`)), 毫秒)
+      }),
+    ])
+  } finally {
+    clearTimeout(定时器)
+  }
+}
+
+/** 非 watch 服务直接持有 HTTP 进程；只发一次 IPC，超时或失败才清理本次进程树。 */
+export async function 优雅关闭测试服务进程(
+  进程: ChildProcess,
+  关闭任务: Promise<测试进程关闭结果>,
+  优雅退出期限: number,
+): Promise<void> {
+  try {
+    let 请求失败 = Promise.withResolvers<never>()
+    let 完成任务 = Promise.race([关闭任务, 请求失败.promise])
+    if (进程.pid !== undefined && 进程已退出(进程) === false) {
+      if (进程.connected === false) throw new Error('测试服务缺少关闭 IPC 通道')
+      进程.send(测试服务关闭消息, (错误): void => {
+        if (错误 !== null) 请求失败.reject(new Error('发送测试服务关闭消息失败', { cause: 错误 }))
+      })
+    }
+    let 结果 = await 限时等待关闭(完成任务, 优雅退出期限)
+    if (结果.错误 !== undefined) throw new Error('测试服务进程发生错误', { cause: 结果.错误 })
+    if (结果.退出码 !== 0 || 结果.信号 !== null)
+      throw new Error(`测试服务关闭失败，退出码：${String(结果.退出码)}，信号：${String(结果.信号)}`)
+  } catch (错误) {
+    try {
+      await 停止测试进程(进程, 1000)
+      await 限时等待关闭(关闭任务, 1000)
+    } catch (清理错误) {
+      throw new AggregateError([错误, 清理错误], '测试服务关闭失败，且未能确认本次服务进程树退出')
+    }
+    throw 错误
+  }
+}
 
 export async function 等待测试进程输出(进程: ChildProcess, 就绪行: string, 取消信号?: AbortSignal): Promise<void> {
   let 输出 = 进程.stdout

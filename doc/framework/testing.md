@@ -42,7 +42,7 @@
 
 ### 失败流程补测与运行前检查
 
-`pnpm run test:requirement -- --retry-failed test-outputs/requirement-report/<原报告>/report.json --list` 先列出原报告中失败或中断的已选流程，去掉 `--list` 后执行；标签过滤仍可使用。该选项与 `--all`、`--scenario`、`--requirement` 互斥。不会自动选择从未执行的流程。执行前核对来源中的流程文件、需求名称与验收点名称及描述，定义变化时拒绝沿用旧结论。
+`pnpm run test:requirement --retry-failed=test-outputs/requirement-report/<原报告>/report.json --list` 先列出原报告中失败或中断的已选流程，去掉 `--list` 后执行；标签过滤仍可使用。该选项与 `--all`、`--scenario`、`--requirement` 互斥。 快捷命令已包含任务分隔符，按上面写法直接传选项。不会自动选择从未执行的流程。执行前核对来源中的流程文件、需求名称与验收点名称及描述，定义变化时拒绝沿用旧结论。
 
 补测目录同时保存本次 `index.html` / `report.json` 和 `combined.html` / `combined.json`。汇总保留原范围，采用每个流程最近一次实际执行结果；本次未执行不会覆盖原结果。每行链接到对应原始报告，旧失败、步骤和附件保留不改。后续可把 `combined.json` 作为再次补测的来源。报告列出已执行数量，错误按检查失败、脚本错误、环境错误或待诊断展示；检查失败需结合预期与实际判断业务原因。
 

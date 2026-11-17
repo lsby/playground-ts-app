@@ -11,15 +11,25 @@ import { z } from 'zod'
 import type { 测试服务日志内容 } from '../../src/model/test-requirement/tools'
 import type { 测试服务日志位置 } from '../../src/test-tools/runtime'
 import { 测试调试环境 } from '../task/model/task-common'
+import type { 任务配置 } from '../task/model/task-runner'
 import { 开发任务表 } from '../task/taskfile/taskfile-dev'
+import { 测试任务表 } from '../task/taskfile/taskfile-test'
 import { 测试日志缓冲 } from './service-log'
 import { 创建测试子进程环境 } from './test-environment'
-import { 停止测试进程, 测试端口已开放, 等待测试进程输出 } from './test-process'
+import {
+  优雅关闭测试服务进程,
+  停止测试进程,
+  测试端口已开放,
+  等待测试进程输出,
+  观察测试进程关闭,
+  type 测试进程关闭结果,
+} from './test-process'
 
 type 后端进程 = {
   子进程: ChildProcess
   已就绪: boolean
   日志控制器: AbortController
+  关闭结果: Promise<测试进程关闭结果>
   日志任务?: Promise<PromiseSettledResult<void>[]>
   停止任务?: Promise<void> | undefined
 }
@@ -130,9 +140,14 @@ export class 测试服务 {
     this.检查未关闭()
 
     fs.mkdirSync(this.报告目录, { recursive: true })
-    let { 参数, 环境变量 } = this.获得启动命令(环境文件)
-    let 进程 = this.创建服务进程(参数, 环境变量)
-    let 当前: 后端进程 = { 子进程: 进程, 已就绪: false, 日志控制器: new AbortController() }
+    let { 参数, 环境变量, 工作目录 } = this.获得启动命令(环境文件)
+    let 进程 = this.创建服务进程(参数, 环境变量, 工作目录)
+    let 当前: 后端进程 = {
+      子进程: 进程,
+      已就绪: false,
+      日志控制器: new AbortController(),
+      关闭结果: 观察测试进程关闭(进程),
+    }
     this.进程 = 当前
     进程.once('exit', (): void => {
       if (当前.已就绪 && this.取消.signal.aborted === false) this.意外退出.resolve()
@@ -166,34 +181,42 @@ export class 测试服务 {
     }
   }
 
-  private 获得启动命令(环境文件: string): { 参数: string[]; 环境变量: NodeJS.ProcessEnv } {
-    if (this.启动任务 !== 'test:requirement:server') {
-      let 任务 = 开发任务表[this.启动任务]
-      // 监听模式的 tsx 和它派生的服务留在同一进程组，重置时可一起关闭。
-      let 入口 =
-        this.启动任务 === 'run:service:test:watch'
-          ? [fileURLToPath(import.meta.resolve('tsx/cli'))]
-          : ['--import', 'tsx']
-      return {
-        参数: [...入口, ...任务.运行.参数],
-        环境变量: { ...process.env, ...任务.环境变量, ENV_FILE_PATH: 环境文件 },
-      }
+  private 获得启动命令(环境文件: string): { 参数: string[]; 环境变量: NodeJS.ProcessEnv; 工作目录: string } {
+    let 任务: 任务配置 =
+      this.启动任务 === 'test:requirement:server' ? 测试任务表[this.启动任务] : 开发任务表[this.启动任务]
+    if (任务.运行 === undefined || Array.isArray(任务.运行))
+      throw new Error('测试服务必须配置一个 Node 或 tsx 启动命令')
+    let 参数: string[]
+    switch (z.enum(['tsx', 'node']).parse(任务.运行.程序)) {
+      case 'tsx':
+        参数 =
+          this.启动任务 === 'run:service:test:watch'
+            ? [fileURLToPath(import.meta.resolve('tsx/cli')), ...任务.运行.参数]
+            : ['--import', 'tsx', ...任务.运行.参数]
+        break
+      case 'node':
+        参数 = [...任务.运行.参数]
+        break
     }
     return {
-      参数: ['--import', 'tsx', 'scripts/task/index.ts', this.启动任务, '--env', 环境文件],
-      环境变量: { ...process.env, ...测试调试环境 },
+      参数,
+      环境变量: { ...process.env, ...测试调试环境, ...任务.环境变量, ENV_FILE_PATH: 环境文件 },
+      工作目录: 任务.工作目录 === undefined ? this.根目录 : path.resolve(this.根目录, 任务.工作目录),
     }
   }
 
-  private 创建服务进程(参数: string[], 环境变量: NodeJS.ProcessEnv): ChildProcess {
+  private 创建服务进程(参数: string[], 环境变量: NodeJS.ProcessEnv, 工作目录: string): ChildProcess {
     // NUL 提供空输入，并让 Windows 监听器保有隐藏控制台供 tsx 重启的子进程使用。
     let 空输入 =
       process.platform === 'win32' && this.启动任务 === 'run:service:test:watch' ? fs.openSync(devNull, 'r') : undefined
     try {
       return crossSpawn(process.execPath, 参数, {
-        cwd: this.根目录,
+        cwd: 工作目录,
         env: { ...创建测试子进程环境(this.根目录), ...环境变量, PATH: 创建测试子进程环境(this.根目录)['PATH'] },
-        stdio: [空输入 ?? 'ignore', 'pipe', 'pipe'],
+        stdio:
+          this.启动任务 === 'run:service:test:watch'
+            ? [空输入 ?? 'ignore', 'pipe', 'pipe']
+            : ['ignore', 'pipe', 'pipe', 'ipc'],
         detached: process.platform !== 'win32',
         windowsHide: true,
       })
@@ -225,15 +248,22 @@ export class 测试服务 {
 
   private async 结束服务进程(当前: 后端进程): Promise<void> {
     let 退出期限 = this.启动任务 === 'run:service:test:watch' ? 5_000 : 15_000
-    await 停止测试进程(当前.子进程, 退出期限)
+    let 错误们: unknown[] = []
+    try {
+      if (this.启动任务 === 'run:service:test:watch') await 停止测试进程(当前.子进程, 退出期限)
+      else await 优雅关闭测试服务进程(当前.子进程, 当前.关闭结果, 退出期限)
+    } catch (错误) {
+      错误们.push(错误)
+    }
     // 任务入口异常退出时，仍在运行的子进程可能继续占用输出管道。
     let 定时器 = setTimeout((): void => 当前.日志控制器.abort(), 3_000)
     try {
       for (let 结果 of (await 当前.日志任务) ?? [])
-        if (结果.status === 'rejected') throw new Error('保存测试服务日志失败', { cause: 结果.reason })
+        if (结果.status === 'rejected') 错误们.push(new Error('保存测试服务日志失败', { cause: 结果.reason }))
     } finally {
       clearTimeout(定时器)
       if (this.进程 === 当前) this.进程 = undefined
     }
+    if (错误们.length > 0) throw new AggregateError(错误们, '关闭测试服务失败')
   }
 }

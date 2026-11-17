@@ -45,7 +45,8 @@ export function 格式化需求测试错误(错误: unknown, 用例文件绝对�
   let 解析 = 错误Schema.safeParse(错误)
   if (解析.success === false) return 详情
   let { message, stack, code, matcherResult, name } = 解析.data
-  if (code === 'ERR_ASSERTION' || matcherResult !== undefined) 详情.类别 = '检查失败'
+  if (code === 'BROWSER_TARGET_AMBIGUOUS') 详情.类别 = '脚本错误'
+  else if (code === 'ERR_ASSERTION' || matcherResult !== undefined) 详情.类别 = '检查失败'
   else if (name === 'ReferenceError' || name === 'SyntaxError' || message?.includes('strict mode violation') === true)
     详情.类别 = '脚本错误'
   else if (code !== undefined && ['ENOENT', 'EADDRINUSE', 'ECONNREFUSED', 'SQLITE_BUSY'].includes(code))

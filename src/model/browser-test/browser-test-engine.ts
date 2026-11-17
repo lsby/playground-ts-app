@@ -298,13 +298,13 @@ export class 浏览器测试引擎 {
   public async 截图(标注?: Locator | { x: number; y: number }, 参数?: { timeout?: number }): Promise<Buffer> {
     this.检查页面()
     if (标注 === undefined) return await this.页面.screenshot({ scale: 'css', ...参数 })
-    if ('x' in 标注) return await 标注截图(this.页面, await this.页面.screenshot({ scale: 'css', ...参数 }), 标注)
+    if ('x' in 标注) return await 标注截图(await this.页面.screenshot({ scale: 'css', ...参数 }), 标注)
 
     this.检查操作目标(标注)
     await this.滚动到目标(标注, 参数?.timeout)
     let 区域 = await 标注.boundingBox(参数)
     if (区域 === null) throw new Error('截图标注目标不可见')
-    return await 标注截图(this.页面, await this.页面.screenshot({ scale: 'css', ...参数 }), 区域)
+    return await 标注截图(await this.页面.screenshot({ scale: 'css', ...参数 }), 区域)
   }
 
   public async 添加初始化脚本(脚本: () => void): Promise<void> {

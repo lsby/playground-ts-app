@@ -5,6 +5,8 @@ import { 标注截图, 获得视口内标注位置, type 截图标注坐标 } fr
 import type { 浏览器步骤证据, 浏览器测试作用域配置 } from './types'
 
 export type 浏览器步骤证据配置 = { 提交: (证据: 浏览器步骤证据) => Promise<void>; 记录错误: (错误: unknown) => void }
+type 取证目标 = Parameters<typeof 获得视口内标注位置>[0]
+type 取证页面 = Pick<Page, 'isClosed' | 'url' | 'screenshot'>
 
 type 步骤证据记录 = {
   配置: 浏览器步骤证据配置
@@ -82,7 +84,7 @@ export class 浏览器步骤证据记录器 {
   private 已导航 = false
 
   public constructor(
-    private 页面: Page,
+    private 页面: 取证页面,
     private 取消信号?: AbortSignal,
     private 取证?: 浏览器会话取证,
   ) {}
@@ -112,7 +114,7 @@ export class 浏览器步骤证据记录器 {
   public async 采集(
     阶段: 浏览器步骤证据['阶段'],
     名称: string,
-    目标?: Locator | 截图标注坐标,
+    目标?: 取证目标 | 截图标注坐标,
     点击作用域?: { 作用域: 浏览器测试作用域配置 | undefined },
   ): Promise<void> {
     let 记录 = this.获得记录()
@@ -152,7 +154,7 @@ export class 浏览器步骤证据记录器 {
 
   private async 获得标注位置(
     记录: 步骤证据记录,
-    目标: Locator | 截图标注坐标 | undefined,
+    目标: 取证目标 | 截图标注坐标 | undefined,
   ): Promise<截图标注坐标 | undefined> {
     if (目标 === undefined || 'x' in 目标) return 目标
     if (目标.page() !== this.页面) return undefined
@@ -167,7 +169,7 @@ export class 浏览器步骤证据记录器 {
   private async 添加标注(记录: 步骤证据记录, 原图: Buffer, 位置: 截图标注坐标 | undefined): Promise<Buffer> {
     if (位置 === undefined || this.可以采集(记录) === false) return 原图
     try {
-      return await 限制标注用时(标注截图(this.页面, 原图, 位置))
+      return await 限制标注用时(标注截图(原图, 位置))
     } catch (错误) {
       this.报告错误(记录, 错误)
       return 原图
