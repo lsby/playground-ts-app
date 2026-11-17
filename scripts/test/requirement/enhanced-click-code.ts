@@ -1,8 +1,7 @@
 import { 规范地址 } from '../../../src/model/web-locate/page-url'
 import type { 操作调用条目 } from '../../../src/test-tools/operation-record'
 
-/** 导出的回放里，等元素出现再点击、等地址变化的最长等待时间。 */
-export let 元素等待毫秒 = 15_000
+import { 推算回放超时 } from './operation-timeout'
 export type 引擎种类 = '苹果' | '安卓' | '浏览器'
 export type 模板资源 = { 操作编号: number; 来源路径: string; 相对路径: string }
 export type 增强点击代码 = { 语句们: string[]; 模板资源?: 模板资源 }
@@ -29,12 +28,12 @@ export function 生成增强点击语句(条目: 操作调用条目, 引擎: 引
       case '苹果':
       case '安卓': {
         let 目标 = { 按: 定位.种类 === '选择器' ? '网页选择器' : '网页文字', 值: 定位.值 }
-        return { 语句们: [`await 引擎.点击(${字面量(目标)}, ${String(元素等待毫秒)})`] }
+        return { 语句们: [`await 引擎.点击(${字面量(目标)}, ${String(推算回放超时(条目))})`] }
       }
       case '浏览器': {
         let 目标 =
           定位.种类 === '选择器' ? `引擎.定位(${字面量(定位.值)})` : `引擎.按文本(${字面量(定位.值)}, { exact: true })`
-        return { 语句们: [`await 引擎.点击(${目标}, { timeout: ${String(元素等待毫秒)} })`] }
+        return { 语句们: [`await 引擎.点击(${目标}, { timeout: ${String(推算回放超时(条目))} })`] }
       }
     }
   }
@@ -44,7 +43,7 @@ export function 生成增强点击语句(条目: 操作调用条目, 引擎: 引
   let 选项 = { x: 模板.原坐标.x, y: 模板.原坐标.y, 比例: 模板.比例, 落点: 模板.落点 }
   return {
     语句们: [
-      `await 引擎.等待图片后点击(new URL(${字面量(相对路径)}, import.meta.url), ${字面量(选项)}, ${String(元素等待毫秒)})`,
+      `await 引擎.等待图片后点击(new URL(${字面量(相对路径)}, import.meta.url), ${字面量(选项)}, ${String(推算回放超时(条目))})`,
     ],
     模板资源: { 操作编号: 条目.id, 来源路径: 模板.文件, 相对路径 },
   }
@@ -59,9 +58,9 @@ export function 生成等地址语句(条目: 操作调用条目, 引擎: 引擎
   switch (引擎) {
     case '苹果':
     case '安卓':
-      return [`await 引擎.等待地址(${目标}, ${String(元素等待毫秒)})`]
+      return [`await 引擎.等待地址(${目标}, ${String(推算回放超时(条目))})`]
     case '浏览器':
       // 以 / 或 # 开头的字符串由浏览器引擎按规范地址比较
-      return [`await 引擎.等待地址(${目标}, { timeout: ${String(元素等待毫秒)}, waitUntil: 'domcontentloaded' })`]
+      return [`await 引擎.等待地址(${目标}, { timeout: ${String(推算回放超时(条目))}, waitUntil: 'domcontentloaded' })`]
   }
 }

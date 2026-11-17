@@ -11,7 +11,7 @@ export let 安卓目标模型 = z.strictObject({
     .describe('Match an Android accessibility property or an element inside the app WebView.'),
   value: z.string().min(1).describe('Exact text or resource ID, or a CSS selector for webSelector.'),
 })
-export let 安卓超时模型 = z.int().min(1).max(120_000).default(5_000).describe('Timeout in milliseconds.')
+export let 安卓超时模型 = z.int().min(1).max(120_000).default(10_000).describe('Timeout in milliseconds.')
 export let 安卓目标操作模型 = z.strictObject({ target: 安卓目标模型, timeoutMs: 安卓超时模型, ...画面观察字段 })
 export let 安卓坐标模型 = z.strictObject({ x: z.int().nonnegative(), y: z.int().nonnegative(), ...画面观察字段 })
 export let 安卓OCR点击模型 = z.strictObject({

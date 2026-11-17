@@ -19,7 +19,7 @@ export let 苹果打开模型 = z.strictObject({
     .describe('Run the test app in this system language (default: the simulator language).'),
   ...苹果观察字段,
 })
-export let 苹果超时模型 = z.int().min(1).max(120_000).default(5_000).describe('Timeout in milliseconds.')
+export let 苹果超时模型 = z.int().min(1).max(120_000).default(10_000).describe('Timeout in milliseconds.')
 export let 苹果目标等待基础模型 = z.strictObject({ target: 苹果目标模型, timeoutMs: 苹果超时模型 })
 export let 苹果目标操作模型 = z.strictObject({ target: 苹果目标模型, timeoutMs: 苹果超时模型, ...苹果观察字段 })
 export let 苹果坐标模型 = z.strictObject({

@@ -75,7 +75,7 @@ export async function 获得视口内标注位置(目标: 标注目标): Promise
   let 位置 = 快照.位置
   if (位置 === null) return undefined
   if (位置.主帧 === true) return { x: 位置.x, y: 位置.y }
-  let 边界 = await 目标.boundingBox({ timeout: 200 })
+  let 边界 = await 目标.boundingBox({ timeout: 10_000 })
   if (边界 === null) return undefined
   let 坐标 = { x: 边界.x + 边界.width * 位置.水平比例, y: 边界.y + 边界.height * 位置.垂直比例 }
   let 视口 = 目标.page().viewportSize()

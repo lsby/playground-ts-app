@@ -51,14 +51,14 @@ let 地址增强: 录制增强 = { 地址变化: { 前: '/#/home', 后: '/#/gift
 describe('坐标点击导出成按元素点击', () => {
   it('iOS：有定位时按元素点击并等元素，不再点坐标', () => {
     let 结果 = 代码(条目(1, 'ios_tap_at', { x: 200, y: 300, observe: true }, { clicked: true }, 定位))
-    expect(结果).toContain('await 引擎.点击({"按":"网页选择器","值":"button[aria-label=\\"收下礼物\\"]"}, 15000)')
+    expect(结果).toContain('await 引擎.点击({"按":"网页选择器","值":"button[aria-label=\\"收下礼物\\"]"}, 10000)')
     expect(结果).not.toContain('点击坐标')
     expect(结果).not.toContain('等待画面稳定')
   })
 
   it('iOS：文字定位用网页文字', () => {
     let 结果 = 代码(条目(1, 'ios_tap_at', { x: 200, y: 300, observe: true }, { clicked: true }, 文字定位))
-    expect(结果).toContain('await 引擎.点击({"按":"网页文字","值":"收下礼物"}, 15000)')
+    expect(结果).toContain('await 引擎.点击({"按":"网页文字","值":"收下礼物"}, 10000)')
   })
 
   it('iOS：OCR 点击有定位时不再回放 OCR，断言要用的坐标取录制值', () => {
@@ -73,7 +73,7 @@ describe('坐标点击导出成按元素点击', () => {
 
   it('Android：坐标点击和 OCR 点击都按元素点击', () => {
     expect(代码(条目(1, 'android_tap_at', { x: 540, y: 1100 }, { clicked: true }, 定位))).toContain(
-      'await 引擎.点击({"按":"网页选择器","值":"button[aria-label=\\"收下礼物\\"]"}, 15000)',
+      'await 引擎.点击({"按":"网页选择器","值":"button[aria-label=\\"收下礼物\\"]"}, 10000)',
     )
     expect(
       代码(条目(2, 'android_tap_ocr', { text: '收下礼物' }, { clicked: true, x: 1, y: 2 }, 文字定位)),
@@ -82,10 +82,10 @@ describe('坐标点击导出成按元素点击', () => {
 
   it('浏览器：选择器用 引擎.定位，文字用 引擎.按文本，都带超时', () => {
     expect(代码(条目(1, 'browser_click_at', { name: 'a', x: 50, y: 30 }, { clicked: true }, 定位))).toContain(
-      'await 引擎.点击(引擎.定位("button[aria-label=\\"收下礼物\\"]"), { timeout: 15000 })',
+      'await 引擎.点击(引擎.定位("button[aria-label=\\"收下礼物\\"]"), { timeout: 10000 })',
     )
     expect(代码(条目(1, 'browser_click_at', { name: 'a', x: 50, y: 30 }, { clicked: true }, 文字定位))).toContain(
-      'await 引擎.点击(引擎.按文本("收下礼物", { exact: true }), { timeout: 15000 })',
+      'await 引擎.点击(引擎.按文本("收下礼物", { exact: true }), { timeout: 10000 })',
     )
   })
 
@@ -111,10 +111,10 @@ describe('地址变化导出成等地址', () => {
         地址增强,
       ),
     )
-    expect(苹果).toContain('await 引擎.等待地址("/#/gift", 15000)')
+    expect(苹果).toContain('await 引擎.等待地址("/#/gift", 10000)')
     expect(苹果.indexOf('引擎.点击(')).toBeLessThan(苹果.indexOf('等待地址'))
     expect(代码(条目(1, 'android_tap_at', { x: 1, y: 2 }, { clicked: true }, { ...地址增强, ...定位 }))).toContain(
-      'await 引擎.等待地址("/#/gift", 15000)',
+      'await 引擎.等待地址("/#/gift", 10000)',
     )
   })
 
@@ -128,7 +128,7 @@ describe('地址变化导出成等地址', () => {
         地址增强,
       ),
     )
-    expect(结果).toContain('await 引擎.等待地址("/#/gift", { timeout: 15000, waitUntil: \'domcontentloaded\' })')
+    expect(结果).toContain('await 引擎.等待地址("/#/gift", { timeout: 10000, waitUntil: \'domcontentloaded\' })')
   })
 
   it('旧录制里带随机 flow 编号的地址，导出时去掉，三端一致', () => {
@@ -144,7 +144,7 @@ describe('地址变化导出成等地址', () => {
         带编号,
       ),
     )
-    expect(苹果).toContain('await 引擎.等待地址("/#protocol", 15000)')
+    expect(苹果).toContain('await 引擎.等待地址("/#protocol", 10000)')
     expect(苹果).not.toContain('flow=')
     let 浏览器 = 代码(
       条目(
@@ -203,7 +203,7 @@ describe('没有 DOM 的点击导出成等图片后点击', () => {
     })
     let 语句 = 结果.语句们.join('\n')
     expect(语句).toContain(
-      'await 引擎.等待图片后点击(new URL("assets/gift-flow-4.png", import.meta.url), {"x":200,"y":300,"比例":3,"落点":{"x":32,"y":32}}, 15000)',
+      'await 引擎.等待图片后点击(new URL("assets/gift-flow-4.png", import.meta.url), {"x":200,"y":300,"比例":3,"落点":{"x":32,"y":32}}, 10000)',
     )
     expect(语句).not.toContain('点击坐标')
     expect(结果.模板资源).toEqual({ 操作编号: 4, 来源路径: '/tmp/op-4.png', 相对路径: 'assets/gift-flow-4.png' })
@@ -282,7 +282,7 @@ export let 业务需求 = new 需求({ 名称: '收下礼物', 描述: '可以�
       文件名: 'gift-flow.ts',
     })
     expect(源码).toContain('引擎.定位("button[aria-label=\\"收下礼物\\"]")')
-    expect(源码).toContain('await 引擎.等待地址("/#/gift", { timeout: 15000, waitUntil: \'domcontentloaded\' })')
+    expect(源码).toContain('await 引擎.等待地址("/#/gift", { timeout: 10000, waitUntil: \'domcontentloaded\' })')
     expect(源码).toContain('new URL("assets/gift-flow-3.png", import.meta.url)')
     expect(源码).not.toContain('等待画面稳定')
     expect(源码).not.toContain('点击坐标')
@@ -336,7 +336,7 @@ export let 业务需求 = new 需求({ 名称: '收下礼物', 描述: '可以�
       })
       expect(设备源码).not.toContain('等待画面稳定')
       expect(设备源码).toContain('await 引擎.等待图片后点击(')
-      expect(设备源码).toContain('await 引擎.等待地址("/#/gift", 15000)')
+      expect(设备源码).toContain('await 引擎.等待地址("/#/gift", 10000)')
       await writeFile(path.join(目录, `${名称}.ts`), 设备源码)
     }
 

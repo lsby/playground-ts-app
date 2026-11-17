@@ -128,7 +128,7 @@ export type 目标描述 = z.infer<typeof 目标模型>
 
 export let 无参数模型 = z.strictObject({})
 export let 会话模型 = z.strictObject({ name: z.string().trim().min(1).max(100).describe('Named browser session.') })
-let 超时模型 = z.int().min(1).default(5_000).describe('Timeout in milliseconds. Defaults to 5000.')
+let 超时模型 = z.int().min(1).default(10_000).describe('Timeout in milliseconds. Defaults to 10000.')
 export let 页面模型 = 会话模型.extend({ timeoutMs: 超时模型 })
 export let 浏览器请求标识模型 = 会话模型.extend({ requestId: z.string().trim().min(1).max(100) })
 export let 浏览器挂起请求模型 = 浏览器请求标识模型.extend({

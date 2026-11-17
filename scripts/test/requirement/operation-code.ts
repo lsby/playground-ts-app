@@ -1,4 +1,5 @@
 import { z } from 'zod-mcp'
+import { 推算回放超时 } from './operation-timeout'
 
 import { HTTP请求模型 } from '../../../src/test-tools/http-request'
 import type { 操作调用条目 } from '../../../src/test-tools/operation-record'
@@ -117,11 +118,11 @@ function 生成页面操作(条目: 操作调用条目, 选项: 生成选项): �
       }
     }
     case 'browser_open': {
-      let { name, url, timeoutMs } = 页面模型.extend({ url: 页面地址模型.optional() }).parse(参数)
+      let { name, url } = 页面模型.extend({ url: 页面地址模型.optional() }).parse(参数)
       let 语句们 = [`let 引擎 = await 当前状态.工具.浏览器.打开(${字面量(name)})`]
       if (url !== undefined)
         语句们.push(
-          `await 引擎.导航(${生成重放地址(url, 选项.测试地址)}, { timeout: ${String(timeoutMs)}, waitUntil: 'domcontentloaded' })`,
+          `await 引擎.导航(${生成重放地址(url, 选项.测试地址)}, { timeout: ${String(推算回放超时(条目))}, waitUntil: 'domcontentloaded' })`,
         )
       if (选项.需要结果) 语句们.push(...保存结果(条目, 选项, `{ name: ${字面量(name)}, url: 引擎.获得地址() }`))
       else if (url === undefined) 语句们[0] = `await 当前状态.工具.浏览器.打开(${字面量(name)})`
@@ -148,14 +149,12 @@ function 生成页面操作(条目: 操作调用条目, 选项: 生成选项): �
       }
     case 'browser_navigate':
     case 'browser_reload': {
-      let { name, timeoutMs } = 页面模型
-        .extend(条目.tool === 'browser_navigate' ? { url: 页面地址模型 } : {})
-        .parse(参数)
+      let { name } = 页面模型.extend(条目.tool === 'browser_navigate' ? { url: 页面地址模型 } : {}).parse(参数)
       let 地址 = 条目.tool === 'browser_navigate' ? 页面模型.extend({ url: 页面地址模型 }).parse(参数).url : undefined
       let 调用 =
         地址 === undefined
-          ? `引擎.重新加载({ timeout: ${String(timeoutMs)}, waitUntil: 'domcontentloaded' })`
-          : `引擎.导航(${生成重放地址(地址, 选项.测试地址)}, { timeout: ${String(timeoutMs)}, waitUntil: 'domcontentloaded' })`
+          ? `引擎.重新加载({ timeout: ${String(推算回放超时(条目))}, waitUntil: 'domcontentloaded' })`
+          : `引擎.导航(${生成重放地址(地址, 选项.测试地址)}, { timeout: ${String(推算回放超时(条目))}, waitUntil: 'domcontentloaded' })`
       return {
         ...基本,
         语句们: [
@@ -166,20 +165,20 @@ function 生成页面操作(条目: 操作调用条目, 选项: 生成选项): �
       }
     }
     case 'browser_screenshot': {
-      let { name, timeoutMs } = 页面模型.parse(参数)
+      let { name } = 页面模型.parse(参数)
       return {
         ...基本,
         类型: '观察',
         语句们: [
           获得引擎(name),
-          `await 引擎.截图(undefined, { timeout: ${String(timeoutMs)} })`,
+          `await 引擎.截图(undefined, { timeout: ${String(推算回放超时(条目))} })`,
           ...保存结果(条目, 选项, "{ url: 引擎.获得地址(), mimeType: 'image/png' }"),
         ],
       }
     }
     case 'browser_inspect_page': {
-      let { name, timeoutMs } = 页面模型.parse(参数)
-      let 调用 = `await 引擎.观察页面({ timeout: ${String(timeoutMs)} })`
+      let { name } = 页面模型.parse(参数)
+      let 调用 = `await 引擎.观察页面({ timeout: ${String(推算回放超时(条目))} })`
       return {
         ...基本,
         类型: '观察',
@@ -195,13 +194,13 @@ function 生成页面操作(条目: 操作调用条目, 选项: 生成选项): �
       }
     }
     case 'browser_wait_url': {
-      let { name, pattern, timeoutMs } = 页面模型.extend({ pattern: z.string().trim().min(1) }).parse(参数)
+      let { name, pattern } = 页面模型.extend({ pattern: z.string().trim().min(1) }).parse(参数)
       return {
         ...基本,
         类型: '观察',
         语句们: [
           获得引擎(name),
-          `await 引擎.等待地址(${生成重放地址(pattern, 选项.测试地址)}, { timeout: ${String(timeoutMs)}, waitUntil: 'domcontentloaded' })`,
+          `await 引擎.等待地址(${生成重放地址(pattern, 选项.测试地址)}, { timeout: ${String(推算回放超时(条目))}, waitUntil: 'domcontentloaded' })`,
           ...保存结果(条目, 选项, '{ url: 引擎.获得地址() }'),
         ],
       }
@@ -221,12 +220,12 @@ function 生成页面操作(条目: 操作调用条目, 选项: 生成选项): �
       }
     }
     case 'browser_drag': {
-      let { name, target, source, destination, timeoutMs } = 浏览器拖动模型.extend(浏览器观察参数模型.shape).parse(参数)
+      let { name, target, source, destination } = 浏览器拖动模型.extend(浏览器观察参数模型.shape).parse(参数)
       return {
         ...基本,
         语句们: [
           获得引擎(name),
-          `await 引擎.拖动画布(${生成目标(target)}, ${JSON.stringify(source)}, ${JSON.stringify(destination)}, ${String(timeoutMs)})`,
+          `await 引擎.拖动画布(${生成目标(target)}, ${JSON.stringify(source)}, ${JSON.stringify(destination)}, ${String(推算回放超时(条目))})`,
           ...保存结果(条目, 选项, '{ dragged: true }'),
         ],
       }
@@ -248,54 +247,54 @@ function 生成目标操作(条目: 操作调用条目, 选项: 生成选项): �
   switch (条目.tool) {
     case 'browser_click':
     case 'browser_check': {
-      let { name, target, timeoutMs } = 目标操作模型.parse(参数)
+      let { name, target } = 目标操作模型.parse(参数)
       let 点击 = 条目.tool === 'browser_click'
       return {
         ...基本,
         语句们: [
           获得引擎(name),
-          `await 引擎.${点击 ? '点击' : '勾选'}(${生成目标(target)}, { timeout: ${String(timeoutMs)} })`,
+          `await 引擎.${点击 ? '点击' : '勾选'}(${生成目标(target)}, { timeout: ${String(推算回放超时(条目))} })`,
           ...保存结果(条目, 选项, 点击 ? '{ clicked: true }' : '{ checked: true }'),
         ],
       }
     }
     case 'browser_fill': {
-      let { name, target, timeoutMs, value } = 目标操作模型.extend({ value: z.string() }).parse(参数)
+      let { name, target, value } = 目标操作模型.extend({ value: z.string() }).parse(参数)
       return {
         ...基本,
         语句们: [
           获得引擎(name),
-          `await 引擎.输入(${生成目标(target)}, ${字面量(value)}, { timeout: ${String(timeoutMs)} })`,
+          `await 引擎.输入(${生成目标(target)}, ${字面量(value)}, { timeout: ${String(推算回放超时(条目))} })`,
           ...保存结果(条目, 选项, '{ filled: true }'),
         ],
       }
     }
     case 'browser_select': {
-      let { name, target, timeoutMs, values } = 目标操作模型.extend({ values: z.array(z.string()).min(1) }).parse(参数)
+      let { name, target, values } = 目标操作模型.extend({ values: z.array(z.string()).min(1) }).parse(参数)
       return {
         ...基本,
         语句们: [
           获得引擎(name),
-          `${选项.需要结果 ? 'let selected = ' : ''}await 引擎.选择(${生成目标(target)}, ${字面量(values)}, { timeout: ${String(timeoutMs)} })`,
+          `${选项.需要结果 ? 'let selected = ' : ''}await 引擎.选择(${生成目标(target)}, ${字面量(values)}, { timeout: ${String(推算回放超时(条目))} })`,
           ...保存结果(条目, 选项, '{ selected }'),
         ],
       }
     }
     case 'browser_wait': {
-      let { name, target, timeoutMs, state } = 目标操作模型.extend({ state: z.enum(['visible', 'hidden']) }).parse(参数)
+      let { name, target, state } = 目标操作模型.extend({ state: z.enum(['visible', 'hidden']) }).parse(参数)
       return {
         ...基本,
         类型: '观察',
         语句们: [
           获得引擎(name),
-          `await 引擎.${state === 'visible' ? '验证可见' : '验证隐藏'}(${生成目标(target)}, { timeout: ${String(timeoutMs)} })`,
+          `await 引擎.${state === 'visible' ? '验证可见' : '验证隐藏'}(${生成目标(target)}, { timeout: ${String(推算回放超时(条目))} })`,
           ...保存结果(条目, 选项, `{ state: ${字面量(state)} }`),
         ],
       }
     }
     case 'browser_inspect_target': {
-      let { name, target, timeoutMs } = 目标操作模型.parse(参数)
-      let 调用 = `await 引擎.检查目标(${生成目标(target)}, { timeout: ${String(timeoutMs)} })`
+      let { name, target } = 目标操作模型.parse(参数)
+      let 调用 = `await 引擎.检查目标(${生成目标(target)}, { timeout: ${String(推算回放超时(条目))} })`
       return {
         ...基本,
         类型: '观察',

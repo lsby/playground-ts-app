@@ -12,6 +12,7 @@ import {
 } from '../mcp/android-input'
 import { 无参数模型 } from '../mcp/tool-input'
 import { 生成增强点击语句, type 模板资源 } from './enhanced-click-code'
+import { 推算回放超时 } from './operation-timeout'
 
 type 安卓调用代码 = { 名称: string; 类型: '行为' | '观察'; 语句们: string[]; 异步: true; 模板资源?: 模板资源 }
 
@@ -69,12 +70,12 @@ export function 生成安卓调用代码(
         ],
       }
     case 'android_tap': {
-      let { target, timeoutMs } = 安卓目标操作模型.parse(参数)
+      let { target } = 安卓目标操作模型.parse(参数)
       return {
         ...基本,
         语句们: [
           引擎,
-          `await 引擎.点击(${字面量(转换安卓目标(target))}, ${String(timeoutMs)})`,
+          `await 引擎.点击(${字面量(转换安卓目标(target))}, ${String(推算回放超时(条目))})`,
           ...保存结果('{ clicked: true }'),
         ],
       }
@@ -134,13 +135,13 @@ export function 生成安卓调用代码(
       return { ...基本, 语句们: [引擎, `await 引擎.输入(${字面量(value)})`, ...保存结果('{ filled: true }')] }
     }
     case 'android_wait': {
-      let { target, state, timeoutMs } = 安卓等待模型.parse(参数)
+      let { target, state } = 安卓等待模型.parse(参数)
       return {
         ...基本,
         类型: '观察',
         语句们: [
           引擎,
-          `await 引擎.${state === 'visible' ? '验证可见' : '验证隐藏'}(${字面量(转换安卓目标(target))}, ${String(timeoutMs)})`,
+          `await 引擎.${state === 'visible' ? '验证可见' : '验证隐藏'}(${字面量(转换安卓目标(target))}, ${String(推算回放超时(条目))})`,
           ...保存结果(`{ state: ${字面量(state)} }`),
         ],
       }

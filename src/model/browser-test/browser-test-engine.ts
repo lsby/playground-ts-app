@@ -23,6 +23,8 @@ import { 标注截图 } from './screenshot'
 import { 浏览器步骤证据记录器, type 浏览器会话取证 } from './step-evidence'
 import type { 浏览器测试作用域配置, 浏览器测试参数, 浏览器测试模式 } from './types'
 
+let 浏览器断言 = expect.configure({ timeout: 10_000 })
+
 type 浏览器测试会话 = {
   引擎: 浏览器测试引擎
   收集附件: (记录错误: (错误: unknown) => void) => Promise<readonly { 名称: string; 路径: string; 内容类型: string }[]>
@@ -89,7 +91,8 @@ export class 浏览器测试引擎 {
           void 关闭().catch((): void => {})
         })
       }
-      上下文.setDefaultTimeout(30_000)
+      上下文.setDefaultTimeout(10_000)
+      上下文.setDefaultNavigationTimeout(10_000)
       await 上下文.tracing.start({ screenshots: true, snapshots: true, sources: true })
       let 页面 = await 上下文.newPage()
       let 引擎 = new 浏览器测试引擎({ 页面, 模式, ...(取消信号 === undefined ? {} : { 取消信号 }) }, 参数.取证)
@@ -103,7 +106,7 @@ export class 浏览器测试引擎 {
           let 追踪路径 = join(参数.附件目录, 'browser-trace.zip')
           let 附件们: { 名称: string; 路径: string; 内容类型: string }[] = []
           try {
-            await 页面.screenshot({ path: 截图路径, fullPage: true, timeout: 5_000 })
+            await 页面.screenshot({ path: 截图路径, fullPage: true, timeout: 10_000 })
             附件们.push({ 名称: '最终页面截图', 路径: 截图路径, 内容类型: 'image/png' })
           } catch (错误) {
             记录错误(错误)
@@ -162,7 +165,7 @@ export class 浏览器测试引擎 {
 
   public get 断言(): typeof expect {
     this.证据.登记当前步骤()
-    return expect
+    return 浏览器断言
   }
 
   public 登记当前步骤(): void {
@@ -175,7 +178,7 @@ export class 浏览器测试引擎 {
   ): Promise<void> {
     this.证据.登记当前步骤()
     await 检查目标唯一性(目标)
-    await expect(目标).toBeVisible(参数)
+    await 浏览器断言(目标).toBeVisible(参数)
     if (this.证据.启用 === true && 目标.page() === this.页面) await this.证据.采集('断言通过', '目标已可见', 目标)
   }
 
@@ -185,7 +188,7 @@ export class 浏览器测试引擎 {
   ): Promise<void> {
     this.证据.登记当前步骤()
     await 检查目标唯一性(目标)
-    await expect(目标).toBeHidden(参数)
+    await 浏览器断言(目标).toBeHidden(参数)
     if (this.证据.启用 === true && 目标.page() === this.页面) await this.证据.采集('断言通过', '目标已隐藏')
   }
 
@@ -230,7 +233,7 @@ export class 浏览器测试引擎 {
     let 匹配数量 = await 目标.count()
     if (匹配数量 !== 1) return { 匹配数量 }
     let 可见 = await 目标.isVisible()
-    let 可用 = await 目标.isEnabled({ timeout: 参数?.timeout ?? 1_000 })
+    let 可用 = await 目标.isEnabled({ timeout: 参数?.timeout ?? 10_000 })
     return { 匹配数量, 可见, 可用 }
   }
 
@@ -297,14 +300,15 @@ export class 浏览器测试引擎 {
   /** 截取当前视口，可标注视口坐标或目标元素可见区域的中心。 */
   public async 截图(标注?: Locator | { x: number; y: number }, 参数?: { timeout?: number }): Promise<Buffer> {
     this.检查页面()
-    if (标注 === undefined) return await this.页面.screenshot({ scale: 'css', ...参数 })
-    if ('x' in 标注) return await 标注截图(await this.页面.screenshot({ scale: 'css', ...参数 }), 标注)
+    let 原生参数 = { ...参数, timeout: 参数?.timeout ?? 10_000 }
+    if (标注 === undefined) return await this.页面.screenshot({ scale: 'css', ...原生参数 })
+    if ('x' in 标注) return await 标注截图(await this.页面.screenshot({ scale: 'css', ...原生参数 }), 标注)
 
     this.检查操作目标(标注)
-    await this.滚动到目标(标注, 参数?.timeout)
-    let 区域 = await 标注.boundingBox(参数)
+    await this.滚动到目标(标注, 原生参数.timeout)
+    let 区域 = await 标注.boundingBox(原生参数)
     if (区域 === null) throw new Error('截图标注目标不可见')
-    return await 标注截图(await this.页面.screenshot({ scale: 'css', ...参数 }), 区域)
+    return await 标注截图(await this.页面.screenshot({ scale: 'css', ...原生参数 }), 区域)
   }
 
   public async 添加初始化脚本(脚本: () => void): Promise<void> {
@@ -335,7 +339,7 @@ export class 浏览器测试引擎 {
     超时毫秒: number,
   ): Promise<void> {
     this.检查操作目标(目标)
-    await expect(目标).toBeVisible({ timeout: 超时毫秒 })
+    await 浏览器断言(目标).toBeVisible({ timeout: 超时毫秒 })
     if ((await 目标.evaluate((元素): string => 元素.tagName)) !== 'CANVAS') throw new Error('拖动目标必须是 canvas')
     let 范围 = await 目标.boundingBox({ timeout: 超时毫秒 })
     if (范围 === null) throw new Error('画布没有可见范围')
@@ -382,7 +386,7 @@ export class 浏览器测试引擎 {
   public async 等待图片后点击(
     模板: string | URL,
     选项: 模板点击选项,
-    超时毫秒 = 15_000,
+    超时毫秒 = 10_000,
   ): Promise<{ x: number; y: number }> {
     this.检查页面()
     let 模板图片 = await readFile(模板)
