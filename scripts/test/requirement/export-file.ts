@@ -6,6 +6,7 @@ import { format, resolveConfig } from 'prettier'
 
 import type { 模板资源 } from './enhanced-click-code'
 import { 列出模板资源, 生成需求测试代码 } from './export-operation-record'
+import { 拆分需求测试源码 } from './export-split'
 import { 读取需求描述文件, 需求描述文件名, 需求流程文件名格式, 需求目录路径格式 } from './requirement-file'
 import { 需求测试运行器 } from './run-requirement'
 
@@ -92,11 +93,29 @@ export function 写出需求测试(项目根目录: string, 参数: 导出参数
     if (已有需求们.some((需求) => 需求 !== 业务需求 && 需求.获得名称() === 需求名称))
       throw new Error(`需求测试已有不同定义的同名需求「${需求名称}」`)
     let 格式 = await resolveConfig(文件)
-    let 内容 = await format(源码, { ...格式, filepath: 文件 })
+    let 辅助目录 = path.join(项目根目录, 'test', 'requirement-support', 参数.需求目录名, 参数.文件名.slice(0, -3))
+    let 拆分 = 拆分需求测试源码(await format(源码, { ...格式, filepath: 文件 }), 文件, 辅助目录)
+    let 内容 = await format(拆分.入口, { ...格式, filepath: 文件 })
+    let 辅助们 = await Promise.all(
+      拆分.辅助们.map(
+        async ({ 路径, 内容 }): Promise<{ 路径: string; 内容: string }> => ({
+          路径,
+          内容: await format(内容, { ...格式, filepath: 路径 }),
+        }),
+      ),
+    )
+    for (let 候选 of [{ 路径: 文件, 内容 }, ...辅助们])
+      if (候选.内容.split('\n').length > 500)
+        throw new Error(`导出文件仍超过500行：${候选.路径}。请拆分过大的初始化数据或步骤分组后再导出`)
     let 临时文件 = `${文件}.${randomUUID()}.tmp`
     // 坐标点击没有元素定位时，录制时裁的图片模板复制到需求目录的 assets/，流程文件按相对路径引用
     let 已复制资源们: string[] = []
     try {
+      for (let 辅助 of 辅助们) {
+        await mkdir(path.dirname(辅助.路径), { recursive: true })
+        await writeFile(辅助.路径, 辅助.内容, { encoding: 'utf8', flag: 'wx' })
+        已复制资源们.push(辅助.路径)
+      }
       await writeFile(临时文件, 内容, { encoding: 'utf8', flag: 'wx' })
       已复制资源们.push(...(await 复制模板资源(需求目录, 列出模板资源(参数.步骤组, 参数.文件名))))
       // 原子地发布完整文件，同名文件存在时由文件系统拒绝覆盖。

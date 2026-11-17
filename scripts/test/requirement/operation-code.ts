@@ -61,25 +61,28 @@ export function 生成重放地址(地址: string, 测试地址: 重放地址配
   return 字面量(地址)
 }
 
-function 生成目标(目标: 目标描述): string {
+function 生成目标(目标: 目标描述, 根 = '引擎'): string {
+  let 有范围 = 目标.within !== undefined
+  if (目标.within !== undefined) 根 = 生成目标(目标.within)
+  let 方法 = (中文: string, 原生: string): string => `${根}.${有范围 ? 原生 : 中文}`
   let 表达式: string
   switch (目标.by) {
     case 'role': {
       let 选项: string[] = []
       if (目标.name !== undefined) 选项.push(`name: ${字面量(目标.name)}`)
       if (目标.exact !== undefined) 选项.push(`exact: ${字面量(目标.exact)}`)
-      表达式 = `引擎.按角色(${字面量(目标.role)}${选项.length === 0 ? '' : `, { ${选项.join(', ')} }`})`
+      表达式 = `${方法('按角色', 'getByRole')}(${字面量(目标.role)}${选项.length === 0 ? '' : `, { ${选项.join(', ')} }`})`
       break
     }
     case 'text':
     case 'label': {
-      let 方法 = 目标.by === 'text' ? '按文本' : '按标签'
+      let 调用 = 目标.by === 'text' ? 方法('按文本', 'getByText') : 方法('按标签', 'getByLabel')
       let 文本 = 目标.by === 'text' ? 目标.text : 目标.label
-      表达式 = `引擎.${方法}(${字面量(文本)}${目标.exact === undefined ? '' : `, { exact: ${字面量(目标.exact)} }`})`
+      表达式 = `${调用}(${字面量(文本)}${目标.exact === undefined ? '' : `, { exact: ${字面量(目标.exact)} }`})`
       break
     }
     case 'selector':
-      表达式 = `引擎.定位(${字面量(目标.selector)})`
+      表达式 = `${方法('定位', 'locator')}(${字面量(目标.selector)})`
       break
   }
   return 目标.index === undefined ? 表达式 : `${表达式}.nth(${String(目标.index)})`
@@ -159,6 +162,18 @@ function 生成页面操作(条目: 操作调用条目, 选项: 生成选项): �
           获得引擎(name),
           `${选项.需要结果 ? 'let 响应 = ' : ''}await ${调用}`,
           ...保存结果(条目, 选项, '{ url: 引擎.获得地址(), status: 响应?.status() ?? null }'),
+        ],
+      }
+    }
+    case 'browser_screenshot': {
+      let { name, timeoutMs } = 页面模型.parse(参数)
+      return {
+        ...基本,
+        类型: '观察',
+        语句们: [
+          获得引擎(name),
+          `await 引擎.截图(undefined, { timeout: ${String(timeoutMs)} })`,
+          ...保存结果(条目, 选项, "{ url: 引擎.获得地址(), mimeType: 'image/png' }"),
         ],
       }
     }

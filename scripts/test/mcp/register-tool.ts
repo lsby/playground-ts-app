@@ -9,6 +9,7 @@ import { z } from 'zod-mcp'
 
 import type { 测试建议 } from '../../../src/model/test-requirement'
 import type { 录制增强, 操作调用结果, 测试操作记录 } from '../../../src/test-tools/operation-record'
+import { 检查操作回放支持 } from './replay-support'
 
 export type MCP执行结果<T> = {
   结果: { 成功: true; 值: T } | { 成功: false; 错误: string }
@@ -65,7 +66,7 @@ export function 创建工具注册器(server: McpServer, 保护: 工具调用保
         description:
           记录 === undefined
             ? `${描述}${截图说明}`
-            : `${描述}${截图说明} Automatically recorded. The response includes recordId for review or editing.`,
+            : `${描述}${截图说明} Automatically recorded. The response includes recordId for review or editing and replay.supported checked by the exporter. Unsupported actions are evidence only; exclude them from replay. Screen observations are evidence, not readiness assertions.`,
         inputSchema: 参数模型,
         ...(注解 === undefined ? {} : { annotations: 注解 }),
       },
@@ -124,6 +125,9 @@ export function 创建工具注册器(server: McpServer, 保护: 工具调用保
               artifacts,
               evidenceErrors,
               ...(recordId === undefined ? {} : { recordId }),
+              ...(recordId === undefined || 结果.成功 === false
+                ? {}
+                : { replay: 检查操作回放支持(名称, 操作参数模型.parse(参数), 结果.值.数据) }),
               ...(recordingError === undefined ? {} : { recordingError }),
             }
             let content: CallToolResult['content'] = [{ type: 'text', text: JSON.stringify(structuredContent) }]

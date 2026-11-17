@@ -17,6 +17,7 @@ import { 开放关闭接口, 请求关闭开发套件 } from './dev-control'
 import type { 启动测试MCP } from './mcp/http'
 import type { MCP测试会话 } from './mcp/session'
 import { 清理同目录残留进程 } from './stale-process'
+import { 创建测试子进程环境, 检查测试命令环境 } from './test-environment'
 import { 停止测试进程, 测试端口已开放, 等待测试进程输出 } from './test-process'
 import { 测试服务 } from './test-server'
 
@@ -97,8 +98,8 @@ async function 运行开发套件(
   if (MCP配置.启用) 使用端口.push(MCP配置.端口)
   if (苹果设备 !== undefined) 使用端口.push(计算苹果中转端口(配置.APP_PORT))
   if (new Set(使用端口).size !== 使用端口.length) throw new Error('测试开发套件各项服务必须使用不同端口')
-  let 本地命令目录 = path.join(项目根目录, 'node_modules', '.bin')
-  process.env['PATH'] = [本地命令目录, process.env['PATH']].join(path.delimiter)
+  await 检查测试命令环境(项目根目录)
+  process.env['PATH'] = 创建测试子进程环境(项目根目录)['PATH']
 
   let 取消 = new AbortController()
   let 已取消 = (): boolean => 取消.signal.aborted

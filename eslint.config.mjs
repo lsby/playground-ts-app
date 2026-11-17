@@ -6,6 +6,10 @@ let 忽略常见文件夹 = { ignores: 常用忽略域 }
 let 常用作用域 = [...eslintConfig.常用作用域, 'scripts/**/*.ts']
 
 export default [
+  {
+    files: ['test/requirement/**/*.ts', 'test/requirement-support/**/*.ts'],
+    rules: { 'project/no-browser-named-callback': 'error' },
+  },
   // ..
   忽略常见文件夹,
   { ...eslintConfig.ts安全性, files: 常用作用域 },

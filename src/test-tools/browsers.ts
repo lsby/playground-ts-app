@@ -38,6 +38,7 @@ export class 需求测试浏览器组 {
       ...(服务地址 === undefined ? {} : { 服务地址 }),
       附件目录: join(this.参数.附件目录, 'browsers', String(this.会话序号)),
       模式: this.参数.模式,
+      会话名称: 名称,
       取消信号: this.参数.取消信号,
       取证: { 作用域: this.取证, 会话名称: 名称 },
       ...(初始地址 === undefined ? {} : { 初始地址 }),

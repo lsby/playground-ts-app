@@ -89,10 +89,11 @@ function 格式化耗时(耗时毫秒: number): string {
 }
 
 function 生成错误Html(错误: 流程运行错误): string {
+  let 类别 = 错误.类别 === undefined ? '' : `<div>错误类别：${转义Html(错误.类别)}</div>`
   let 位置 = 错误.位置 === undefined ? '' : `<div>位置 ${String(错误.位置.行)}:${String(错误.位置.列)}</div>`
   let 预期值 = 错误.预期值 === undefined ? '' : `<div>预期 <code>${转义Html(错误.预期值)}</code></div>`
   let 实际值 = 错误.实际值 === undefined ? '' : `<div>实际 <code>${转义Html(错误.实际值)}</code></div>`
-  return `<div class="problem">${位置}${预期值}${实际值}<pre>${转义Html(错误.文本)}</pre></div>`
+  return `<div class="problem">${类别}${位置}${预期值}${实际值}<pre>${转义Html(错误.文本)}</pre></div>`
 }
 
 function 生成建议目录(步骤们: readonly 步骤记录[]): string {
@@ -435,6 +436,7 @@ export function 保存需求测试报告(报告目录: string, 参数: 报告参
     Node版本: process.version,
     平台: process.platform,
     总流程数: 选中流程状态们.length,
+    已执行数: 选中流程状态们.filter((状态) => 状态 !== '未执行' && 状态 !== '已排除').length,
     通过数: 选中流程状态们.filter((状态) => 状态 === '通过').length,
     建议数: 参数.选中流程们.filter(({ 流程 }) => 有建议流程.has(流程)).length,
     失败数: 选中流程状态们.filter((状态) => 状态 === '失败').length,

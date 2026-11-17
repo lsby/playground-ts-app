@@ -1,6 +1,5 @@
 import inquirer from 'inquirer'
 
-import { 需求测试运行器 } from '../../test/requirement/run-requirement'
 import type { 任务准备上下文, 任务准备结果 } from '../model/task-runner'
 
 export async function 准备需求测试参数(上下文: 任务准备上下文): Promise<任务准备结果> {
@@ -11,11 +10,14 @@ export async function 准备需求测试参数(上下文: 任务准备上下文)
       参数 === '--all' ||
       参数 === '--scenario' ||
       参数.startsWith('--scenario=') ||
+      参数 === '--retry-failed' ||
+      参数.startsWith('--retry-failed=') ||
       参数 === '--requirement' ||
       参数.startsWith('--requirement='),
   )
   if (已指定) return { 参数: 参数们 }
   if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) return { 参数: [...参数们, '--all'] }
+  let { 需求测试运行器 } = await import('../../test/requirement/run-requirement')
   let 流程们 = await new 需求测试运行器(上下文.工作目录).发现测试(参数们)
   let 回答 = await inquirer.prompt<{ 流程名称: string }>([
     {

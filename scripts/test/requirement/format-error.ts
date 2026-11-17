@@ -7,6 +7,7 @@ import type { 流程运行错误 } from '../../../src/model/test-requirement'
 
 let 错误Schema = z.object({
   message: z.string().optional(),
+  name: z.string().optional(),
   stack: z.string().optional(),
   code: z.string().optional(),
   matcherResult: z.unknown().optional(),
@@ -40,10 +41,15 @@ function 查找位置(调用栈: string, 用例文件绝对路径: string): 流�
 }
 
 export function 格式化需求测试错误(错误: unknown, 用例文件绝对路径: string): 流程运行错误 {
-  let 详情: 流程运行错误 = { 文本: 格式化值(错误) }
+  let 详情: 流程运行错误 = { 文本: 格式化值(错误), 类别: '待诊断' }
   let 解析 = 错误Schema.safeParse(错误)
   if (解析.success === false) return 详情
-  let { message, stack, code, matcherResult } = 解析.data
+  let { message, stack, code, matcherResult, name } = 解析.data
+  if (code === 'ERR_ASSERTION' || matcherResult !== undefined) 详情.类别 = '检查失败'
+  else if (name === 'ReferenceError' || name === 'SyntaxError' || message?.includes('strict mode violation') === true)
+    详情.类别 = '脚本错误'
+  else if (code !== undefined && ['ENOENT', 'EADDRINUSE', 'ECONNREFUSED', 'SQLITE_BUSY'].includes(code))
+    详情.类别 = '环境错误'
   if (message !== undefined) 详情.消息 = stripVTControlCharacters(message)
   if (stack !== undefined) {
     let 位置 = 查找位置(stripVTControlCharacters(stack), 用例文件绝对路径)

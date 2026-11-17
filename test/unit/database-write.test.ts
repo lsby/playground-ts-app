@@ -1,5 +1,6 @@
 import SQLite from 'node-sqlite3-wasm'
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
+import { once } from 'node:events'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -93,6 +94,44 @@ describe('测试数据库可写', () => {
     环境.NODE_ENV = 'production'
     数据库.重置连接()
     expect(() => 数据库.执行('INSERT INTO parent (name) VALUES (?)', ['戊'], 无记录)).toThrow('只允许操作测试环境')
+  })
+
+  it('只读连接等待其他进程释放写锁，重置后仍能等待', async () => {
+    数据库.执行('INSERT INTO parent (name) VALUES (?)', ['初始'], 无记录)
+    let 验证等待 = async (新名字: string): Promise<void> => {
+      let 子进程 = spawn(
+        process.execPath,
+        [
+          '-e',
+          `let SQLite = require('node-sqlite3-wasm'); let db = new SQLite.Database(process.argv[1]);
+          db.exec('BEGIN EXCLUSIVE'); db.run('UPDATE parent SET name = ?', [process.argv[2]]);
+          process.stdout.write('locked'); setTimeout(() => { db.exec('COMMIT'); db.close() }, 300);`,
+          环境.DB_PATH,
+          新名字,
+        ],
+        { cwd: 项目根目录, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
+      )
+      let 退出 = new Promise<number | null>((完成): void => {
+        子进程.once('exit', (退出码): void => 完成(退出码))
+      })
+      try {
+        await Promise.race([
+          once(子进程.stdout, 'data'),
+          退出.then((): never => {
+            throw new Error('写锁子进程提前退出')
+          }),
+        ])
+        expect(数据库.查询('SELECT name FROM parent', [], ['name'], 无记录)).toEqual([{ name: 新名字 }])
+        expect(await 退出).toBe(0)
+      } finally {
+        if (子进程.exitCode === null && 子进程.signalCode === null) 子进程.kill()
+      }
+    }
+    // 提前建立只读连接，确保验证的是已打开连接与重建连接的并发行为。
+    数据库.查询('SELECT name FROM parent', [], [], 无记录)
+    await 验证等待('第一次')
+    数据库.重置连接()
+    await 验证等待('重建后')
   })
 
   it('表结构返回列和外键，可只看部分表', () => {

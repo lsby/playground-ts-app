@@ -107,11 +107,22 @@ let 角色模型 = z.enum([
 ])
 let 索引 = z.int().nonnegative().optional().describe('Zero-based index when the locator matches multiple elements.')
 let 精确 = z.boolean().optional().describe('Match the full name, text, or label case-sensitively.')
-let 目标模型 = z.discriminatedUnion('by', [
+let 基础目标模型 = z.discriminatedUnion('by', [
   z.strictObject({ by: z.literal('role'), role: 角色模型, name: z.string().optional(), exact: 精确, index: 索引 }),
   z.strictObject({ by: z.literal('text'), text: z.string().min(1), exact: 精确, index: 索引 }),
   z.strictObject({ by: z.literal('label'), label: z.string().min(1), exact: 精确, index: 索引 }),
   z.strictObject({ by: z.literal('selector'), selector: z.string().trim().min(1), index: 索引 }),
+])
+let 限定范围 = {
+  within: 基础目标模型
+    .optional()
+    .describe('Scope the target to one unique region, dialog, or container. No nested within.'),
+}
+let 目标模型 = z.discriminatedUnion('by', [
+  基础目标模型.options[0].extend(限定范围),
+  基础目标模型.options[1].extend(限定范围),
+  基础目标模型.options[2].extend(限定范围),
+  基础目标模型.options[3].extend(限定范围),
 ])
 export type 目标描述 = z.infer<typeof 目标模型>
 
@@ -147,22 +158,32 @@ export let 页面地址模型 = z
   .describe('HTTP(S) URL, path relative to the local test server, or about:blank.')
 
 export function 定位目标(引擎: 浏览器测试引擎, 描述: 目标描述): Locator {
+  return 定位范围内目标(描述.within === undefined ? 引擎 : 定位范围内目标(引擎, 描述.within), 描述)
+}
+
+function 定位范围内目标(引擎: 浏览器测试引擎 | Locator, 描述: z.infer<typeof 基础目标模型>): Locator {
   let 目标: Locator
   switch (描述.by) {
     case 'role':
-      目标 = 引擎.按角色(描述.role, {
+      目标 = ('按角色' in 引擎 ? 引擎.按角色.bind(引擎) : 引擎.getByRole.bind(引擎))(描述.role, {
         ...(描述.name === undefined ? {} : { name: 描述.name }),
         ...(描述.exact === undefined ? {} : { exact: 描述.exact }),
       })
       break
     case 'text':
-      目标 = 引擎.按文本(描述.text, 描述.exact === undefined ? undefined : { exact: 描述.exact })
+      目标 = ('按文本' in 引擎 ? 引擎.按文本.bind(引擎) : 引擎.getByText.bind(引擎))(
+        描述.text,
+        描述.exact === undefined ? undefined : { exact: 描述.exact },
+      )
       break
     case 'label':
-      目标 = 引擎.按标签(描述.label, 描述.exact === undefined ? undefined : { exact: 描述.exact })
+      目标 = ('按标签' in 引擎 ? 引擎.按标签.bind(引擎) : 引擎.getByLabel.bind(引擎))(
+        描述.label,
+        描述.exact === undefined ? undefined : { exact: 描述.exact },
+      )
       break
     case 'selector':
-      目标 = 引擎.定位(描述.selector)
+      目标 = '定位' in 引擎 ? 引擎.定位(描述.selector) : 引擎.locator(描述.selector)
       break
   }
   return 描述.index === undefined ? 目标 : 目标.nth(描述.index)

@@ -28,7 +28,7 @@ let 外键结果模型 = z.array(
     on_delete: z.string(),
   }),
 )
-let 写入忙等待毫秒 = 5000
+let 忙等待毫秒 = 5000
 
 /** 用只读连接观察测试数据库，用独立的写入连接造数据；两者都只允许在测试环境使用。 */
 export class 需求测试数据库 {
@@ -136,8 +136,16 @@ export class 需求测试数据库 {
 
   private 获得只读连接(): SQLite.Database {
     // 只执行能够作为表来源的查询，并由 SQLite 连接强制保护数据库文件。
-    this.数据库 ??= new SQLite.Database(this.获得数据库路径(), { readOnly: true })
-    return this.数据库
+    if (this.数据库 !== undefined) return this.数据库
+    let 数据库 = new SQLite.Database(this.获得数据库路径(), { readOnly: true })
+    try {
+      数据库.exec(`PRAGMA busy_timeout = ${String(忙等待毫秒)};`)
+    } catch (错误) {
+      数据库.close()
+      throw 错误
+    }
+    this.数据库 = 数据库
+    return 数据库
   }
 
   private 获得写入连接(): SQLite.Database {
@@ -145,7 +153,7 @@ export class 需求测试数据库 {
     // 后端进程可能同时持有锁，写入要等一等而不是立刻失败。
     let 数据库 = new SQLite.Database(this.获得数据库路径(), { fileMustExist: true })
     try {
-      数据库.exec(`PRAGMA busy_timeout = ${String(写入忙等待毫秒)};`)
+      数据库.exec(`PRAGMA busy_timeout = ${String(忙等待毫秒)};`)
     } catch (错误) {
       数据库.close()
       throw 错误

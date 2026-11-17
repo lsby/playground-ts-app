@@ -1,6 +1,8 @@
 import { chromium, type Browser, type Page } from '@playwright/test'
+import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { promisify } from 'node:util'
 import { runInThisContext } from 'node:vm'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -28,6 +30,7 @@ let MCP: Awaited<ReturnType<typeof 启动测试MCP>> | null = null
 let 记录: 测试操作记录
 let 目录 = ''
 let 耗时: Record<string, number> = {}
+let 执行文件 = promisify(execFile)
 let 内容模型 = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), text: z.string() }),
   z.object({ type: z.literal('image'), data: z.string(), mimeType: z.string() }),
@@ -36,6 +39,7 @@ type MCP调用响应 = {
   recordId: number
   result?: JSON对象 | undefined
   error?: string | undefined
+  replay?: { supported: boolean; reason?: string | undefined } | undefined
   content: z.infer<typeof 内容模型>[]
 }
 
@@ -61,6 +65,7 @@ async function 调用(名称: string, 参数: JSON对象): Promise<MCP调用响�
           recordId: z.number(),
           result: JSON对象模式.optional(),
           error: z.string().optional(),
+          replay: z.object({ supported: z.boolean(), reason: z.string().optional() }).optional(),
         }),
       }),
     })
@@ -129,6 +134,66 @@ afterAll(async () => {
 })
 
 describe('浏览器录制与回放的条件一致', () => {
+  it('重复文字在录制时说明歧义，限定区域后的定位可以导出回放', async (): Promise<void> => {
+    let 内容 = `<span>未登录</span><section role="region" aria-label="后台状态"><button onclick="this.textContent='已登录'">未登录</button></section>`
+    await 页面.setContent(内容)
+    let 歧义 = await 调用('browser_click', {
+      name: '条件',
+      target: { by: 'text', text: '未登录', exact: true },
+      observe: false,
+    })
+    expect(歧义.error).toMatch(/匹配了 2 个元素/u)
+    expect(歧义.error).toContain('<span>未登录</span>')
+    expect(歧义.error).toContain('within')
+    let 点击 = await 调用('browser_click', {
+      name: '条件',
+      target: { by: 'text', text: '未登录', exact: true, within: { by: 'role', role: 'region', name: '后台状态' } },
+      observe: false,
+    })
+    expect(点击.error).toBeUndefined()
+    expect(点击.replay?.supported).toBe(true)
+    expect(await 页面.getByRole('button').textContent()).toBe('已登录')
+    await 页面.setContent(内容)
+    await 回放(点击.recordId)
+    expect(await 页面.getByRole('button').textContent()).toBe('已登录')
+  })
+
+  it('零匹配可以等待隐藏，后来出现的目标仍由显式条件等待', async (): Promise<void> => {
+    await 页面.setContent(
+      "<button onclick=\"setTimeout(()=>this.insertAdjacentHTML('afterend','<p id=ready>完成</p>'),100)\">开始</button>",
+    )
+    let 隐藏 = await 调用('browser_wait', {
+      name: '条件',
+      target: { by: 'selector', selector: '#ready' },
+      state: 'hidden',
+      timeoutMs: 1000,
+    })
+    expect(隐藏.error).toBeUndefined()
+    await 调用('browser_click', { name: '条件', target: { by: 'role', role: 'button', name: '开始' }, observe: false })
+    let 出现 = await 调用('browser_wait', {
+      name: '条件',
+      target: { by: 'selector', selector: '#ready' },
+      state: 'visible',
+      timeoutMs: 1000,
+    })
+    expect(出现.error).toBeUndefined()
+  })
+
+  it('实际tsx编译后的对象方法回调可在浏览器运行，命名局部函数会暴露__name错误', async (): Promise<void> => {
+    let 脚本 = path.join(目录, 'callback-serialization.ts')
+    await writeFile(
+      脚本,
+      `let 错误回调 = (): number => { let 双倍 = (值: number): number => 值 * 2; return 双倍(21) };
+let 正确回调 = (): number => { let 运算 = { 双倍(值: number): number { return 值 * 2 } }; return 运算.双倍(21) };
+console.log(JSON.stringify({ 错误: 错误回调.toString(), 正确: 正确回调.toString() }));`,
+    )
+    let 输出 = await 执行文件(process.execPath, ['--import', 'tsx', 脚本], { cwd: 项目根目录 })
+    let 回调 = z.object({ 错误: z.string(), 正确: z.string() }).parse(JSON.parse(输出.stdout))
+    expect(回调.错误).toContain('__name')
+    await expect(页面.evaluate(`(${回调.错误})()`)).rejects.toThrow(/__name/u)
+    expect(await 页面.evaluate(`(${回调.正确})()`)).toBe(42)
+  })
+
   it('主动截图返回原分辨率 PNG 并加刻度白边', async (): Promise<void> => {
     await 调用('browser_environment', {
       name: '条件',
@@ -149,6 +214,8 @@ describe('浏览器录制与回放的条件一致', () => {
     // 原分辨率截图四周加刻度白边，白边四边等宽
     expect(元数据.width - 2400).toBe(元数据.height - 1200)
     expect(元数据.width).toBeGreaterThan(2400)
+    expect(结果.replay?.supported).toBe(true)
+    await 回放(结果.recordId)
   })
 
   it('延迟出现与退出均由显式条件等待，导出回放不依赖 OCR 暂停', async () => {

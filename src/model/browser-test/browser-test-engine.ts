@@ -5,6 +5,8 @@ import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
 
+import { 独占无头浏览器 } from '../../test-tools/browser-resource-lock'
+import { 检查目标唯一性 } from '../../test-tools/browser-target'
 import { 等待模板后点击, type 模板点击选项 } from '../../test-tools/template-match'
 import type { 落点探测结果 } from '../web-locate/candidates'
 import { 地址一致 } from '../web-locate/page-url'
@@ -40,16 +42,23 @@ export class 浏览器测试引擎 {
     模式?: 浏览器测试模式
     取消信号?: AbortSignal
     取证?: 浏览器会话取证
+    会话名称?: string
   }): Promise<浏览器测试会话> {
     let 模式 = z.enum(['自动', '演示']).parse(参数.模式 ?? '自动')
     let 取消信号 = 参数.取消信号
     取消信号?.throwIfAborted()
     await mkdir(参数.附件目录, { recursive: true })
+    let 释放占用 = 模式 === '自动' ? await 独占无头浏览器(参数.会话名称 ?? 参数.附件目录) : undefined
     let 浏览器 = await chromium
       .launch({ headless: 模式 === '自动', handleSIGINT: 取消信号 === undefined })
       .catch((错误: unknown): never => {
+        释放占用?.()
         throw 转换浏览器启动错误(错误)
       })
+    let 正在关闭 = false
+    浏览器.once('disconnected', (): void => {
+      if (正在关闭 === false) 释放占用?.()
+    })
     let 浏览器上下文: BrowserContext | undefined
     let 关闭任务: Promise<void> | undefined
     let 取消监听: ReturnType<typeof addAbortListener> | undefined
@@ -58,10 +67,17 @@ export class 浏览器测试引擎 {
       try {
         await 浏览器上下文?.close()
       } finally {
-        await 浏览器.close()
+        try {
+          await 浏览器.close()
+        } finally {
+          释放占用?.()
+        }
       }
     }
-    let 关闭 = (): Promise<void> => (关闭任务 ??= 释放资源())
+    let 关闭 = (): Promise<void> => {
+      正在关闭 = true
+      return (关闭任务 ??= 释放资源())
+    }
     try {
       取消信号?.throwIfAborted()
       let 上下文 = await 浏览器.newContext(参数.服务地址 === undefined ? {} : { baseURL: 参数.服务地址 })
@@ -158,6 +174,7 @@ export class 浏览器测试引擎 {
     参数?: Parameters<ReturnType<typeof expect<Locator>>['toBeVisible']>[0],
   ): Promise<void> {
     this.证据.登记当前步骤()
+    await 检查目标唯一性(目标)
     await expect(目标).toBeVisible(参数)
     if (this.证据.启用 === true && 目标.page() === this.页面) await this.证据.采集('断言通过', '目标已可见', 目标)
   }
@@ -167,6 +184,7 @@ export class 浏览器测试引擎 {
     参数?: Parameters<ReturnType<typeof expect<Locator>>['toBeHidden']>[0],
   ): Promise<void> {
     this.证据.登记当前步骤()
+    await 检查目标唯一性(目标)
     await expect(目标).toBeHidden(参数)
     if (this.证据.启用 === true && 目标.page() === this.页面) await this.证据.采集('断言通过', '目标已隐藏')
   }
@@ -491,6 +509,7 @@ export class 浏览器测试引擎 {
 
   private async 操作动画(目标: Locator, 颜色: string, 超时: number | undefined): Promise<void> {
     this.检查操作目标(目标)
+    await 检查目标唯一性(目标)
     if (this.模式 === '自动') return
     await this.滚动到目标(目标, 超时)
     if (this.步骤作用域.getStore()?.跳过操作动画 === true) return

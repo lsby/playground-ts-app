@@ -10,10 +10,13 @@ import type { 浏览器测试模式 } from '../../../src/model/browser-test'
 import { 需求测试, type 需求, type 需求测试流程 } from '../../../src/model/test-requirement'
 import { 读取移动测试配置 } from '../../../src/test-tools/mobile-config'
 import { 独占测试数据库 } from '../database-lock'
+import { 创建测试子进程环境, 检查测试命令环境 } from '../test-environment'
 import { 测试服务 } from '../test-server'
 import { 格式化需求测试错误 } from './format-error'
 import { 保存需求测试报告, type 需求测试尝试记录, type 需求测试附件记录 } from './report'
+import { 保存补测汇总, 获得失败流程名称们, 验证补测定义 } from './report-followup'
 import { 读取需求描述文件, 需求描述文件名 } from './requirement-file'
+import { 检查需求源码版本 } from './source-version'
 import { 匹配标签, 解析标签过滤, 过滤需求流程, 验证标签存在, type 标签过滤 } from './tag-filter'
 
 type 需求测试实例 = Pick<
@@ -36,6 +39,7 @@ type 需求测试运行选项 = {
   标签过滤: 标签过滤 | undefined
   安卓设备: string | undefined
   苹果设备: string | undefined
+  补测来源: string | undefined
 }
 type 尝试参数 = {
   模式: 浏览器测试模式
@@ -76,6 +80,7 @@ export class 需求测试运行器 {
   }
 
   public async 发现登记(): Promise<需求测试登记> {
+    await 检查需求源码版本(this.根目录)
     let 文件们 = (await readdir(this.需求目录, { recursive: true, withFileTypes: true }))
       .filter((项) => 项.isFile() && 项.name.endsWith('.ts'))
       .map((项) => path.relative(this.需求目录, path.join(项.parentPath, 项.name)).replaceAll('\\', '/'))
@@ -111,6 +116,7 @@ export class 需求测试运行器 {
       ...测试,
       需求们: 需求们.filter((值) => 测试.流程.获得覆盖验收点们().some((点) => 值.包含(点))),
     }))
+    await 检查需求源码版本(this.根目录)
     return { 流程们, 需求们, 需求描述路径们 }
   }
 
@@ -126,8 +132,24 @@ export class 需求测试运行器 {
 
   private async 执行流程们(参数们: readonly string[]): Promise<number> {
     let 选项 = this.解析运行选项(参数们)
+    if (选项.补测来源 !== undefined) {
+      let 失败流程们 = await 获得失败流程名称们(选项.补测来源)
+      if (失败流程们.length === 0) throw new Error('来源报告没有失败或中断的已选流程，无需补测')
+      选项.指定流程名称们 = 失败流程们
+    }
     let 登记 = await this.发现登记()
     let { 流程们, 需求们 } = 登记
+    if (选项.补测来源 !== undefined)
+      await 验证补测定义(
+        选项.补测来源,
+        流程们.map(({ 文件, 流程, 需求们 }) => ({
+          流程名称: 流程.获得名称(),
+          文件: `test/requirement/${文件}`,
+          需求名称们: 需求们.map((需求) => 需求.获得名称()),
+          目标验收点名称们: 流程.获得覆盖验收点们().map((点) => 点.获得名称()),
+          目标验收点描述们: 流程.获得覆盖验收点们().map((点) => 点.获得描述()),
+        })),
+      )
     this.验证过滤标签(登记, 选项.标签过滤)
     let 候选流程们 = this.选择流程(登记, 选项)
     let { 选中流程们, 排除流程们 } = 过滤需求流程(候选流程们, 选项.标签过滤)
@@ -202,6 +224,7 @@ export class 需求测试运行器 {
     process.on('SIGTERM', 处理SIGTERM)
     try {
       if (覆盖错误们.length === 0 && 选中流程们.length > 0) {
+        await 检查测试命令环境(this.根目录)
         释放数据库 = await 独占测试数据库(this.根目录)
         await new 测试服务(this.根目录, 报告目录).确认端口可用()
         if (已取消() === false) await this.运行准备任务('db:ensure:test:web')
@@ -283,6 +306,10 @@ export class 需求测试运行器 {
       中断码,
     })
     console.log(`需求测试报告已生成：${pathToFileURL(产物.html路径).href}`)
+    if (选项.补测来源 !== undefined) {
+      await 保存补测汇总(选项.补测来源, path.join(报告目录, 'report.json'))
+      console.log(`补测汇总已生成：${pathToFileURL(path.join(报告目录, 'combined.html')).href}`)
+    }
     return 中断码 ?? (产物.全部通过 ? 0 : 1)
   }
 
@@ -291,7 +318,7 @@ export class 需求测试运行器 {
     await new Promise<void>((完成, 失败) => {
       let 进程 = spawn(process.execPath, ['--import', 'tsx', 'scripts/task/index.ts', 任务, '--env', 环境文件], {
         cwd: this.根目录,
-        env: process.env,
+        env: 创建测试子进程环境(this.根目录),
         stdio: ['ignore', 'inherit', 'inherit'],
         windowsHide: true,
       })
@@ -304,6 +331,7 @@ export class 需求测试运行器 {
   }
 
   private async 执行尝试(测试: 需求测试入口, 尝试序号: number, 参数: 尝试参数): Promise<需求测试尝试记录> {
+    await 检查需求源码版本(this.根目录)
     let { 测试运行工具 } = await import('../../../src/test-tools/runtime')
     let 工具 = new 测试运行工具({ ...参数, 项目根目录: this.根目录 })
     let 格式化错误 = (错误: unknown): ReturnType<typeof 格式化需求测试错误> =>
@@ -371,6 +399,7 @@ export class 需求测试运行器 {
         mode: { type: 'string' },
         device: { type: 'string' },
         'ios-device': { type: 'string' },
+        'retry-failed': { type: 'string' },
       },
     })
     if (values.mode !== undefined && values.mode !== 'auto' && values.mode !== 'demo')
@@ -387,8 +416,13 @@ export class 需求测试运行器 {
     let 苹果设备 = values['ios-device']?.trim()
     if (苹果设备 === '') throw new Error('--ios-device 后必须提供 iOS 模拟器 UDID')
     let 全部运行 = values.all === true
-    if ([全部运行, 指定流程名称们.length > 0, 指定需求名称 !== undefined].filter(Boolean).length > 1)
-      throw new Error('--all、--scenario、--requirement 只能选择一种')
+    let 补测来源 = values['retry-failed']
+    if (补测来源 !== undefined && 补测来源.trim() === '') throw new Error('--retry-failed 后必须提供报告 JSON 路径')
+    if (
+      [全部运行, 指定流程名称们.length > 0, 指定需求名称 !== undefined, 补测来源 !== undefined].filter(Boolean).length >
+      1
+    )
+      throw new Error('--all、--scenario、--requirement、--retry-failed 只能选择一种')
     return {
       全部运行,
       指定流程名称们,
@@ -399,6 +433,7 @@ export class 需求测试运行器 {
       标签过滤: 解析标签过滤(values['exclude-tag'], values['include-tag']),
       安卓设备,
       苹果设备,
+      补测来源: 补测来源 === undefined ? undefined : path.resolve(this.根目录, 补测来源),
     }
   }
 

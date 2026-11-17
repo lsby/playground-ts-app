@@ -36,7 +36,8 @@ let 业务流程 = new 流程({
   },
   名称: '开放注册时创建并使用访客账号',
   标签们: ['开放注册', '浏览器'],
-  测试思路: '访客提交两次不同的密码并查库，改正后完成注册。再由独立访客尝试重名注册，核对原账号并验证它仍能登录。',
+  测试思路:
+    '访客提交两次不同的密码并查库，改正后完成注册并用自动带入的用户名登录。关闭该浏览器后，由独立访客尝试重名注册，核对原账号记录保持不变，再独立打开浏览器确认原密码仍能登录。',
   步骤们: [
     new 行为<测试上下文>('提交两次不同的密码', async (当前状态): Promise<测试上下文> => {
       {
@@ -128,8 +129,29 @@ let 业务流程 = new 流程({
         })
       }
     }),
+    new 行为<测试上下文>('用自动带入的用户名登录', async (当前状态, 提交附件): Promise<测试上下文> => {
+      {
+        提交附件([{ 类型: '文本', 内容: '决策说明\n只填写密码，使用注册成功后自动带入的用户名登录。' }])
+        let 引擎 = 当前状态.工具.浏览器.获得('开放注册的访客')
+        await 引擎.输入(引擎.按角色('textbox', { name: '密码', exact: true }), 'TestPass26!', { timeout: 5000 })
+      }
+      {
+        let 引擎 = 当前状态.工具.浏览器.获得('开放注册的访客')
+        await 引擎.点击(引擎.按角色('button', { name: '登录', exact: true }), { timeout: 5000 })
+      }
+      {
+        let 引擎 = 当前状态.工具.浏览器.获得('开放注册的访客')
+        await 引擎.等待地址('**/index.html', { timeout: 5000, waitUntil: 'domcontentloaded' })
+      }
+      return 当前状态
+    }),
+    new 观察<测试上下文>('确认进入项目首页', async (当前状态): Promise<void> => {
+      let 引擎 = 当前状态.工具.浏览器.获得('开放注册的访客')
+      await 引擎.验证可见(引擎.按角色('heading', { name: '项目首页', exact: true }), { timeout: 5000 })
+    }),
     new 行为<测试上下文>('使用同名账号再次注册', async (当前状态): Promise<测试上下文> => {
       {
+        await 当前状态.工具.浏览器.关闭('开放注册的访客')
         let 引擎 = await 当前状态.工具.浏览器.打开('重名注册的访客')
         await 引擎.导航('/login.html', { timeout: 5000, waitUntil: 'domcontentloaded' })
       }
@@ -180,24 +202,18 @@ let 业务流程 = new 流程({
         提交附件([{ 类型: '文本', 内容: '数据库仍只有一条同名账号记录，且账号 ID 未变。' }], { 并入上一组: true })
       }
     }),
-    new 行为<测试上下文>('用自动带入的用户名登录', async (当前状态, 提交附件): Promise<测试上下文> => {
-      {
-        提交附件([{ 类型: '文本', 内容: '决策说明\n只填写密码，使用注册成功后自动带入的用户名登录。' }])
-        let 引擎 = 当前状态.工具.浏览器.获得('开放注册的访客')
-        await 引擎.输入(引擎.按角色('textbox', { name: '密码', exact: true }), 'TestPass26!', { timeout: 5000 })
-      }
-      {
-        let 引擎 = 当前状态.工具.浏览器.获得('开放注册的访客')
-        await 引擎.点击(引擎.按角色('button', { name: '登录', exact: true }), { timeout: 5000 })
-      }
-      {
-        let 引擎 = 当前状态.工具.浏览器.获得('开放注册的访客')
-        await 引擎.等待地址('**/index.html', { timeout: 5000, waitUntil: 'domcontentloaded' })
-      }
+    new 行为<测试上下文>('重名被拒后使用原密码重新登录', async (当前状态): Promise<测试上下文> => {
+      await 当前状态.工具.浏览器.关闭('重名注册的访客')
+      let 引擎 = await 当前状态.工具.浏览器.打开('重名拒绝后的原账号')
+      await 引擎.导航('/login.html', { timeout: 5000, waitUntil: 'domcontentloaded' })
+      await 引擎.输入(引擎.按角色('textbox', { name: '用户名', exact: true }), 'visitor-e2e', { timeout: 5000 })
+      await 引擎.输入(引擎.按角色('textbox', { name: '密码', exact: true }), 'TestPass26!', { timeout: 5000 })
+      await 引擎.点击(引擎.按角色('button', { name: '登录', exact: true }), { timeout: 5000 })
+      await 引擎.等待地址('**/index.html', { timeout: 5000, waitUntil: 'domcontentloaded' })
       return 当前状态
     }),
-    new 观察<测试上下文>('确认进入项目首页', async (当前状态): Promise<void> => {
-      let 引擎 = 当前状态.工具.浏览器.获得('开放注册的访客')
+    new 观察<测试上下文>('确认重名拒绝后原账号仍可登录', async (当前状态): Promise<void> => {
+      let 引擎 = 当前状态.工具.浏览器.获得('重名拒绝后的原账号')
       await 引擎.验证可见(引擎.按角色('heading', { name: '项目首页', exact: true }), { timeout: 5000 })
     }),
   ],

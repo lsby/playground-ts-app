@@ -13,6 +13,7 @@ import type { 需求测试工具 } from './tools'
 
 export type 流程运行错误 = {
   文本: string
+  类别?: '检查失败' | '脚本错误' | '环境错误' | '待诊断'
   消息?: string
   预期值?: string
   实际值?: string

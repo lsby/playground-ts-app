@@ -13,6 +13,7 @@ import type { 测试服务日志位置 } from '../../src/test-tools/runtime'
 import { 测试调试环境 } from '../task/model/task-common'
 import { 开发任务表 } from '../task/taskfile/taskfile-dev'
 import { 测试日志缓冲 } from './service-log'
+import { 创建测试子进程环境 } from './test-environment'
 import { 停止测试进程, 测试端口已开放, 等待测试进程输出 } from './test-process'
 
 type 后端进程 = {
@@ -191,7 +192,7 @@ export class 测试服务 {
     try {
       return crossSpawn(process.execPath, 参数, {
         cwd: this.根目录,
-        env: 环境变量,
+        env: { ...创建测试子进程环境(this.根目录), ...环境变量, PATH: 创建测试子进程环境(this.根目录)['PATH'] },
         stdio: [空输入 ?? 'ignore', 'pipe', 'pipe'],
         detached: process.platform !== 'win32',
         windowsHide: true,
