@@ -7,7 +7,15 @@ import { z } from 'zod'
 let 仓库模式 = z
   .union([z.string(), z.object({ type: z.string().optional(), url: z.string() }).passthrough()])
   .optional()
-let 包信息模式 = z.object({ name: z.string(), version: z.string(), repository: 仓库模式 }).passthrough()
+let 包信息模式 = z
+  .object({
+    name: z.string(),
+    version: z.string(),
+    type: z.string().optional(),
+    main: z.string().optional(),
+    repository: 仓库模式,
+  })
+  .passthrough()
 
 export function 获得Prisma迁移名称组(迁移目录: string): string[] {
   if (fs.existsSync(迁移目录) === false) return []
@@ -50,6 +58,8 @@ export async function 写入AppPackageJson(项目根目录: string, 便携包目
       {
         name: 源包信息.name,
         version: 源包信息.version,
+        ...(源包信息.type === undefined ? {} : { type: 源包信息.type }),
+        ...(源包信息.main === undefined ? {} : { main: 源包信息.main }),
         ...(首个Prisma迁移名称 === undefined ? {} : { prismaMigrationBaseline: 首个Prisma迁移名称 }),
         ...(源包信息.repository === undefined ? {} : { repository: 源包信息.repository }),
       },
