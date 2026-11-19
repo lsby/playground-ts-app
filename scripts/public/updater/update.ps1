@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$ZipUrl = '',
   [string]$LocalZip = '',
   [string]$ExpectedSha256 = '',
@@ -22,8 +22,8 @@ $PreviousRootManifestPath = Join-Path $WorkDir 'previous-root-entries.json'
 $DbBackupDir = Join-Path $WorkDir 'db.backup'
 $MarkerPath = Join-Path $DataDir 'update-in-progress'
 $PackagePath = Join-Path $AppDir 'package.json'
-$AppExeName = 'lsby-playground-ts-app.exe'
-$AppProcessName = 'lsby-playground-ts-app'
+$AppExeName = 'lsby-deepseek-desktop.exe'
+$AppProcessName = 'lsby-deepseek-desktop'
 $script:DownloadSha256 = $ExpectedSha256
 $script:ResolvedGitHubToken = if ($GitHubToken -ne '') { $GitHubToken } else { [string]$env:GITHUB_TOKEN }
 
@@ -209,16 +209,13 @@ function Expand-ValidatedZip([string]$ZipPath) {
   } finally {
     $archive.Dispose()
   }
-  foreach ($requiredPath in @('app\package.json', "app\$AppExeName", 'app\.env\.env.production.electron', 'update.cmd', 'scripts\update.ps1', 'lsby-playground-ts-app.exe')) {
+  foreach ($requiredPath in @('app\package.json', "app\$AppExeName", 'app\.env\.env.production.electron', 'update.cmd', 'scripts\update.ps1', 'lsby-deepseek-desktop.exe')) {
     if (-not (Test-Path -LiteralPath (Join-Path $StagingDir $requiredPath) -PathType Leaf)) { throw "ZIP 缺少 $requiredPath" }
   }
   $stagedAppDir = Join-Path $StagingDir 'app'
   if (@(Get-PrismaMigrationNames $stagedAppDir).Count -gt 0) {
-    if (-not (Test-Path -LiteralPath (Join-Path $stagedAppDir 'resources\app\node_modules\prisma\build\index.js') -PathType Leaf)) {
-      throw 'ZIP 缺少 Prisma CLI'
-    }
-    if (-not (Test-Path -LiteralPath (Join-Path $stagedAppDir 'resources\app\node_modules\@prisma\studio-core\dist\data\bff\index.cjs') -PathType Leaf)) {
-      throw 'ZIP 中的 Prisma CLI 依赖不完整'
+    if (-not (Test-Path -LiteralPath (Join-Path $stagedAppDir 'resources\app\dist\scripts\db\push-prod.js') -PathType Leaf)) {
+      throw 'ZIP 缺少 push-prod.js'
     }
     if (-not (Test-Path -LiteralPath (Join-Path $stagedAppDir 'prisma.config.ts') -PathType Leaf)) { throw 'ZIP 缺少 prisma.config.ts' }
   }
@@ -359,7 +356,7 @@ try {
   Remove-Item -LiteralPath $MarkerPath -Force
   Remove-SafePath $StagingDir
   Remove-SafePath $WorkDir
-  Write-Host '更新成功。现在可以运行 lsby-playground-ts-app.exe 启动新版本。'
+  Write-Host '更新成功。现在可以运行 lsby-deepseek-desktop.exe 启动新版本。'
   exit 0
 } catch {
   Write-Host "更新失败: $($_.Exception.Message)" -ForegroundColor Red
