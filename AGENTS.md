@@ -220,8 +220,8 @@
 
 ### 部署与发布追溯
 
-- 通用 OSS 发布任务为 `public:oss:aliyun`，配置仅使用 `.env/.env.oss-aliyun`，各 OSS 字段显式留空，执行同步时严格校验；加密由 `CONFIG_ENCRYPTION` 自选，沿用现有项目密钥与环境加密机制，不提供独立示例配置文件。
-- 双站发布工作流模板为 `.github/workflows/deploy-pages.yml.example`，启用前填写项目配置；操作说明见 [OSS 网站发布](doc/framework/oss-publishing.md)。
+- **纯前端网站发布**:
+  - 支持将纯前端应用部署到阿里云 OSS 和 GitHub Pages；发布流程、环境配置与同步机制见 [纯前端网站发布指南](doc/framework/oss-publishing.md)。
 
 - **发布产物源码追溯与 Docker 远程部署**:
   - 关于发布任务中 Git 状态拦截、Docker 自动化安全部署机制、以及手动运维流程（如数据库迁移冲突处理），请参见 [doc/framework/deploy-and-release.md](doc/framework/deploy-and-release.md)。

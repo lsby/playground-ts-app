@@ -2,7 +2,7 @@
 
 ## 配置
 
-OSS 发布只使用 `.env/.env.oss-aliyun`，不再读取 JSON 或独立示例文件。模板中保留全部字段，未配置的值显式写为空字符串：
+OSS 发布配置位于 `.env/.env.oss-aliyun`。填写目标区域、访问凭证、Bucket 和网站目录：
 
 ```dotenv
 CONFIG_ENCRYPTION=false
