@@ -50,7 +50,7 @@ done
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 ROOT="$( cd "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd )"
-APP_DIR="$ROOT/lsby-deepseek-desktop.app"
+APP_DIR="$ROOT/lsby-playground-ts-app.app"
 DATA_DIR="$ROOT/data"
 DB_DIR="$DATA_DIR/db"
 BACKUPS_DIR="$DATA_DIR/backups"
@@ -61,7 +61,7 @@ PREVIOUS_ROOT_MANIFEST="$WORK_DIR/previous-root-entries.txt"
 DB_BACKUP_DIR="$WORK_DIR/db.backup"
 MARKER_PATH="$DATA_DIR/update-in-progress"
 PACKAGE_PATH="$APP_DIR/Contents/Resources/app/package.json"
-APP_PROCESS_NAME="lsby-deepseek-desktop"
+APP_PROCESS_NAME="lsby-playground-ts-app"
 
 DOWNLOAD_SHA256="$EXPECTED_SHA256"
 
@@ -370,9 +370,9 @@ expand_validated_zip() {
     unzip -q -o "$zip_file" -d "$STAGING_DIR"
   fi
 
-  local staged_app="$STAGING_DIR/lsby-deepseek-desktop.app"
+  local staged_app="$STAGING_DIR/lsby-playground-ts-app.app"
   local staged_pkg="$staged_app/Contents/Resources/app/package.json"
-  local staged_bin="$staged_app/Contents/MacOS/lsby-deepseek-desktop"
+  local staged_bin="$staged_app/Contents/MacOS/lsby-playground-ts-app"
 
   if [ ! -f "$staged_pkg" ]; then
     log_error "ZIP 缺少 $staged_pkg"
@@ -430,9 +430,9 @@ invoke_raw_migration() {
   shift
   local app_resources="$staged_app/Contents/Resources/app"
   local macos_dir="$staged_app/Contents/MacOS"
-  local electron_bin="$macos_dir/lsby-deepseek-desktop-bin"
+  local electron_bin="$macos_dir/lsby-playground-ts-app-bin"
   if [ ! -f "$electron_bin" ]; then
-    electron_bin="$macos_dir/lsby-deepseek-desktop"
+    electron_bin="$macos_dir/lsby-playground-ts-app"
   fi
   local push_prod_js="$app_resources/dist/scripts/db/push-prod.js"
 
@@ -530,7 +530,7 @@ select_update_zip "$PACKAGE_PATH" "$DOWNLOAD_PATH"
 assert_zip_sha256 "$DOWNLOAD_PATH"
 expand_validated_zip "$DOWNLOAD_PATH"
 
-STAGED_APP_DIR="$STAGING_DIR/lsby-deepseek-desktop.app"
+STAGED_APP_DIR="$STAGING_DIR/lsby-playground-ts-app.app"
 NEW_PACKAGE_PATH="$STAGED_APP_DIR/Contents/Resources/app/package.json"
 assert_package_identity "$PACKAGE_PATH" "$NEW_PACKAGE_PATH"
 
@@ -584,9 +584,9 @@ for entry in "$STAGING_DIR"/*; do
   fi
 done
 
-if [ -d "$ROOT/lsby-deepseek-desktop.app" ]; then
-  chmod -R +x "$ROOT/lsby-deepseek-desktop.app/Contents/MacOS" 2>/dev/null || true
-  xattr -dr com.apple.quarantine "$ROOT/lsby-deepseek-desktop.app" 2>/dev/null || true
+if [ -d "$ROOT/lsby-playground-ts-app.app" ]; then
+  chmod -R +x "$ROOT/lsby-playground-ts-app.app/Contents/MacOS" 2>/dev/null || true
+  xattr -dr com.apple.quarantine "$ROOT/lsby-playground-ts-app.app" 2>/dev/null || true
 fi
 if [ -f "$ROOT/update.command" ]; then
   chmod +x "$ROOT/update.command" 2>/dev/null || true
