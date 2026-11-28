@@ -30,6 +30,8 @@ export function 发现环境文件(项目根目录) {
         目录项.name.startsWith('.env.') === true &&
         目录项.name !== '.env.deploy' &&
         目录项.name !== '.env.external-lfs' &&
+        目录项.name !== '.env.oss-aliyun' &&
+        目录项.name !== '.env.publish.web' &&
         目录项.name.endsWith('.decode') === false,
     )
     .sort((左, 右) => 左.name.localeCompare(右.name))

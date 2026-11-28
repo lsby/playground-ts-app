@@ -28,7 +28,6 @@
     "preinstall": "node scripts/setup/preinstall.mjs",
     "postinstall": "node scripts/setup/postinstall.mjs",
     "prepare": "husky",
-    "public:oss:aliyun": "tsx scripts/task/index.ts public:oss:aliyun",
     "release:all": "tsx scripts/task/index.ts release:all",
     "setup:all": "tsx scripts/task/index.ts setup:all --",
     "task": "tsx scripts/task/index.ts",

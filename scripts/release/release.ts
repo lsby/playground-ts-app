@@ -35,8 +35,8 @@ let 主程序 = (): void => {
       执行Git(['commit', '-m', `chore: release v${版本号}`], '创建发布提交')
       执行Git(['tag', `v${版本号}`], '创建版本标签')
     }
-    执行Git(['push'], '推送提交到远程')
-    执行Git(['push', 'origin', `refs/tags/v${版本号}`], '推送本次版本标签到远程')
+    执行Git(['push', '--no-follow-tags'], '推送提交到远程')
+    执行Git(['push', '--no-follow-tags', 'origin', `refs/tags/v${版本号}`], '推送本次版本标签到远程')
 
     console.log('版本标签已推送，可查看仓库配置的后续发布任务。')
 

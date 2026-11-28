@@ -22,10 +22,22 @@ export let 发布任务表 = 定义任务({
   'capacitor:open:android': { 说明: '打开 Android 工程', 运行: 命令('cap', 'open', 'android'), 传递参数: true },
 
   // 发行
-  'public:oss:aliyun': {
+  'public:web:oss': {
     说明: '构建并按确认参数同步纯前端网站至阿里云 OSS',
     运行: 命令('tsx', 'scripts/public/release-oss-aliyun.ts'),
+    公开: false,
     传递参数: true,
+  },
+  'public:web:github-pages': {
+    说明: '构建并发布纯前端网站至 GitHub Pages',
+    运行: 命令('tsx', 'scripts/public/release-github-pages.ts'),
+    传递参数: true,
+    公开: false,
+  },
+  'build:web:publish': {
+    说明: '按已启用平台和公共路径构建网站发布产物',
+    运行: 命令('tsx', 'scripts/public/build-websites.ts'),
+    公开: false,
   },
   'public:docker:local': {
     说明: '执行本地 Docker 发布',

@@ -1,64 +1,52 @@
-# 阿里云 OSS 与 GitHub Pages 发布
+# 纯前端网站发布
 
-## 配置
+网站可以发布到阿里云 OSS、GitHub Pages，或同时发布到两个平台。运行常用命令 `npm run release:all` 选择新版本，工具通过 bumpp 更新版本号，完成单元测试和构建，再提交、创建版本标签并推送当前版本。标签推送触发网站 CI，普通提交和 PR 只运行检查。
 
-OSS 发布配置位于 `.env/.env.oss-aliyun`。填写目标区域、访问凭证、Bucket 和网站目录：
+## 平台与公共路径
 
-```dotenv
-CONFIG_ENCRYPTION=false
-OSS_REGION=""
-OSS_ACCESS_KEY_ID=""
-OSS_ACCESS_KEY_SECRET=""
-OSS_BUCKET=""
-OSS_PREFIX=""
-```
+正式配置位于 `.env/.env.publish.web`。`ENABLE_OSS`、`ENABLE_GITHUB_PAGES` 分别控制平台开关，值为 `true` 或 `false`；`OSS_PUBLIC_PATH`、`PAGES_PUBLIC_PATH` 指定各平台的资源公共路径，必须以 `/` 开始和结束，例如 `/my-app/`。域名主页使用 `/`，GitHub Pages 项目网站通常使用 `/<仓库名>/`。
 
-这些字段全部必填，上传或查看同步计划时遇到空值会直接报错。`OSS_PREFIX` 使用非空子目录，例如 `my-app/`；不允许 Bucket 根目录，不支持含空格或特殊字符的目录。
+内部任务 `npm run task -- build:web:publish` 为所有启用的平台构建产物。公共路径相同时只构建一次，然后复制给两个平台；路径不同时分别构建。OSS 产物位于 `dist/web-publish/oss`，Pages 产物位于 `dist/web-publish/github-pages`。构建复用纯前端生产环境、代码生成与静态检查，页面、API Worker、SQLite Worker 和 WASM 由 Parcel 一起打包。
 
-`CONFIG_ENCRYPTION` 自选明文或加密模式。脚本复用现有环境文件读取机制，加密时通过项目根目录的 `.project-config.key` 在内存中解密，不把 OSS 配置注入网页。需要加密时使用 `npm run task -- env:enable-encryption`；人工编辑已加密配置使用 `env:decode`、`env:encode`，完成后清理 `.decode`。项目密钥与 `.decode` 不得入库，配置是否加密由 `CONFIG_ENCRYPTION` 自主选择。
+产物中的 `release-info.json` 记录真实 Git 提交与工作区状态，`website-build.json` 记录构建提交和公共路径。复用产物上传要求当前工作区干净、产物来自当前 HEAD 且公共路径匹配。生成或自动格式化若修改源码，应先提交再构建。
 
-GitHub Actions 使用项目密钥时，唯一密钥 Secret 为 `PROJECT_CONFIG_KEY_FILE`，值为 `.project-config.key` 的完整原文；配置方式为 `npm run task -- setup:github-config-key`。工作流是否启用 OSS、发布标签与目标前缀由项目设置。
+## OSS 发布
 
-## 本地构建
+OSS 配置位于 `.env/.env.oss-aliyun`，包含 `OSS_REGION`、`OSS_ACCESS_KEY_ID`、`OSS_ACCESS_KEY_SECRET`、`OSS_BUCKET`、`OSS_PREFIX` 和 `OSS_ROOT_ALLOWED_DIRECTORIES`。未启用 OSS 时凭证字段可以显式留空；实际发布时凭证必须完整。子目录站点的 `OSS_PREFIX` 使用 `my-app/`，并与 `OSS_PUBLIC_PATH` 对应。
 
-只构建指定子目录的纯前端产物，不读取 OSS 凭证，也不连接 OSS：
+`OSS_PREFIX=""` 表示 Bucket 根站点。根站点只检查并上传本次产物的精确文件名，不列出整个 Bucket；产物中的一级目录必须在 `OSS_ROOT_ALLOWED_DIRECTORIES` 中明确授权，用逗号分隔，例如 `public,worker-assets,demo`。根站点禁止批量删除，其他产品目录不受影响。网站产物禁止符号链接、隐藏文件与特殊文件。
 
 ```bash
-npm run task -- public:oss:aliyun -- --build-only=my-app/
+# 只构建 OSS 产物，不读取访问凭证、不连接云端
+npm run task -- public:web:oss -- --build-only
+# 复用产物，读取云端文件并展示同步计划
+npm run task -- public:web:oss -- --upload-only
+# 确认后上传
+npm run task -- public:web:oss -- --upload-only --yes
 ```
 
-构建复用纯前端生产环境、派生文件生成与静态检查。页面、API Worker、SQLite Worker、WASM 等资源由 Parcel 一起打包，使用指定的公共路径，输出到 `dist/src/web`。
+不带 `--upload-only` 时先构建。上传按 MD5 比较文件，先更新资源，再更新 HTML；带内容哈希的资源使用长期缓存，其他文件使用 `no-cache`。默认保留旧资源，子目录站点可在检查计划后加 `--yes --delete` 清理该前缀下的旧文件。`--build-only` 必须单独使用。
 
-构建前后都按 `.env/.env.production.pure-frontend` 的 `DEPLOY_ALLOW_DIRTY_GIT` 检查 Git 状态；禁止 dirty 时遇到未提交修改就终止。成功后写入 `release-info.json`，记录实际 Git 提交和 dirty 状态，同时自动生成 `website-build.json`，记录构建公共路径与 Git 提交。这两个文件都是工具生成的产物，不需要手工配置。生成或自动格式化若改变了源码，应提交修改后重新构建。
-
-## 查看计划与上传
-
-默认重新构建，再通过 OSS 的只读列表接口比较文件，展示计划：
+## GitHub Pages 发布
 
 ```bash
-npm run task -- public:oss:aliyun
+npm run task -- public:web:github-pages -- --build-only
+npm run task -- public:web:github-pages -- --upload-only
+npm run task -- public:web:github-pages -- --upload-only --yes
 ```
 
-已经构建时可以复用产物，只查看同步计划：
+本地命令通过 GitHub CLI 的现有登录触发当前版本标签的 CI，要求工作区干净且版本标签指向当前 HEAD。`--upload-only` 先核对本地已有产物，跳过本地构建；实际部署使用 CI 按同一版本构建并保存的产物。发布前需要已推送版本标签，且 GitHub CLI 已登录。
 
-```bash
-npm run task -- public:oss:aliyun -- --upload-only
-```
+CI 使用 GitHub 官方 Pages artifact 与部署 action，直接部署 build 作业保存的产物，不重新构建。在仓库 Settings → Pages 中选择 GitHub Actions，并允许 `github-pages` 环境接受 `v*` 版本标签的部署。
 
-`--upload-only` 要求 `dist/src/web/index.html`、`release-info.json` 与 `website-build.json` 存在，两个信息文件的提交均等于当前 HEAD，且产物、工作区与暂存区均为干净状态。工具还会自动核对构建公共路径与本次 `OSS_PREFIX` 是否一致；信息缺失、格式错误或目标不匹配都会终止上传并要求重新构建。它不重新构建。
+## 版本 CI
 
-确认计划后，显式加 `--yes` 执行上传：
+将 `.github/workflows/deploy-pages.yml.example` 启用为 `.yml`。示例支持 `main`、`master` 的提交与 PR 检查，发布时要求 `v*` 标签与 `package.json` 版本完全一致。手动运行选择已有版本标签和 `all`、`oss`、`github-pages` 目标可重跑发布。
 
-```bash
-npm run task -- public:oss:aliyun -- --upload-only --yes
-```
+`check` 完成后运行 `build`，再分别执行 `publish-oss` 与 `publish-pages`；两个发布作业只依赖 `build`，其中一个失败不会阻止另一个。发布作业复用同一版本的构建产物；两个平台更新并非原子操作，失败后可单独重跑对应作业。
 
-脚本按 MD5 比较文件，先上传全部变更资源，成功后再更新 HTML。带内容哈希的资源使用长期缓存，其余文件使用 `no-cache`。资源上传失败时不进入 HTML 上传阶段；多页面上传和跨站点发布仍可能部分完成，修复后可以重跑。
+## 配置加密
 
-默认保留云端旧文件，让已打开的旧页面仍可加载旧资源。确需清理时检查列出的旧文件，显式加 `--yes --delete`；清理在资源与 HTML 全部上传成功后执行，只作用于配置的前缀。未加 `--yes` 时不会上传或删除。`--build-only` 不能与上传或删除参数同时使用。
+正式环境文件均须显式填写全部字段。`CONFIG_ENCRYPTION` 选择明文或逐项加密，配置读取复用项目现有机制，OSS 凭证不会注入前端。写入真实凭证前可运行 `npm run task -- env:enable-encryption`；人工编辑加密配置使用 `env:decode`、`env:encode`。
 
-## 两个站点共用产物
-
-GitHub Pages 与 OSS 共用一次构建时，两站的公共路径必须一致。GitHub Pages 使用仓库名作为子目录时，`OSS_PREFIX` 也应设为同一仓库名加 `/`。将同一份 `dist/src/web` 发布到 Pages，再用 `--upload-only --yes` 上传 OSS，避免两次构建产生不同资源。
-
-普通提交、PR、版本标签和手动重跑的触发规则写在项目工作流中。两个站点分别更新，发布期间可能短暂处于不同版本；失败时检查对应任务的日志并重跑。Pages 使用 `gh-pages` 分支托管时，在仓库 Settings → Pages 中选择该分支和根目录。
+GitHub Actions 通过 `PROJECT_CONFIG_KEY_FILE` Secret 恢复 `.project-config.key` 原文，可运行 `npm run task -- setup:github-config-key` 配置。工作流只在内存中读取解密配置，结束后清理密钥文件；密钥与 `.decode` 不得入库。

@@ -1,0 +1,33 @@
+name: Prepare website publishing
+description: Install dependencies and restore the project configuration key
+inputs:
+  config-key:
+    description: Project configuration key file content
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 9.5.0
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: pnpm
+    - name: Restore project configuration key
+      shell: bash
+      env:
+        PROJECT_CONFIG_KEY_FILE: ${{ inputs.config-key }}
+      run: |
+        node --input-type=module <<'NODE'
+        import fs from 'node:fs'
+        let key = process.env.PROJECT_CONFIG_KEY_FILE
+        let files = ['.env/.env.production.pure-frontend', '.env/.env.oss-aliyun', '.env/.env.publish.web']
+        let encrypted = files.some(file => /^CONFIG_ENCRYPTION\s*=\s*true\s*$/mu.test(fs.readFileSync(file, 'utf8')))
+        if (encrypted && (key === undefined || key.trim() === '')) throw new Error('Missing PROJECT_CONFIG_KEY_FILE secret')
+        if (key !== undefined && key.trim() !== '') fs.writeFileSync('.project-config.key', key, { mode: 0o600 })
+        NODE
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile

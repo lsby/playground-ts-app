@@ -2,14 +2,17 @@ name: CI and Publish Websites
 
 on:
   push:
-    branches:
-      - master
-    tags:
-      - 'v*'
+    branches: [main, master]
+    tags: ['v*']
   pull_request:
-    branches:
-      - master
+    branches: [main, master]
   workflow_dispatch:
+    inputs:
+      target:
+        description: Website publishing platform
+        type: choice
+        options: [all, oss, github-pages]
+        default: all
 
 permissions:
   contents: read
@@ -26,78 +29,82 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Check source
-        run: pnpm run check:all
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check:all
 
-  publish:
+  build:
     needs: check
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    concurrency:
-      group: publish-websites
-      cancel-in-progress: false
+    outputs:
+      oss: ${{ steps.config.outputs.oss }}
+      pages: ${{ steps.config.outputs.pages }}
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: ./.github/actions/setup-web-publish
         with:
-          version: 9.5.0
-      - uses: actions/setup-node@v4
+          config-key: ${{ secrets.PROJECT_CONFIG_KEY_FILE }}
+      - name: Validate release and select platforms
+        id: config
+        env:
+          INPUT_TARGET: ${{ inputs.target }}
+        run: pnpm exec tsx scripts/public/web-ci.ts
+      - name: Build each distinct public path
+        env:
+          INPUT_TARGET: ${{ inputs.target }}
+        run: pnpm run task -- build:web:publish
+      - name: Save OSS website
+        if: steps.config.outputs.oss == 'true'
+        uses: actions/upload-artifact@v4
         with:
-          node-version: 22
-          cache: pnpm
-      - name: Restore project configuration key
-        env:
-          PROJECT_CONFIG_KEY_FILE: ${{ secrets.PROJECT_CONFIG_KEY_FILE }}
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs'
-          let key = process.env.PROJECT_CONFIG_KEY_FILE
-          let files = ['.env/.env.production.pure-frontend', '.env/.env.oss-aliyun']
-          let encrypted = files.some(file => /^CONFIG_ENCRYPTION\s*=\s*true\s*$/mu.test(fs.readFileSync(file, 'utf8')))
-          if (encrypted && (key === undefined || key.trim() === '')) throw new Error('Missing PROJECT_CONFIG_KEY_FILE secret')
-          if (key !== undefined && key.trim() !== '') fs.writeFileSync('.project-config.key', key, { mode: 0o600 })
-          NODE
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Validate release and encrypted configuration
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-          REPOSITORY_NAME: ${{ github.event.repository.name }}
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs'
-          import path from 'node:path'
-          import { parse } from 'dotenv'
-          import { 读取环境文件明文 } from './scripts/setup/env-crypto-core.mjs'
-          let root = process.env.GITHUB_WORKSPACE
-          if (root === undefined) throw new Error('Missing GITHUB_WORKSPACE')
-          let pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
-          if (process.env.RELEASE_TAG !== `v${pkg.version}`) throw new Error('Release tag must match package.json version')
-          for (let file of ['.env/.env.production.pure-frontend', '.env/.env.oss-aliyun']) {
-            let values = parse(读取环境文件明文(root, path.resolve(root, file)))
-            for (let [name, value] of Object.entries(values)) {
-              if (/SECRET|PASSWORD|PWD|ACCESS_KEY/iu.test(name) && value !== '') console.log(`::add-mask::${value}`)
-            }
-            if (file.endsWith('.env.oss-aliyun') && values.OSS_PREFIX?.replace(/^\/+|\/+$/gu, '') !== process.env.REPOSITORY_NAME) {
-              throw new Error('OSS_PREFIX must match repository name for the shared Pages/OSS build')
-            }
-          }
-          NODE
-      - name: Build website once
-        env:
-          REPOSITORY_NAME: ${{ github.event.repository.name }}
-        run: pnpm run public:oss:aliyun -- --build-only="$REPOSITORY_NAME/"
-      - name: Publish to Aliyun OSS
-        run: pnpm run public:oss:aliyun -- --upload-only --yes
-      - name: Publish same build to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@v4
+          name: website-oss
+          path: dist/web-publish/oss
+          if-no-files-found: error
+      - name: Save GitHub Pages website
+        if: steps.config.outputs.pages == 'true'
+        uses: actions/upload-pages-artifact@v3
         with:
-          folder: dist/src/web
-          branch: gh-pages
+          path: dist/web-publish/github-pages
       - name: Remove project configuration key
         if: always()
         run: rm -f -- .project-config.key
+
+  publish-oss:
+    needs: build
+    if: needs.build.outputs.oss == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: publish-oss
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web-publish
+        with:
+          config-key: ${{ secrets.PROJECT_CONFIG_KEY_FILE }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: website-oss
+          path: dist/web-publish/oss
+      - name: Publish existing OSS website
+        run: pnpm run task -- public:web:oss -- --upload-only --yes
+      - name: Remove project configuration key
+        if: always()
+        run: rm -f -- .project-config.key
+
+  publish-pages:
+    needs: build
+    if: needs.build.outputs.pages == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: publish-pages
+      cancel-in-progress: false
+    steps:
+      - name: Deploy existing GitHub Pages website
+        id: deployment
+        uses: actions/deploy-pages@v4
