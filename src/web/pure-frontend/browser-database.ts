@@ -112,6 +112,10 @@ export async function 应用浏览器迁移(数据库: Kysely<DB>): Promise<void
     })
   } finally {
     await sql`PRAGMA foreign_keys = ON`.execute(数据库)
+    let 外键开关 = await sql<{ foreign_keys: number }>`PRAGMA foreign_keys`.execute(数据库)
+    z.array(z.object({ foreign_keys: z.literal(1) }).strict())
+      .length(1)
+      .parse(外键开关.rows)
   }
   return
 }

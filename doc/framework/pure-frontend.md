@@ -12,6 +12,7 @@
 - Worker 通信及跨标签页写入锁由 `src/web/global/manager/pure-frontend-client.ts` 负责。
 - 接口逻辑在 `src/web/pure-frontend/pure-frontend-api-worker.ts` 中执行, 使用本机 JWT 认证, 不依赖远程认证服务。
 - SQLite Worker 位于 `src/web/pure-frontend/local-sqlite-worker.ts`, 数据依托 IndexedDB 持久化, 刷新页面后保留。
+- SQLite Worker 每次打开连接时立即开启并校验外键约束，包括无需执行迁移的连接；迁移仅在执行期间临时关闭约束，提交或回滚后必须恢复并校验开启状态，开启失败时阻止继续使用数据库。
 - 对 Node 运行时的模拟实现在 `src/web/mock/` 中, 通过 `package.json` 的 `browser` 与 `alias` 字段进行替换配置。
 
 ## 生成与配置
