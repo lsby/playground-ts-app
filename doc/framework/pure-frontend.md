@@ -21,6 +21,7 @@
 - 只有明确声明 `{ 浏览器支持: '纯前端' }` 的接口才会被生成器收录, 表示接口及其依赖可以打包到浏览器; 普通 Web 中这些接口仍在服务端执行。
 - 登录接口示例见 `src/interface/demo/auth/is-login/index.ts`, 用户配置示例见 `src/interface/user/get-user-config/index.ts`。
 - 浏览器数据库执行 `prisma/migrations/` 中的迁移链, 通过 `_prisma_migrations` 记录和校验迁移, 迁移失败时明确报错。
+- API Worker 与 SQLite Worker 使用 `new Worker(new URL(源码路径, import.meta.url))` 声明, 由 Parcel 统一跟踪、生成带内容哈希的资源及依赖, 不再独立构建或监听 API Worker。`--public-url` 同时控制页面和 Worker 的资源路径, 支持子目录部署。
 - 仅纯前端构建会生成 API Worker 及 SQLite 资源, 普通 Web 构建不包含这些数据库运行资源。
 
 ## 运行与并发

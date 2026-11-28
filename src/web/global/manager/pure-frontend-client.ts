@@ -20,8 +20,10 @@ let 纯前端数据库锁名称 = `${项目标识}-pure-frontend-database`
 
 function 获得纯前端Worker(): Worker {
   if (纯前端Worker === undefined) {
-    let WorkerURL = new URL('/worker-assets/pure-frontend-api-worker.js', globalThis.location.href)
-    let 当前Worker = new Worker(WorkerURL, { type: 'module', name: `${项目标识}-pure-frontend-sqlite` })
+    let 当前Worker = new Worker(new URL('../../pure-frontend/pure-frontend-api-worker.ts', import.meta.url), {
+      type: 'module',
+      name: `${项目标识}-pure-frontend-sqlite`,
+    })
     纯前端Worker = 当前Worker
     当前Worker.addEventListener('message', (event: MessageEvent<纯前端Worker响应>) => {
       let 等待项 = 纯前端等待请求.get(event.data.id)

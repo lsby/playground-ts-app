@@ -4,7 +4,6 @@ import dotenv from 'dotenv'
 import { readdirSync } from 'fs'
 import path from 'path'
 import { 读取环境文件明文 } from '../setup/env-crypto-core.mjs'
-import { ParcelWorker入口, ParcelWorker选项 } from '../task/model/task-common'
 
 function getHtmlEntries(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -42,22 +41,6 @@ function 启动任务(): void {
 
   正在重启 = false
   Parcel进程列表 = []
-  if (process.env['BUILD_TARGET'] === 'pure-frontend') {
-    let Worker进程 = crossSpawn(
-      'parcel',
-      [
-        'watch',
-        ...ParcelWorker选项,
-        '--dist-dir',
-        'dist/src/web/worker-assets',
-        '--no-hmr',
-        '--watch-for-stdin',
-        ParcelWorker入口,
-      ],
-      { stdio: ['pipe', 'inherit', 'inherit'], windowsHide: true },
-    )
-    Parcel进程列表.push(Worker进程)
-  }
   let Web进程 = crossSpawn(
     'parcel',
     [

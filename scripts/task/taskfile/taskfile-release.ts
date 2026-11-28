@@ -22,6 +22,11 @@ export let 发布任务表 = 定义任务({
   'capacitor:open:android': { 说明: '打开 Android 工程', 运行: 命令('cap', 'open', 'android'), 传递参数: true },
 
   // 发行
+  'public:oss:aliyun': {
+    说明: '构建并按确认参数同步纯前端网站至阿里云 OSS',
+    运行: 命令('tsx', 'scripts/public/release-oss-aliyun.ts'),
+    传递参数: true,
+  },
   'public:docker:local': {
     说明: '执行本地 Docker 发布',
     运行: 命令('tsx', 'scripts/public/release-docker-local.ts'),
@@ -81,6 +86,6 @@ export let 发布任务表 = 定义任务({
   },
   'release:push': {
     说明: '推送当前的发布提交与版本标签到远程仓库',
-    运行: [命令('git', 'push'), 命令('git', 'push', '--tags')],
+    运行: 命令('tsx', 'scripts/release/release.ts', '--push-only'),
   },
 })

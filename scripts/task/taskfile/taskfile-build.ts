@@ -1,4 +1,4 @@
-import { ParcelWorker基础参数, Parcel基础参数, 测试环境文件 } from '../model/task-common'
+import { Parcel基础参数, 测试环境文件 } from '../model/task-common'
 import { 命令, 定义任务 } from '../model/task-runner'
 
 export let 构建任务表 = 定义任务({
@@ -25,11 +25,6 @@ export let 构建任务表 = 定义任务({
     运行: 命令('parcel', ...Parcel基础参数, '--dist-dir', 'test-outputs/web-test'),
     公开: false,
   },
-  'bundle:worker:pure-frontend': {
-    说明: '构建纯前端 API Worker',
-    运行: 命令('parcel', ...ParcelWorker基础参数, '--dist-dir', 'dist/src/web/worker-assets'),
-    公开: false,
-  },
   // 构建
   'build:post': { 说明: '执行构建后处理', 运行: 命令('tsx', 'scripts/post-build/index.ts'), 公开: false },
   'build:all': {
@@ -45,7 +40,7 @@ export let 构建任务表 = 定义任务({
   },
   'build:web:pure-frontend': {
     说明: '生成、自愈并构建纯前端版本',
-    依赖: ['tidy:all', 'clean:web', 'bundle:worker:pure-frontend', 'bundle:web'],
+    依赖: ['tidy:all', 'clean:web', 'bundle:web-no-scope-hoist'],
     需要环境文件: true,
   },
   'build:web:test': {
