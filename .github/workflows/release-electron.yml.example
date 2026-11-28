@@ -21,6 +21,11 @@ jobs:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: 保持检出文件使用仓库换行
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
@@ -52,13 +57,12 @@ jobs:
           fi
           if [ -n "$PROJECT_CONFIG_KEY_FILE" ]; then printf '%s\n' "$PROJECT_CONFIG_KEY_FILE" > .project-config.key; fi
 
-      # Windows 下使用 hoisted 布局，避免 Electron/Parcel 的深层 pnpm 路径问题。
-      - name: 配置依赖布局 (Windows)
+      - name: 安装依赖 (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
-        run: pnpm config set node-linker hoisted
+        run: pnpm install --frozen-lockfile --config.node-linker=isolated --package-import-method=copy
 
-      - name: 安装依赖
+      - name: 安装依赖 (macOS)
+        if: runner.os != 'Windows'
         run: pnpm install --frozen-lockfile
 
       - name: 准备 Electron 数据库 (Windows)

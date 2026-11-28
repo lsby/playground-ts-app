@@ -52,7 +52,7 @@ jobs:
       - name: Build each distinct public path
         env:
           INPUT_TARGET: ${{ inputs.target }}
-        run: pnpm run task -- build:web:publish
+        run: npm run task -- build:web:publish
       - name: Save OSS website
         if: steps.config.outputs.oss == 'true'
         uses: actions/upload-artifact@v4
@@ -86,7 +86,7 @@ jobs:
           name: website-oss
           path: dist/web-publish/oss
       - name: Publish existing OSS website
-        run: pnpm run task -- public:web:oss -- --upload-only --yes
+        run: npm run task -- public:web:oss -- --upload-only --yes
       - name: Remove project configuration key
         if: always()
         run: rm -f -- .project-config.key
