@@ -25,7 +25,7 @@ function 读取迁移(): 迁移[] {
     .map((项): 迁移 => {
       let SQL路径 = path.join(迁移目录, 项.name, 'migration.sql')
       if (fs.existsSync(SQL路径) === false) throw new Error(`迁移缺少 migration.sql: ${项.name}`)
-      let SQL = fs.readFileSync(SQL路径, 'utf-8')
+      let SQL = fs.readFileSync(SQL路径, 'utf-8').replace(/\r\n/gu, '\n')
       return { 名称: 项.name, SQL, 校验和: crypto.createHash('sha256').update(SQL).digest('hex') }
     })
 }
