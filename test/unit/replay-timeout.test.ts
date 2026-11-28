@@ -154,10 +154,21 @@ describe('导出实际回放调用', () => {
       覆盖验收点键们: ['完成'],
       流程名称: '时间缺失的回放',
       测试思路: '验证旧录制的等待时间',
-      步骤组: [{ 条目们: [条目], 备注们: [] }],
+      步骤组: [
+        { 条目们: [条目], 备注们: [] },
+        {
+          条目们: [
+            {
+              ...创建条目('browser_wait', { name: 'a', target: { by: 'text', text: '完成' }, state: 'visible' }),
+              id: 2,
+            },
+          ],
+          备注们: [],
+        },
+      ],
       测试地址,
     })
-    expect(输出).toContain('timeout: 10000')
+    expect(输出).toMatch(/点击\(.+timeout: 10000/u)
     expect(输出).not.toContain('timeout: undefined')
   })
 
