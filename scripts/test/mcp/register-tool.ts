@@ -8,11 +8,16 @@ import type {
 import { z } from 'zod-mcp'
 
 import type { 测试建议 } from '../../../src/model/test-requirement'
+import { 计算记录状态 } from '../../../src/model/test-requirement/recording'
+import { 是动作未执行错误, 运行于动作阶段记录 } from '../../../src/test-tools/action-phase'
 import type { 录制增强, 操作调用结果, 测试操作记录 } from '../../../src/test-tools/operation-record'
+import { 运行于工具调用 } from '../../../src/test-tools/tool-call-context'
+import { 判定失败阶段, type 失败线索 } from './failure-phase'
 import { 检查操作回放支持 } from './replay-support'
 
 export type MCP执行结果<T> = {
-  结果: { 成功: true; 值: T } | { 成功: false; 错误: string }
+  /** 失败时的线索：错误是否明确说明动作没执行。引擎标记过动作已执行的信息由注册器补上。 */
+  结果: { 成功: true; 值: T } | { 成功: false; 错误: string; 失败线索?: Pick<失败线索, '明确未执行'> }
   附件们: readonly { 路径: string; 说明?: string }[]
   取证错误们: readonly string[]
 }
@@ -75,11 +80,22 @@ export function 创建工具注册器(server: McpServer, 保护: 工具调用保
           return await 保护(async (): Promise<CallToolResult> => {
             let recordId: number | undefined
             let 执行结果: MCP执行结果<工具输出>
+            let 动作阶段: { 动作已执行: boolean } = { 动作已执行: false }
             try {
               if (记录 !== undefined) recordId = await 记录.开始(名称, 操作参数模型.parse(参数))
-              执行结果 = await 执行(参数, 上下文.mcpReq.signal)
+              // 调用方超时或取消时，设备据此取消正在跑的操作并释放占用，不能让它在后台继续占着设备
+              let 运行 = 运行于动作阶段记录(() =>
+                运行于工具调用({ 工具名: 名称, 信号: 上下文.mcpReq.signal }, () => 执行(参数, 上下文.mcpReq.signal)),
+              )
+              动作阶段 = 运行.记录
+              执行结果 = await 运行.结果
             } catch (错误) {
-              执行结果 = { 结果: { 成功: false, 错误: 错误文本(错误) }, 附件们: [], 取证错误们: [] }
+              // 明确未执行由引擎标记；其余异常交给失败阶段判定，复合动作保留待确认。
+              执行结果 = {
+                结果: { 成功: false, 错误: 错误文本(错误), 失败线索: { 明确未执行: 是动作未执行错误(错误) } },
+                附件们: [],
+                取证错误们: [],
+              }
             }
             let { 结果, 附件们, 取证错误们 } = 执行结果
             let artifacts = 附件们.map(({ 路径, 说明 }) => ({
@@ -89,6 +105,7 @@ export function 创建工具注册器(server: McpServer, 保护: 工具调用保
             let evidenceErrors = [...取证错误们]
             let 结果数据 = 结果.成功 ? { result: { ...结果.值.数据, ...结果.值.响应附加 } } : { error: 结果.错误 }
             let recordingError: string | undefined
+            let recordState: ReturnType<typeof 计算记录状态> | undefined
             if (记录 !== undefined && recordId !== undefined) {
               let 增强: 录制增强 | undefined
               let 输出增强 = 结果.成功 ? 结果.值.录制增强 : undefined
@@ -112,10 +129,20 @@ export function 创建工具注册器(server: McpServer, 保护: 工具调用保
                     evidenceErrors,
                     ...(增强 === undefined || Object.keys(增强).length === 0 ? {} : { 增强 }),
                   }
-                : { status: 'failed', error: 结果.错误, artifacts, evidenceErrors }
+                : {
+                    status: 'failed',
+                    error: 结果.错误,
+                    failurePhase: 判定失败阶段(名称, 注解?.readOnlyHint === true, {
+                      明确未执行: 结果.失败线索?.明确未执行 === true,
+                      动作已执行: 动作阶段.动作已执行,
+                    }),
+                    artifacts,
+                    evidenceErrors,
+                  }
               try {
                 await 记录.完成(recordId, 调用结果)
                 if (结果.成功) for (let 建议 of 结果.值.建议们 ?? []) await 记录.添加建议(recordId, 建议)
+                else recordState = 计算记录状态(await 记录.获得(recordId))
               } catch (错误) {
                 recordingError = 错误文本(错误)
               }
@@ -129,6 +156,7 @@ export function 创建工具注册器(server: McpServer, 保护: 工具调用保
                 ? {}
                 : { replay: 检查操作回放支持(名称, 操作参数模型.parse(参数), 结果.值.数据) }),
               ...(recordingError === undefined ? {} : { recordingError }),
+              ...(recordState ?? {}),
             }
             let content: CallToolResult['content'] = [{ type: 'text', text: JSON.stringify(structuredContent) }]
             if (结果.成功)

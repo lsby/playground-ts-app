@@ -201,7 +201,11 @@ export let 开发任务表 = 定义任务({
     依赖: ['watch:type', 'watch:lint', 'watch:api-list', 'watch:api-type', 'watch:web-page-entry'],
     公开: false,
   },
-  'dev:test:prepare': { 说明: '准备测试数据库和派生文件', 依赖: ['db:ensure:test:web', 'generate:all'], 公开: false },
+  'dev:test:prepare': {
+    说明: '准备测试数据库和派生文件',
+    依赖: ['db:ensure:test:web', 'generate:all:fast'],
+    公开: false,
+  },
   'dev:test': {
     说明: '准备测试数据库和派生文件后启动测试开发套件',
     环境文件: 测试环境文件,

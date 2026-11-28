@@ -1,6 +1,8 @@
 import { Electron生产环境文件, Sea生产环境文件, Web生产环境文件, 纯前端生产环境文件 } from '../model/task-common'
 import { 命令, 定义任务 } from '../model/task-runner'
+import { 准备Docker发布参数 } from '../prepare/release-docker'
 import { 准备Electron发布参数 } from '../prepare/release-electron'
+import { 准备发布测试参数, 准备完整发布参数 } from '../prepare/release-test'
 import { 准备发布版本参数 } from '../prepare/release-version'
 import { 准备网站发布参数 } from '../prepare/release-web'
 
@@ -49,8 +51,8 @@ export let 发布任务表 = 定义任务({
   'public:docker:remote': {
     说明: '执行远程 Docker 发布',
     运行: 命令('tsx', 'scripts/public/release-docker-remote.ts'),
+    准备运行: 准备Docker发布参数,
     传递参数: true,
-    运行时终端输入: true,
   },
   'public:electron': {
     说明: '构建 Electron 发布包',
@@ -83,7 +85,19 @@ export let 发布任务表 = 定义任务({
   },
 
   // 发布
-  'release:verify': { 说明: '发布前运行单元测试并完成构建', 依赖: ['test:unit', 'build:all'], 公开: false },
+  'release:test': {
+    说明: '按发布选项运行或跳过单元测试',
+    准备运行: 准备发布测试参数,
+    传递参数: true,
+    运行: 命令('node', '--import', 'tsx', 'scripts/release/test-before-release.ts'),
+    公开: false,
+  },
+  'release:verify': {
+    说明: '按选择运行单元测试并完成构建',
+    依赖: ['release:test', 'build:all'],
+    参数传递目标: 'release:test',
+    公开: false,
+  },
   'release:version': {
     说明: '交互式选择新版本号',
     运行: 命令('bumpp', '--no-commit', '--no-tag', '--no-push'),
@@ -95,7 +109,8 @@ export let 发布任务表 = 定义任务({
     说明: '构建、提交、打标签并推送新版本',
     环境文件: Web生产环境文件,
     依赖: ['release:version', 'release:verify'],
-    参数传递目标: 'release:version',
+    准备运行: 准备完整发布参数,
+    传递参数: true,
     运行: 命令('tsx', 'scripts/release/release.ts'),
   },
   'release:push': {

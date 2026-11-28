@@ -198,8 +198,10 @@
   - 你可以使用 `npm run task -- --list` 查看公开任务, 使用 `npm run task -- --list-all` 查看包含内部叶子任务在内的全部任务, 或者用 `npm run task -- <任务名> --dry-run` 预览具体的执行计划
   - 为了维持一个唯一的事实来源, `package.json` 的 scripts 里只保留最常用任务的快捷别名, 复杂的任务组合一律在 Taskfile 中通过 `依赖` 和 `依赖方式` 声明
   - 基础的叶子任务不应该反向调用包含它的组合任务, 以避免递归调用
+  - 整理目录可用 `npm run task -- files:move -- --dry-run <来源...> <目标>` 预览文件搬移与引用更新, 确认计划后移除 `--dry-run` 执行; 批量规则可用 `--plan <计划.json>`. `files:plan` 按文件名前缀生成计划草稿. 搬移后运行生成与类型检查
   - 只有当输出结果互不覆盖时才可以安排任务并行执行, 以避免竞争冒险
   - 任务启动配置必须通过任务的 `准备运行` 阶段集中收集. 任务执行器会先遍历完整依赖图并完成全部准备器, 再执行任何正式命令; 禁止把本可提前确定的问题留到构建, 测试, 迁移或发布途中询问
+  - 组合任务可在准备结果中通过 `依赖参数` 向尚未准备、明确接收参数的下游任务分发参数; 重复分发或向已准备节点分发会报错. `release:all` 以此分别准备版本选项和可选单测, 非交互时必须显式指定 `--unit-tests=true|false`, 运行单测还需 `--unit-test-filter=<正则>`
   - 可使用 `npm run task -- <任务名> --prepare-only -- <任务参数>` 仅收集选项并查看最终执行计划, 不运行正式命令. `--dry-run` 仍保持无交互的静态计划预览
   - 正式任务子进程默认关闭标准输入. 只有启动即完成交互的独立向导, 必须先做只读扫描才能确认的安全关卡, 或确实需要持续终端控制的任务, 才能显式声明 `运行时终端输入`; 此类边界必须纳入交互阶段静态检查的已审阅清单
   - 项目脚本新增 `inquirer`, `readline.question`, 原始按键读取或继承完整 `stdio` 前, 必须先判断其应归属准备阶段还是运行时人工关卡, 并通过 `check:task-interaction` 检查. 不得用宽泛目录白名单掩盖未分类的交互
@@ -213,6 +215,7 @@
   - 系统级别的通用文件监听统一借助 `scripts/watch/watch.ts` 实现
 - **文件生成机制**:
   - 运行 `npm run task -- generate:all` 即可触发全量代码生成
+  - `generate:all:fast` 保留全部生成步骤, 对 API 列表和类型按输入与输出内容复用结果; `build:web:test` 复用源码、环境与完整产物均未变化的测试前端构建. 缓存保存在 `test-outputs/`, 构建期间输入变化会报错且不记录缓存
   - 所有派生文件都交由生成器覆盖维护. 任何手动修改都会在下次生成时被冲掉, 正确做法是去修改源头定义然后重新生成. 这些派生文件包含:
     - 数据库与接口层面的 `src/types/db.ts`, `src/interface/interface-list.ts` 以及 `src/types/interface-type.ts`
     - 前端相关与本地数据库层面的 `src/web/page/entry/**/*.ts`, `src/web/pure-frontend/local-api-list.ts` 和 `src/web/pure-frontend/local-schema.ts`

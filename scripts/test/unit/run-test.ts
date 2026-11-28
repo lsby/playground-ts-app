@@ -1,4 +1,5 @@
 import crossSpawn from 'cross-spawn'
+import { existsSync, readdirSync, readFileSync } from 'fs'
 import * as path from 'path'
 import { pathToFileURL } from 'url'
 
@@ -96,7 +97,11 @@ class 单元测试运行器 {
 
     try {
       this.执行命令('lsby-net-core-gen-test', this.获得单元测试生成参数(实际过滤器))
-      this.执行命令('vitest', 选项.生成覆盖率 === true ? ['run', '--coverage'] : ['run'])
+      this.执行命令('vitest', [
+        'run',
+        ...(选项.生成覆盖率 === true ? ['--coverage'] : []),
+        ...this.选出匹配的测试文件(实际过滤器),
+      ])
 
       if (选项.生成覆盖率 === true) {
         let 报告文件 = path.join(this.报告目录, 'index.html')
@@ -115,6 +120,30 @@ class 单元测试运行器 {
     }
 
     console.log(`\n✅ 单元测试执行成功！`)
+  }
+
+  /**
+   * 过滤器只按「相对仓库根目录的路径」匹配 test/ 下手写的测试文件，不看绝对路径
+   * （工作树目录名常带功能名，如 feature-system-notice，按绝对路径匹配会把无关测试带进来）。
+   * 接口生成的 unit-test.test.ts 已在生成时按接口路径过滤，里面有测试就保留。
+   * 过滤器是 .* 表示全部运行，不传文件参数。
+   */
+  private 选出匹配的测试文件(过滤器: string): string[] {
+    if (过滤器 === '.*') return []
+    let 正则 = new RegExp(过滤器)
+    let 生成文件 = 'test/unit/unit-test.test.ts'
+    let 文件们 = readdirSync(path.join(this.根目录, 'test'), { recursive: true })
+      .map((项) => `test/${String(项).replaceAll('\\', '/')}`)
+      .filter((相对路径) => 相对路径.endsWith('.test.ts') && 相对路径 !== 生成文件 && 正则.test(相对路径))
+      .sort()
+    // 过滤后没有匹配的接口时，生成文件里没有任何测试，vitest 会报「没有测试套件」，这时不带它。
+    let 生成文件路径 = path.join(this.根目录, 生成文件)
+    let 有接口测试 =
+      existsSync(生成文件路径) && /\b(?:describe|it|test)\s*[.(]/u.test(readFileSync(生成文件路径, 'utf8'))
+    let 结果 = [...(有接口测试 ? [生成文件] : []), ...文件们]
+    // 一个都没匹配到时不能返回空，否则 vitest 会把全部测试跑一遍
+    if (结果.length === 0) throw new Error(`过滤器 ${过滤器} 没有匹配到任何测试（只按相对仓库根目录的路径匹配）`)
+    return 结果
   }
 
   private 获得单元测试生成参数(过滤器: string): string[] {

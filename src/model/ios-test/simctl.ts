@@ -6,7 +6,7 @@ export async function 执行Xcrun(参数: readonly string[], 取消信号: Abort
   取消信号.throwIfAborted()
   let 信号 = AbortSignal.any([取消信号, AbortSignal.timeout(超时毫秒)])
   return await new Promise<Buffer>((完成, 失败): void => {
-    let 进程 = spawn('xcrun', [...参数], { signal: 信号, stdio: ['ignore', 'pipe', 'pipe'] })
+    let 进程 = spawn('xcrun', [...参数], { signal: 信号, killSignal: 'SIGKILL', stdio: ['ignore', 'pipe', 'pipe'] })
     let 输出: Buffer[] = []
     let 错误输出: Buffer[] = []
     进程.stdout.on('data', (数据: Buffer): void => void 输出.push(数据))
@@ -63,9 +63,37 @@ export async function 设置应用语言(
   await 执行Xcrun(['simctl', 'spawn', 设备, 'defaults', 'write', 包名, 'AppleLocale', 地区码], 取消信号)
 }
 
+/** 从 `simctl spawn <设备> launchctl list` 的输出里找包名对应应用的进程号；应用没在运行（进程号列是 -）返回 undefined。 */
+export function 解析应用进程号(launchctl输出: string, 包名: string): number | undefined {
+  for (let 行 of launchctl输出.split('\n')) {
+    let 列们 = 行.trim().split(/\s+/u)
+    let 标签 = 列们[2]
+    if (标签 === undefined || 标签.startsWith(`UIKitApplication:${包名}[`) === false) continue
+    let 进程号 = Number(列们[0])
+    if (Number.isSafeInteger(进程号) && 进程号 > 0) return 进程号
+  }
+  return undefined
+}
+
+/** 读取模拟器里某个应用当前运行的进程号，没在运行返回 undefined。 */
+export async function 读取应用进程号(设备: string, 包名: string, 取消信号: AbortSignal): Promise<number | undefined> {
+  let 输出 = await 执行Xcrun(['simctl', 'spawn', 设备, 'launchctl', 'list'], 取消信号, 30_000)
+  return 解析应用进程号(输出.toString('utf8'), 包名)
+}
+
 /** 找原生输入框（网页里的输入框获得焦点时也以原生输入框出现在无障碍树里）。 */
 export let 输入框查询 = {
   using: '-ios predicate string',
   value:
     "type IN {'XCUIElementTypeTextField', 'XCUIElementTypeSecureTextField', 'XCUIElementTypeTextView', 'XCUIElementTypeSearchField'}",
+}
+
+/** 本机进程是否还活着（模拟器里的应用进程也是本机进程）。没权限发信号说明进程在，只有找不到进程才算已退出。 */
+export function 进程存活(进程号: number): boolean {
+  try {
+    process.kill(进程号, 0)
+    return true
+  } catch (错误) {
+    return 错误 instanceof Error && 'code' in 错误 && 错误.code === 'EPERM'
+  }
 }

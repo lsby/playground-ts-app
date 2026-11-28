@@ -9,7 +9,7 @@
 - **定位与目录**: 测试单个独立模块（如单个接口），与目标代码同目录存放（如 `src/interface/demo/base/add/t01.test.ts`）。
 - **入口与命令**:
   - 由 `scripts/test/unit/run-test.ts` 驱动。
-  - 运行 `npm run test:unit`（支持交互选择、`--all` 全量、`--filter <正则>` 筛选、`--no-coverage` 跳过覆盖率、`--open` 打开报告），默认生成覆盖率与测试报告至 `test-outputs/coverage/index.html`。
+  - 运行 `npm run test:unit`（支持交互选择、`--all` 全量、`--filter <正则>` 按仓库相对路径筛选手写测试及接口生成测试（未匹配时报错）、`--no-coverage` 跳过覆盖率、`--open` 打开报告），默认生成覆盖率与测试报告至 `test-outputs/coverage/index.html`。
 
 ## 集成测试 (Integration Testing)
 
@@ -55,6 +55,28 @@
 浏览器目标支持 `within` 限定一个区域、对话框或容器，例如 `{ by: 'text', text: '未登录', exact: true, within: { by: 'role', role: 'status' } }`。多匹配时报告候选元素，收窄目标后再操作；零匹配保留 Playwright 的条件等待。手写 `evaluate` / `evaluateAll` 等回调内不要声明命名局部函数，tsx 的命名保留可能插入浏览器中不存在的 `__name`，ESLint 会指出危险写法；使用直接传入的匿名回调或对象方法。
 
 导出超过 500 行时按完整步骤拆分到 `test/requirement-support/<需求目录>/<流程名>/`，入口保持步骤顺序，自动调整相对导入和图片资源路径。辅助文件不会被当成流程发现。单步骤或初始化仍过长时明确提示分组，不截断代码或删除检查。
+
+### 测试前端构建缓存
+
+`build:web:test` 与 `dev:test -- --replay-build` 共用内容缓存。源码、静态资源、构建脚本、依赖锁文件、配置及构建环境摘要一致，并且 `test-outputs/web-test` 的完整文件清单和内容一致时才复用。输入变化、产物缺失或被修改会重新生成和构建；构建中输入变化会报错并拒绝更新缓存。缓存只保存摘要，数据库和服务仍按每次运行正常准备。
+
+并发构建会明确报错。异常退出遗留 `test-outputs/build-cache/web-test.json.lock` 时，先确认原构建进程已经退出，再手工移除锁文件后重试。
+
+### 录制状态、续录与重新导出
+
+录制的调用带 `state`：正常、已排除或待确认。引擎明确标记动作尚未执行时，失败记录自动移出回放草稿；只读检查失败也会移出。动作已执行或无法确定是否执行时保留为待确认，`record_list` 返回 `needsConfirmIds`。确认动作有效用 `record_confirm`，点错或无效用 `record_mark { ids, reason }` 或 `record_remove`；待确认项未处理完时拒绝导出。`record_remove` 批量逐条处理，返回已移除、已排除及未能处理的编号与原因。
+
+`operations.json` 每次修改都原子写盘。`dev:test` 重启后接续最近一份有内容且未导出的记录，连同图片模板一起复制；中断时仍在运行的操作转为待确认。成功导出后不再接续，导出后新操作会再次标为未导出。传 `--fresh-record` 可直接开始新录制。恢复只接受第 4 版格式并逐项校验条目；旧格式、损坏数据及无效引用会明确报错，请重新录制或选择新记录。
+
+`record_export` 使用临时子进程读取当前需求定义，避免常驻进程沿用旧模块。已有同名流程时默认拒绝覆盖；明确传 `replace: true` 只替换该流程入口、辅助目录及本次图片模板，失败时还原旧文件。需求描述不存在时，可通过 `requirementName`、`requirementDescription` 和 `acceptanceCriteria` 生成骨架；返回 `skeletonGenerated` 与 `skeletonPath`，导出失败会清理本次新建骨架。
+
+### 移动交互与失败定位
+
+`ios_wait`、`android_wait` 默认精确匹配文字；日期等动态内容可传 `match: 'contains'`，只用于文字、描述和网页文字等待，多个匹配仍报错。点击保持唯一目标。`ios_fill`、`android_fill` 默认追加，传 `clear: true` 先清空，`value: ''` 可只清空；Android 最多删除 200 个字符。
+
+`ios_reload`、`android_reload` 只刷新 WebView。iOS WebView 按当前被测应用进程选择，页面换文档或应用重启后重新定位上下文。系统权限弹框通过 `ios_system_alert` 处理，可指定按钮或 `ifPresent: true`。网页结构中的名称可能来自文字，`ios_inspect_web` 会区分真实 aria-label 并提供已经确认唯一的定位。
+
+三端点击会等有限动画结束，跳过循环动画；错误带最近点击实际命中的元素。移动操作失败时保存画面和最多 3000 字网页可见文字，同一错误只采集一次。设备占用会持续到实际操作和取证结束，调用超时不会直接释放占用；底层请求未结束时须等待或关闭并重新建立设备会话。
 
 ## 交互式测试 MCP
 

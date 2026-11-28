@@ -15,7 +15,7 @@ export type 任务准备上下文 = {
   环境变量: NodeJS.ProcessEnv
   工作目录: string
 }
-export type 任务准备结果 = { 参数: string[] }
+export type 任务准备结果 = { 参数: string[]; 依赖参数?: Record<string, string[]> }
 export type 任务配置 = {
   说明: string
   详细说明?: string
@@ -283,11 +283,26 @@ async function 准备任务参数(
   参数传递目标: string | undefined,
 ): Promise<Map<string, string[]>> {
   let 准备参数表 = new Map<string, string[]>()
+  let 待传递参数表 = new Map<string, string[]>()
+  if (参数传递目标 !== undefined) 待传递参数表.set(参数传递目标, [...(选项.传递参数 ?? [])])
+  let 节点表 = new Map(节点组.map((节点) => [节点.名称, 节点]))
+  let 是下游依赖 = (当前: 任务节点, 目标: string): boolean => {
+    let 待访问 = [...(当前.任务.依赖 ?? [])]
+    let 已访问 = new Set<string>()
+    while (待访问.length > 0) {
+      let 名称 = 待访问.pop()
+      if (名称 === undefined || 已访问.has(名称)) continue
+      if (名称 === 目标) return true
+      已访问.add(名称)
+      待访问.push(...(节点表.get(名称)?.任务.依赖 ?? []))
+    }
+    return false
+  }
   let 是否存在准备器 = 节点组.some((节点) => 节点.任务.准备运行 !== undefined)
   if (是否存在准备器 === true) console.log('[task] 开始收集整条任务链的运行选项')
   for (let 节点 of 节点组) {
     选项.取消信号?.throwIfAborted()
-    let 原始参数 = 节点.名称 === 参数传递目标 ? [...(选项.传递参数 ?? [])] : []
+    let 原始参数 = 待传递参数表.get(节点.名称) ?? []
     if (节点.任务.准备运行 === undefined) {
       准备参数表.set(节点.名称, 原始参数)
       continue
@@ -301,6 +316,14 @@ async function 准备任务参数(
       工作目录: path.resolve(项目根目录, 节点.任务.工作目录 ?? '.'),
     })
     准备参数表.set(节点.名称, 结果.参数)
+    for (let [目标名称, 参数组] of Object.entries(结果.依赖参数 ?? {})) {
+      let 目标 = 节点表.get(目标名称)
+      if (是下游依赖(节点, 目标名称) === false || 目标?.任务.传递参数 !== true || 目标.任务.参数传递目标 !== undefined)
+        throw new Error(`任务 ${节点.名称} 只能向明确接收参数的下游依赖分发参数: ${目标名称}`)
+      if (准备参数表.has(目标名称) || 待传递参数表.has(目标名称))
+        throw new Error(`任务 ${目标名称} 已准备或已收到参数，不能重复分发`)
+      待传递参数表.set(目标名称, [...参数组])
+    }
   }
   if (是否存在准备器 === true) console.log('[task] 全部运行选项已收集，正式执行阶段不再询问启动配置')
   return 准备参数表

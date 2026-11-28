@@ -1,28 +1,33 @@
-import { execFile } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import os from 'node:os'
-import path from 'node:path'
-import { setTimeout as 等待 } from 'node:timers/promises'
-import { promisify } from 'node:util'
 import { z } from 'zod'
 
+import { 动作前执行 } from '../../test-tools/action-guard'
+import { 动作未执行错误, 标记动作已执行 } from '../../test-tools/action-phase'
 import type { 模板点击选项 } from '../../test-tools/template-match'
 import { 寻找截图文字 } from '../android-test/ocr'
-import type { 落点探测结果 } from '../web-locate/candidates'
+import { type 落点探测结果 } from '../web-locate/candidates'
+import { 整理网页可见文字, 格式化点中元素, 点击现场记录, 网页可见文字脚本 } from '../web-locate/diagnostics'
+import { 检查等待超时, 调用信号持有者 } from './abortable'
 import { Appium会话 } from './appium'
 import type { Appium配置 } from './appium-dir'
-import { 向焦点输入框输入, 检查点坐标 } from './input'
+import { 目标已停稳, type 定位结果 } from './click-ready'
+import { 关闭苹果会话 } from './close'
+import { 向焦点输入框输入, 检查点坐标, 生成滑动动作 } from './input'
 import { 准备测试包 } from './install'
-import { 生成原生谓词 } from './native-predicate'
+import { 等待苹果原生元素 } from './native-wait'
 import type { 苹果网络中转, 苹果网络状态 } from './network-relay'
 import { 解析苹果界面 } from './parse-screen'
+import { 重新加载苹果网页 } from './reload'
 import { 创建Appium常驻管理器 } from './resident'
-import { 上下文模型, 元素标识模型, 定位结果模型, 矩形模型, 苹果目标模型 } from './schema'
-import { 执行Xcrun, 设置应用语言, 读取模拟器状态 } from './simctl'
+import { 元素标识模型, 矩形模型, 解析点击目标, 解析等待目标 } from './schema'
+import { 截取模拟器画面 } from './screenshot'
+import { 执行Xcrun, 设置应用语言, 读取应用进程号, 读取模拟器状态, 进程存活 } from './simctl'
+import { 处理系统弹框, 读取系统弹框, type 系统弹框信息 } from './system-alert'
 import type { 苹果界面元素, 苹果目标 } from './types'
-import { 筛选网页上下文, 读取网页地址 } from './web-context'
-import { 探测苹果落点, 等待苹果模板后点击, 等待苹果画面稳定, 轮询等待地址 } from './web-probe'
-import { 定位脚本, 观察网页脚本 } from './web-script'
+import { 切换到网页上下文, 解析网页上下文, 读取网页地址 } from './web-context'
+import { 探测苹果落点, 描述苹果点击点, 等待苹果模板后点击, 等待苹果画面稳定, 轮询等待地址 } from './web-probe'
+import { 观察网页脚本 } from './web-script'
+import { 等待苹果网页定位 } from './web-wait'
+import { 读取窗口矩形 } from './window-rect'
 
 export { 计算苹果应用摘要 } from './app-digest'
 export { 苹果网络中转, 计算苹果中转端口 } from './network-relay'
@@ -30,9 +35,7 @@ export type { 苹果网络状态 } from './network-relay'
 export { 执行Xcrun } from './simctl'
 export type { 苹果界面元素, 苹果目标 } from './types'
 
-let PNG签名 = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
 let 原生上下文 = 'NATIVE_APP'
-let 执行文件 = promisify(execFile)
 
 function 是原生目标(目标: 苹果目标): boolean {
   return 目标.按 === '文字' || 目标.按 === '描述' || 目标.按 === '标识'
@@ -46,9 +49,14 @@ export class 苹果测试引擎 {
   private appium: Appium会话 | undefined
   private 当前上下文: string | undefined
   private 网页上下文: string | undefined
+  /** 被测应用当前的进程号缓存；应用重启、网页定位找不到页面时清掉重取。网页上下文只认这个进程的页面。 */
+  private 应用进程号: number | undefined
   private 原外观: 'light' | 'dark' | undefined
   private 是我们启动的模拟器 = false
   private 窗口缓存: z.infer<typeof 矩形模型> | undefined
+  private readonly 点击现场 = new 点击现场记录()
+  /** 当前 MCP 工具调用的取消信号；调用方超时或放弃时触发，让正在跑的等待和请求马上结束 */
+  public readonly 调用信号 = new 调用信号持有者()
 
   public constructor(
     private readonly 设备: string,
@@ -96,7 +104,7 @@ export class 苹果测试引擎 {
     })
     await this.应用配置.启动前?.(this.设备, this.取消信号)
     await 设置应用语言(this.设备, this.应用配置.包名, this.应用语言, this.取消信号)
-    this.appium = await Appium会话.启动(this.取消信号, this.应用配置.Appium)
+    this.appium = await Appium会话.启动(this.取消信号, this.应用配置.Appium, this.调用信号)
     try {
       await this.appium.创建会话(
         {
@@ -116,13 +124,13 @@ export class 苹果测试引擎 {
           // Web Inspector 进程标识由项目提供
           'appium:additionalWebviewBundleIds': [...this.应用配置.网页进程标识们],
           'appium:webviewConnectTimeout': 30_000,
-          // 默认 60 秒没命令就回收会话，等 AI 生成、人工看图都会超；改成 1 小时（不用 0，避免会话泄漏到永远），
-          // 真失效了由 ios_* 工具自动检测并重建（见 需求测试苹果设备.确保会话可用）
+          // 录制时等待人工查看画面，保留会话一小时。失效后由调用方重新打开。
           'appium:newCommandTimeout': 3600,
         },
         900_000,
       )
       this.当前上下文 = 原生上下文
+      this.appium.设置页面丢失恢复(() => this.恢复网页页面())
       await this.使用网页()
     } catch (错误) {
       let 日志 = this.appium.获得日志()
@@ -135,22 +143,10 @@ export class 苹果测试引擎 {
   }
 
   public async 截图(信号: AbortSignal = this.取消信号): Promise<Buffer> {
-    let 目录 = await mkdtemp(path.join(os.tmpdir(), 'mobile-test-ios-shot-'))
-    try {
-      let 文件 = path.join(目录, 'screen.png')
-      await 执行文件('xcrun', ['simctl', 'io', this.设备, 'screenshot', '--type=png', 文件], {
-        signal: AbortSignal.any([this.取消信号, 信号]),
-        timeout: 30_000,
-      })
-      let 图片 = await readFile(文件)
-      if (图片.length < 24 || 图片.subarray(0, 8).equals(PNG签名) === false) throw new Error('iOS 截图不是有效的 PNG')
-      return 图片
-    } finally {
-      await rm(目录, { recursive: true, force: true })
-    }
+    return await 截取模拟器画面(this.设备, AbortSignal.any([this.取消信号, 信号]))
   }
 
-  /** 切换模拟的网络：online 透传，offline 像飞行模式一样拒绝连接，hang 接住连接但不回复。切换时断开现存连接，杀掉重开应用时状态保持。 */
+  /** 切换模拟的网络：online 透传，offline 像飞行模式一样拒绝连接，hang 接住连接但不回复，maintenance 模拟服务器升级（OPTIONS 回 204，其他请求回 503 JSON），crash 模拟主服务崩溃、nginx 回 502 JSON（错误码「服务暂时不可用」，预检同样回 204）。切换时断开现存连接，杀掉重开应用时状态保持。 */
   public 设置网络(状态: 苹果网络状态): void {
     if (this.网络中转 === undefined) throw new Error('当前测试会话没有网络中转')
     this.网络中转.设置状态(状态)
@@ -160,46 +156,40 @@ export class 苹果测试引擎 {
     await this.simctl(['ui', this.设备, 'appearance', 配色方案])
   }
 
-  public async 点击(目标: 苹果目标, 超时毫秒 = 10_000): Promise<void> {
-    目标 = 苹果目标模型.parse(目标)
-    this.检查超时(超时毫秒)
+  /**
+   * 点击目标，返回点击前坐标处最上层元素的描述（网页目标才有，原生目标没有）。
+   * 网页目标点之前要等目标停稳：可见、中心点没被别的层盖住、目标及祖先上的有限动画播完、连续两次定位位置大小不变；
+   * 目标或祖先有循环动画时位置永远不会稳定，只检查前三项。总超时沿用 超时毫秒，超时报错会说明卡在哪一项、被谁盖住。
+   */
+  public async 点击(目标: 苹果目标, 超时毫秒 = 10_000): Promise<string | undefined> {
+    目标 = 解析点击目标(目标)
+    检查等待超时(超时毫秒)
     if (是原生目标(目标)) {
-      let 元素 = await this.等待原生(目标, 超时毫秒, '可点击', true)
-      if (元素 === undefined) throw new Error('目标不存在')
+      let 元素 = await 动作前执行(() => this.等待原生(目标, 超时毫秒, '可点击', true))
+      if (元素 === undefined) throw new 动作未执行错误('目标不存在')
       await this.点击点(Math.round(元素.x + 元素.宽 / 2), Math.round(元素.y + 元素.高 / 2))
-      return
+      return undefined
     }
-    // 可点击 = 可见、中心点没被别的元素盖住、没有 disabled 或 aria-disabled；不满足就在超时内继续等
-    let 可点击 = (值: z.infer<typeof 定位结果模型>): boolean => 值.数量 === 1 && 值.可点击
-    let 结果 = await this.等待定位(目标, 超时毫秒, '可点击', true, 可点击)
-    // 元素还在动画（弹窗滑入等）时位置会变，等连续两次定位的矩形一致再点，和 Playwright 的稳定性检查一样
-    // 一直在动的元素（循环动画）等不到稳定，最多等 3 秒就按最后的位置点，和之前的行为一致
-    let 稳定截止 = Date.now() + Math.min(超时毫秒, 3000)
-    while (true) {
-      await 等待(150, undefined, { signal: this.取消信号 })
-      let 新结果 = await this.等待定位(目标, 超时毫秒, '可点击', true, 可点击)
-      let 稳定 = (['x', 'y', '元素宽', '元素高'] as const).every((键) => Math.abs(新结果[键] - 结果[键]) < 1)
-      结果 = 新结果
-      if (稳定 || Date.now() >= 稳定截止) break
-    }
+    let 结果 = await 动作前执行(() => this.等待定位(目标, 超时毫秒, '可点击', true, 目标已停稳))
+    let 描述 = 格式化点中元素(结果.点中)
+    this.点击现场.记录(描述)
     let { x, y, width, height } = await this.读取网页范围()
     await this.点击点(Math.round(x + (结果.x * width) / 结果.宽), Math.round(y + (结果.y * height) / 结果.高))
+    return 描述
   }
 
   /** 点击屏幕坐标。坐标单位是「点」（逻辑像素，iPhone 17 为 402×874），不是截图像素。 */
-  public async 点击坐标(x: number, y: number): Promise<void> {
+  public async 点击坐标(x: number, y: number): Promise<string | undefined> {
+    let 描述 = await this.记录点击点现场(x, y)
     await this.点击点(x, y)
+    return 描述
   }
 
   /** 读取原生无障碍树的精简列表（位置和尺寸单位是「点」）。 */
   public async 观察界面(): Promise<readonly 苹果界面元素[]> {
-    await this.使用原生()
-    try {
-      let 源码 = z.string().parse(await this.会话().请求('GET', '/source'))
-      return 解析苹果界面(源码)
-    } finally {
-      await this.使用网页()
-    }
+    return await this.在原生上下文执行(async () =>
+      解析苹果界面(z.string().parse(await this.会话().请求('GET', '/source'))),
+    )
   }
 
   /** 读取 WebView 的精简无障碍快照文本。 */
@@ -212,24 +202,12 @@ export class 苹果测试引擎 {
   public async 滑动(x1: number, y1: number, x2: number, y2: number, 耗时毫秒 = 300): Promise<void> {
     if (Number.isSafeInteger(耗时毫秒) === false || 耗时毫秒 <= 0 || 耗时毫秒 > 60_000)
       throw new Error('滑动耗时必须是 1 到 60000 毫秒之间的整数')
-    let 窗口 = await this.读取窗口()
     for (let [x, y] of [
       [x1, y1],
       [x2, y2],
     ] as const)
-      检查点坐标(x, y, 窗口)
-    await this.使用原生()
-    try {
-      await this.发指针动作([
-        { type: 'pointerMove', duration: 0, x: x1, y: y1 },
-        { type: 'pointerDown', button: 0 },
-        { type: 'pause', duration: 50 },
-        { type: 'pointerMove', duration: 耗时毫秒, x: x2, y: y2 },
-        { type: 'pointerUp', button: 0 },
-      ])
-    } finally {
-      await this.使用网页()
-    }
+      检查点坐标(x, y, await this.读取窗口())
+    await this.在原生上下文执行(() => this.发指针动作(生成滑动动作(x1, y1, x2, y2, 耗时毫秒)))
   }
 
   /**
@@ -252,7 +230,8 @@ export class 苹果测试引擎 {
 
   /** 截图后用 OCR 找到唯一匹配的文字，把像素坐标换算成点坐标，在原生层发真实触摸。 */
   public async 点击截图文字(文字: string): Promise<{ x: number; y: number }> {
-    let 点 = await this.查找截图文字(文字)
+    let 点 = await 动作前执行(() => this.查找截图文字(文字))
+    await this.记录点击点现场(点.x, 点.y)
     await this.点击点(点.x, 点.y)
     return 点
   }
@@ -267,7 +246,10 @@ export class 苹果测试引擎 {
     超时毫秒 = 15_000,
   ): Promise<{ x: number; y: number }> {
     let 窗口宽 = (await this.读取窗口()).width
-    let 点击 = (x: number, y: number): Promise<void> => this.点击点(x, y)
+    let 点击 = async (x: number, y: number): Promise<void> => {
+      await this.记录点击点现场(x, y)
+      await this.点击点(x, y)
+    }
     return await 等待苹果模板后点击({
       模板,
       选项,
@@ -281,7 +263,18 @@ export class 苹果测试引擎 {
 
   /** WebView 当前的页面地址（location.href）；整页换文档后会重新查找并切换上下文，见 读取网页地址。 */
   public async 读取地址(): Promise<string> {
-    let { 地址, 上下文 } = await 读取网页地址(this.会话(), this.网页地址前缀, this.网页上下文, this.当前上下文)
+    let { 地址, 上下文 } = await 读取网页地址(
+      this.会话(),
+      {
+        网页地址前缀: this.网页地址前缀,
+        取进程号: (强制) => this.取得应用进程号(强制),
+        取消信号: this.取消信号,
+        超时毫秒: 10_000,
+      },
+      this.网页上下文,
+      this.当前上下文,
+      () => this.清除网页上下文缓存(),
+    )
     this.网页上下文 = 上下文
     this.当前上下文 = 上下文
     return 地址
@@ -289,7 +282,7 @@ export class 苹果测试引擎 {
 
   /** 等页面地址的 pathname 加 hash 与目标一致（忽略 origin，热重载包和打包版通用）；超时报错并说明实际地址。 */
   public async 等待地址(目标: string, 超时毫秒 = 10_000): Promise<void> {
-    await 轮询等待地址(() => this.读取地址(), 目标, 超时毫秒, this.取消信号)
+    await this.点击现场.包裹(() => 轮询等待地址(() => this.读取地址(), 目标, 超时毫秒, this.取消信号))
   }
 
   /**
@@ -301,12 +294,40 @@ export class 苹果测试引擎 {
     return await 探测苹果落点(this.会话(), 范围, { x, y })
   }
 
-  /** 向当前获得焦点的输入框输入文字，走系统键盘。 */
-  public async 输入(文字: string): Promise<void> {
-    if (文字 === '') throw new Error('iOS 输入内容不能为空')
-    await this.使用原生()
+  /** 失败现场用：WebView 里页面可见文字（innerText，压缩空行，最多约 3000 字）。 */
+  public async 读取网页可见文字(): Promise<string> {
     try {
-      await 向焦点输入框输入(this.会话(), 文字)
+      await this.使用网页()
+      return 整理网页可见文字(z.string().parse(await this.会话().执行脚本(网页可见文字脚本)))
+    } catch (错误) {
+      // 页面可能整页换过文档，缓存的网页上下文失效：清掉让下次重新查找（失败现场会重试一次）
+      this.清除网页上下文缓存()
+      this.应用进程号 = undefined
+      throw 错误
+    }
+  }
+
+  /** 点击屏幕坐标前记下该处最上层元素的描述（诊断，失败返回 undefined），见 描述苹果点击点。 */
+  private async 记录点击点现场(x: number, y: number): Promise<string | undefined> {
+    try {
+      let 描述 = await 描述苹果点击点(this.会话(), await this.读取网页范围(), { x, y })
+      this.点击现场.记录(描述)
+      return 描述
+    } catch {
+      this.取消信号.throwIfAborted()
+      return undefined
+    }
+  }
+
+  /** 向当前获得焦点的输入框输入文字，走系统键盘。默认在已有文字后追加；`清空` 为 true 时先清空再输入，此时文字可以为空（只清空）。 */
+  public async 输入(文字: string, { 清空 = false }: { 清空?: boolean } = {}): Promise<void> {
+    await 动作前执行(async () => {
+      if (文字 === '' && 清空 === false) throw new Error('iOS 输入内容不能为空；要清空输入框请把清空设为 true')
+      await this.使用原生()
+    })
+    try {
+      await 向焦点输入框输入(this.会话(), 文字, 清空)
+      标记动作已执行()
     } finally {
       await this.使用网页()
     }
@@ -327,9 +348,38 @@ export class 苹果测试引擎 {
     await this.使用原生()
     await this.会话().执行脚本('mobile: terminateApp', [{ bundleId: this.应用配置.包名 }])
     await this.会话().执行脚本('mobile: activateApp', [{ bundleId: this.应用配置.包名 }])
-    this.网页上下文 = undefined
+    this.清除网页上下文缓存()
+    this.应用进程号 = undefined
     this.当前上下文 = 原生上下文
     await this.使用网页()
+  }
+
+  /** 当前有没有系统弹框（通知权限等），有就返回文字和按钮。 */
+  public async 读取系统弹框(): Promise<系统弹框信息 | undefined> {
+    return await this.在原生上下文执行(() => 读取系统弹框(this.会话()))
+  }
+
+  /**
+   * 点系统弹框的按钮（原生文字、网页坐标都点不到它），见 处理系统弹框。返回是否点了。
+   * 必须在原生上下文里点：实测在 WebView 上下文里 mobile: alert 带 buttonLabel 点「使用App时允许」，系统会把定位权限记成拒绝（locationd 里 Authorization 为 1）。
+   */
+  public async 处理系统弹框(
+    动作: 'accept' | 'dismiss',
+    选项: { 按钮文字?: string; 仅当出现时?: boolean; 超时毫秒?: number } = {},
+  ): Promise<boolean> {
+    let 参数 = { 动作, 按钮文字: 选项.按钮文字, 仅当出现时: 选项.仅当出现时 ?? false, 超时毫秒: 选项.超时毫秒 ?? 5000 }
+    return await this.在原生上下文执行(() => 处理系统弹框(this.会话(), 参数, this.取消信号))
+  }
+
+  /** 只刷新网页：当前 WebView 整页重新加载，不重启 App、不清数据，等新文档加载完成再返回。 */
+  public async 重新加载网页(超时毫秒 = 30_000): Promise<void> {
+    await 重新加载苹果网页({
+      会话: this.会话(),
+      使用网页: () => this.使用网页(),
+      清缓存: () => this.清除网页上下文缓存(),
+      取消信号: this.取消信号,
+      超时毫秒,
+    })
   }
 
   /** 回放用：动作已经做完，只等画面稳定（每 250ms 截一张缩小灰度图，连续两次差异小于 1% 即稳定，最多 6 秒），不做 OCR。 */
@@ -338,8 +388,8 @@ export class 苹果测试引擎 {
   }
 
   public async 验证可见(目标: 苹果目标, 超时毫秒 = 10_000): Promise<void> {
-    目标 = 苹果目标模型.parse(目标)
-    this.检查超时(超时毫秒)
+    目标 = 解析等待目标(目标)
+    检查等待超时(超时毫秒)
     if (是原生目标(目标)) {
       await this.等待原生(目标, 超时毫秒, '可见', false)
       return
@@ -348,8 +398,8 @@ export class 苹果测试引擎 {
   }
 
   public async 验证隐藏(目标: 苹果目标, 超时毫秒 = 10_000): Promise<void> {
-    目标 = 苹果目标模型.parse(目标)
-    this.检查超时(超时毫秒)
+    目标 = 解析等待目标(目标)
+    检查等待超时(超时毫秒)
     if (是原生目标(目标)) {
       await this.等待原生(目标, 超时毫秒, '隐藏', false, false)
       return
@@ -358,53 +408,26 @@ export class 苹果测试引擎 {
   }
 
   public async 关闭(): Promise<void> {
-    let 错误们: unknown[] = []
-    try {
-      await this.appium?.关闭()
-    } catch (错误) {
-      错误们.push(错误)
-    }
+    let 会话 = this.appium
     this.appium = undefined
-    try {
-      await 执行Xcrun(['simctl', 'terminate', this.设备, this.应用配置.包名], new AbortController().signal, 15_000)
-    } catch {
-      // 应用已经退出时 terminate 会报错，可忽略。
-    }
-    for (let 步骤 of [
-      async (): Promise<void> => {
-        if (this.原外观 !== undefined)
-          await 执行Xcrun(['simctl', 'ui', this.设备, 'appearance', this.原外观], new AbortController().signal, 15_000)
-      },
-      async (): Promise<void> => {
-        if (this.是我们启动的模拟器 && (await 读取模拟器状态(this.设备, new AbortController().signal)) === 'Booted')
-          await 执行Xcrun(['simctl', 'shutdown', this.设备], new AbortController().signal, 60_000)
-      },
-    ])
-      try {
-        await 步骤()
-      } catch (错误) {
-        错误们.push(错误)
-      }
+    let 原外观 = this.原外观
     this.原外观 = undefined
-    try {
-      if (this.拥有网络中转) await this.网络中转?.关闭()
-      else this.网络中转?.恢复在线()
-    } catch (错误) {
-      错误们.push(错误)
-    }
-    if (错误们.length > 0) throw new AggregateError(错误们, '关闭 iOS 测试会话失败')
+    await 关闭苹果会话({
+      会话,
+      设备: this.设备,
+      包名: this.应用配置.包名,
+      原外观,
+      要关闭模拟器: this.是我们启动的模拟器,
+      网络中转: this.网络中转,
+      拥有网络中转: this.拥有网络中转,
+    })
   }
 
   /** 窗口尺寸（点）在会话内不变，只读一次，后面的点击、滑动、观察都不用再切上下文。 */
   public async 读取窗口(): Promise<z.infer<typeof 矩形模型>> {
     if (this.窗口缓存 !== undefined) return this.窗口缓存
-    await this.使用原生()
-    try {
-      this.窗口缓存 = 矩形模型.parse(await this.会话().请求('GET', '/window/rect'))
-      return this.窗口缓存
-    } finally {
-      await this.使用网页()
-    }
+    this.窗口缓存 = await this.在原生上下文执行(() => 读取窗口矩形(this.会话()))
+    return this.窗口缓存
   }
 
   /** WebView 控件在屏幕上的位置和大小（点）。 */
@@ -424,8 +447,10 @@ export class 苹果测试引擎 {
   }
 
   private async 点击点(x: number, y: number): Promise<void> {
-    检查点坐标(x, y, await this.读取窗口())
-    await this.使用原生()
+    await 动作前执行(async () => {
+      检查点坐标(x, y, await this.读取窗口())
+      await this.使用原生()
+    })
     try {
       await this.发指针动作([
         { type: 'pointerMove', duration: 0, x, y },
@@ -442,109 +467,87 @@ export class 苹果测试引擎 {
     await this.会话().请求('POST', '/actions', {
       actions: [{ type: 'pointer', id: 'finger1', parameters: { pointerType: 'touch' }, actions: 动作们 }],
     })
+    标记动作已执行()
     await this.会话().请求('DELETE', '/actions')
   }
 
-  /** 在原生无障碍树里按条件找元素，返回每个匹配的屏幕位置（单位是点）。 */
-  private async 查找原生(目标: 苹果目标): Promise<{ x: number; y: number; 宽: number; 高: number; 可见: boolean }[]> {
-    await this.使用原生()
-    let 谓词 = 生成原生谓词(目标)
-    let 元素们 = z
-      .array(元素标识模型)
-      .parse(await this.会话().请求('POST', '/elements', { using: '-ios predicate string', value: 谓词 }))
-    let 结果: { x: number; y: number; 宽: number; 高: number; 可见: boolean }[] = []
-    for (let 元素 of 元素们) {
-      let 编号 = 元素['element-6066-11e4-a52e-4f735466cecf']
-      try {
-        let 范围 = 矩形模型.parse(await this.会话().请求('GET', `/element/${编号}/rect`))
-        let 显示 = z.boolean().parse(await this.会话().请求('GET', `/element/${编号}/displayed`))
-        结果.push({
-          x: 范围.x,
-          y: 范围.y,
-          宽: 范围.width,
-          高: 范围.height,
-          可见: 显示 && 范围.width > 0 && 范围.height > 0,
-        })
-      } catch {
-        // 元素在查询期间消失，当作不存在。
-      }
-    }
-    return 结果
-  }
-
-  private async 等待原生(
+  private 等待原生(
     目标: 苹果目标,
     超时毫秒: number,
     说明: string,
-    要点击: boolean,
+    _要点击: boolean,
     应存在 = true,
   ): Promise<{ x: number; y: number; 宽: number; 高: number } | undefined> {
-    let 超时信号 = AbortSignal.timeout(超时毫秒)
-    let 信号 = AbortSignal.any([this.取消信号, 超时信号])
-    let 最后数量 = 0
-    try {
-      while (true) {
-        let 可见们 = (await this.查找原生(目标)).filter((元素) => 元素.可见)
-        最后数量 = 可见们.length
-        if (应存在 === false && 可见们.length === 0) return undefined
-        if (应存在 && 可见们.length > 1) throw new Error(`iOS 目标匹配到多个元素：${目标.按}=${目标.值}`)
-        if (应存在 && 可见们.length === 1) return 可见们[0]
-        await 等待(250, undefined, { signal: 信号 })
-      }
-    } catch (错误) {
-      this.取消信号.throwIfAborted()
-      if (超时信号.aborted)
-        throw new Error(`iOS 等待目标${说明}超时：${目标.按}=${目标.值}（可见匹配 ${String(最后数量)} 个）`, {
-          cause: 错误,
-        })
-      void 要点击
-      throw 错误
-    } finally {
-      await this.使用网页()
-    }
+    return 等待苹果原生元素({
+      会话: () => this.会话(),
+      使用原生: () => this.使用原生(),
+      使用网页: () => this.使用网页(),
+      取消信号: this.调用信号.合并(this.取消信号),
+      点击现场: this.点击现场,
+      目标,
+      超时毫秒,
+      说明,
+      应存在,
+    })
   }
 
-  private async 等待定位(
+  private 等待定位(
     目标: 苹果目标,
     超时毫秒: number,
     说明: string,
     要点击: boolean,
-    满足: (值: z.infer<typeof 定位结果模型>) => boolean,
-  ): Promise<z.infer<typeof 定位结果模型>> {
-    let 超时信号 = AbortSignal.timeout(超时毫秒)
-    let 信号 = AbortSignal.any([this.取消信号, 超时信号])
-    let 最后: z.infer<typeof 定位结果模型> | undefined
-    try {
-      while (true) {
-        await this.使用网页()
-        最后 = 定位结果模型.parse(
-          await this.会话().执行脚本(定位脚本, [目标.按 === '网页文字' ? 'text' : 'css', 目标.值, 要点击]),
-        )
-        if (满足(最后)) return 最后
-        await 等待(250, undefined, { signal: 信号 })
-      }
-    } catch (错误) {
-      this.取消信号.throwIfAborted()
-      if (超时信号.aborted)
-        throw new Error(
-          `iOS 等待目标${说明}超时：${目标.按}=${目标.值}（匹配 ${String(最后?.数量)} 个，可见 ${String(最后?.可见数量)} 个，可点击 ${String(最后?.可点击)}，禁用 ${String(最后?.禁用)}）`,
-          { cause: 错误 },
-        )
-      throw 错误
-    }
+    满足: (值: 定位结果, 上次: 定位结果 | undefined) => boolean,
+  ): Promise<定位结果> {
+    return 等待苹果网页定位({
+      会话: () => this.会话(),
+      使用网页: () => this.使用网页(),
+      取消信号: this.调用信号.合并(this.取消信号),
+      点击现场: this.点击现场,
+      目标,
+      超时毫秒,
+      说明,
+      要点击,
+      满足,
+    })
   }
 
   private async 网页上下文取得(): Promise<string> {
     if (this.网页上下文 !== undefined) return this.网页上下文
-    let 截止 = Date.now() + 30_000
-    while (true) {
-      this.取消信号.throwIfAborted()
-      let 上下文们 = 上下文模型.parse(await this.会话().执行脚本('mobile: getContexts', [{ waitForWebviewMs: 3000 }]))
-      let [候选, ...其余] = 筛选网页上下文(上下文们, this.网页地址前缀)
-      if (候选 !== undefined && 其余.length === 0) return (this.网页上下文 = 候选)
-      if (Date.now() > 截止) throw new Error(`iOS 测试 WebView 页面数量不是 1：${String(上下文们.length)}`)
-      await 等待(500, undefined, { signal: this.取消信号 })
-    }
+    return (this.网页上下文 = await this.解析当前网页上下文(30_000))
+  }
+
+  private 解析当前网页上下文(超时毫秒 = 30_000): Promise<string> {
+    return 解析网页上下文({
+      会话: this.会话(),
+      网页地址前缀: this.网页地址前缀,
+      取进程号: (强制) => this.取得应用进程号(强制),
+      缓存: this.网页上下文,
+      取消信号: this.调用信号.合并(this.取消信号),
+      超时毫秒,
+    })
+  }
+
+  /** 网页脚本报页面已不存在时由 Appium会话 调用：回原生、清掉缓存的页面和进程号，按当前进程重新找页面并切过去。 */
+  private async 恢复网页页面(): Promise<void> {
+    await this.会话()
+      .请求('POST', '/context', { name: 原生上下文 })
+      .catch((): void => {})
+    this.清除网页上下文缓存()
+    this.应用进程号 = undefined
+    this.当前上下文 = 原生上下文
+    await this.使用网页()
+  }
+
+  private 清除网页上下文缓存(): void {
+    this.网页上下文 = undefined
+    this.当前上下文 = undefined
+  }
+
+  /** 被测应用当前的进程号（simctl 查）；缓存的进程已经不在时重新查。强制为 true 时忽略缓存。 */
+  private async 取得应用进程号(强制: boolean): Promise<number | undefined> {
+    if (强制 === false && this.应用进程号 !== undefined && 进程存活(this.应用进程号)) return this.应用进程号
+    this.应用进程号 = await 读取应用进程号(this.设备, this.应用配置.包名, this.取消信号)
+    return this.应用进程号
   }
 
   private async 使用网页(名称?: string): Promise<void> {
@@ -552,12 +555,31 @@ export class 苹果测试引擎 {
     if (this.当前上下文 === 网页) return
     try {
       await this.会话().请求('POST', '/context', { name: 网页 })
-    } catch {
+    } catch (错误) {
+      // 缓存的页面失效（进程换了、整页换文档）：先回原生，按当前进程重新找页面再切，仍报 No targets 时在里面有限次重试
       this.网页上下文 = undefined
-      网页 = await this.网页上下文取得()
-      await this.会话().请求('POST', '/context', { name: 网页 })
+      await this.会话()
+        .请求('POST', '/context', { name: 原生上下文 })
+        .catch((): void => {})
+      网页 = await 切换到网页上下文(
+        this.会话(),
+        () => this.解析当前网页上下文(),
+        undefined,
+        () => this.清除网页上下文缓存(),
+        错误,
+      )
+      this.网页上下文 = 网页
     }
     this.当前上下文 = 网页
+  }
+
+  private async 在原生上下文执行<T>(执行: () => Promise<T>): Promise<T> {
+    await this.使用原生()
+    try {
+      return await 执行()
+    } finally {
+      await this.使用网页()
+    }
   }
 
   private async 使用原生(): Promise<void> {
@@ -569,10 +591,6 @@ export class 苹果测试引擎 {
   private 会话(): Appium会话 {
     if (this.appium === undefined) throw new Error('iOS 测试会话尚未启动')
     return this.appium
-  }
-
-  private 检查超时(超时毫秒: number): void {
-    if (Number.isSafeInteger(超时毫秒) === false || 超时毫秒 <= 0) throw new Error('iOS 等待超时必须是正整数')
   }
 
   private async simctl(参数: readonly string[], 超时毫秒 = 120_000): Promise<Buffer> {

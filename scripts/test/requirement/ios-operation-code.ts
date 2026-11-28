@@ -7,10 +7,12 @@ import {
   苹果滑动模型,
   苹果目标操作模型,
   苹果等待模型,
+  苹果系统弹框模型,
   苹果网络模型,
   苹果输入模型,
   苹果配色模型,
   转换苹果目标,
+  转换苹果等待目标,
 } from '../mcp/ios-input'
 import { 无参数模型 } from '../mcp/tool-input'
 import { 生成增强点击语句, type 模板资源 } from './enhanced-click-code'
@@ -130,22 +132,37 @@ export function 生成苹果调用代码(
       苹果仅观察开关模型.parse(参数)
       return { ...基本, 语句们: [引擎, 'await 引擎.重启应用()', ...保存结果('{ restarted: true }')] }
     }
+    case 'ios_system_alert': {
+      let { action, button, ifPresent } = 苹果系统弹框模型.parse(参数)
+      let 选项 = { ...(button === undefined ? {} : { 按钮文字: button }), 仅当出现时: ifPresent }
+      return {
+        ...基本,
+        语句们: [引擎, `await 引擎.处理系统弹框(${字面量(action)}, ${字面量(选项)})`, ...保存结果('{ handled: true }')],
+      }
+    }
+    case 'ios_reload': {
+      苹果仅观察开关模型.parse(参数)
+      return { ...基本, 语句们: [引擎, 'await 引擎.重新加载网页()', ...保存结果('{ reloaded: true }')] }
+    }
     case 'ios_observe':
       无参数模型.parse(参数)
       // 观察只是看一眼，回放不再等画面稳定；留一张截图作为这一步的证据
       return { ...基本, 类型: '观察', 语句们: [引擎, 'await 引擎.截图()', ...保存结果('{}')] }
     case 'ios_fill': {
-      let { value } = 苹果输入模型.parse(参数)
-      return { ...基本, 语句们: [引擎, `await 引擎.输入(${字面量(value)})`, ...保存结果('{ filled: true }')] }
+      let { value, clear } = 苹果输入模型.parse(参数)
+      // 默认追加；显式 clear 为 true 时导出清空选项。
+      let 选项 = clear ? ', { 清空: true }' : ''
+      return { ...基本, 语句们: [引擎, `await 引擎.输入(${字面量(value)}${选项})`, ...保存结果('{ filled: true }')] }
     }
     case 'ios_wait': {
-      let { target, state } = 苹果等待模型.parse(参数)
+      let 等待参数 = 苹果等待模型.parse(参数)
+      let { state } = 等待参数
       return {
         ...基本,
         类型: '观察',
         语句们: [
           引擎,
-          `await 引擎.${state === 'visible' ? '验证可见' : '验证隐藏'}(${字面量(转换苹果目标(target))}, ${String(推算回放超时(条目))})`,
+          `await 引擎.${state === 'visible' ? '验证可见' : '验证隐藏'}(${字面量(转换苹果等待目标(等待参数))}, ${String(推算回放超时(条目))})`,
           ...保存结果(`{ state: ${字面量(state)} }`),
         ],
       }

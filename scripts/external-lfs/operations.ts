@@ -3,53 +3,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { 元数据匹配 } from './cloud-store'
+import { 并发执行, 默认并发数 } from './concurrency'
 import { 项目根目录 } from './config'
+import { type 操作上下文, 创建上下文, 文件相同, 格式化文件大小, 选中清单 } from './context'
 import { 加密文件, 解密文件 } from './crypto'
-import {
-  写入清单,
-  创建临时目录,
-  删除清单,
-  扫描本地文件,
-  文件匹配模式,
-  规范路径,
-  计算文件摘要,
-  读取清单组,
-} from './local-store'
+import { 写入清单, 创建临时目录, 删除清单, 文件匹配模式, 规范路径, 计算文件摘要 } from './local-store'
 import type { 外挂LFS配置, 本地文件, 清单 } from './model'
-import { 云存储仓库管理器 } from './repository'
-
-type 操作上下文 = {
-  配置: 外挂LFS配置
-  scope?: string | undefined
-  仓库管理器: 云存储仓库管理器
-  清单组: Map<string, 清单>
-  本地组: Map<string, 本地文件>
-}
-
-async function 创建上下文(配置: 外挂LFS配置, scope?: string | undefined): Promise<操作上下文> {
-  let 清单组 = await 读取清单组(配置)
-  let 本地组 = await 扫描本地文件(配置, scope)
-  return { 配置, scope, 仓库管理器: new 云存储仓库管理器(配置), 清单组, 本地组 }
-}
-
-function 选中清单(上下文: 操作上下文, 过滤?: { target?: string | undefined; file?: string | undefined }): 清单[] {
-  return [...上下文.清单组.values()]
-    .filter((项) => 上下文.scope === undefined || 项.scope === 上下文.scope)
-    .filter((项) => 过滤?.target === undefined || 项.remote.target === 过滤.target)
-    .filter((项) => 过滤?.file === undefined || 文件匹配模式(项.path, 过滤.file))
-    .sort((左, 右) => 左.path.localeCompare(右.path))
-}
-
-function 文件相同(文件: 本地文件, 清单: 清单): boolean {
-  return 文件.size === 清单.plaintext.size && 文件.sha256 === 清单.plaintext.sha256
-}
-
-function 格式化文件大小(字节数: number): string {
-  if (字节数 < 1024) return `${String(字节数)} B`
-  if (字节数 < 1024 * 1024) return `${(字节数 / 1024).toFixed(1)} KB`
-  if (字节数 < 1024 * 1024 * 1024) return `${(字节数 / (1024 * 1024)).toFixed(1)} MB`
-  return `${(字节数 / (1024 * 1024 * 1024)).toFixed(2)} GB`
-}
 
 async function 请求确认(提示: string): Promise<boolean> {
   if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
@@ -74,6 +33,11 @@ async function 上传一个(上下文: 操作上下文, 文件: 本地文件, �
   let 密文路径 = path.join(临时根, 'object.enc')
   try {
     await 加密文件(文件.absolutePath, 密文路径, 'object', id)
+    let 校验路径 = path.join(临时根, 'check')
+    await 解密文件(密文路径, 校验路径, 'object', id)
+    let 摘要 = await 计算文件摘要(校验路径)
+    if (摘要.size !== 文件.size || 摘要.sha256 !== 文件.sha256) throw new Error(`上传期间文件发生变化: ${文件.path}`)
+    fs.unlinkSync(校验路径)
     if (fs.statSync(密文路径).size > 5 * 1024 * 1024 * 1024) {
       throw new Error(`加密后单文件上限为 5 GiB: ${文件.path}`)
     }
@@ -103,6 +67,7 @@ export type 推选项 = {
   file?: string | undefined
   acceptDeletions: boolean
   yes: boolean
+  concurrency?: number | undefined
 }
 
 export async function 推送(配置: 外挂LFS配置, 选项: 推选项): Promise<void> {
@@ -114,12 +79,21 @@ export async function 推送(配置: 外挂LFS配置, 选项: 推选项): Promis
   }
 
   let 候选清单项 = 选中清单(上下文, { target: 选项.target, file: 选项.file })
-  let 缺失 = 候选清单项.filter((项) => 上下文.本地组.has(项.path) === false)
+  let 缺失 = 候选清单项.filter(
+    (项) =>
+      上下文.本地组.has(项.path) === false &&
+      配置.managedPaths.find((范围) => 范围.scope === 项.scope)?.onDemand !== true,
+  )
+  let 按需缺失 = 候选清单项.filter(
+    (项) =>
+      上下文.本地组.has(项.path) === false &&
+      配置.managedPaths.find((范围) => 范围.scope === 项.scope)?.onDemand === true,
+  )
   if (缺失.length > 0 && 选项.acceptDeletions === false) {
     throw new Error(`本地缺少 ${String(缺失.length)} 个已登记文件；确认删除时重新运行并传入 --accept-deletions`)
   }
 
-  if (选项.file !== undefined && 本地候选.length === 0 && 缺失.length === 0) {
+  if (选项.file !== undefined && 本地候选.length === 0 && 缺失.length === 0 && 按需缺失.length === 0) {
     throw new Error(`未匹配到任何管辖文件或清单: ${选项.file}`)
   }
 
@@ -144,6 +118,11 @@ export async function 推送(配置: 外挂LFS配置, 选项: 推选项): Promis
       let 目标名称: string
       if (选项.target !== undefined) {
         目标名称 = 选项.target
+      } else if (配置.managedPaths.find((范围) => 范围.scope === 文件.scope)?.target !== undefined) {
+        let 范围目标 = 配置.managedPaths.find((范围) => 范围.scope === 文件.scope)?.target
+        if (范围目标 === undefined || 配置.targets[范围目标] === undefined)
+          throw new Error(`scope 的目标无效: ${文件.scope}`)
+        目标名称 = 范围目标
       } else if (全部目标.length === 1 && 首个目标 !== undefined) {
         目标名称 = 首个目标
       } else {
@@ -156,7 +135,7 @@ export async function 推送(配置: 外挂LFS配置, 选项: 推选项): Promis
   }
 
   if (待上传组.length === 0 && 缺失.length === 0) {
-    console.log('所有匹配文件均已最新，无需推送。')
+    console.log(`所有匹配文件均已最新，无需推送；按需文件未拉取 ${String(按需缺失.length)} 个。`)
     return
   }
 
@@ -177,9 +156,9 @@ export async function 推送(配置: 外挂LFS配置, 选项: 推选项): Promis
     }
   }
 
-  for (let 项 of 待上传组) {
+  await 并发执行(待上传组, 选项.concurrency ?? 默认并发数, async (项): Promise<void> => {
     await 上传一个(上下文, 项.文件, 项.目标名称, 项.旧清单)
-  }
+  })
 
   for (let 清单 of 缺失) {
     删除清单(配置, 清单)
@@ -190,22 +169,30 @@ export async function 推送(配置: 外挂LFS配置, 选项: 推选项): Promis
 
 function 恢复目录(): string {
   let 时间 = new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-')
-  return path.resolve(项目根目录, '.external-lfs/recovery', 时间)
+  return path.resolve(项目根目录, '.external-lfs/recovery', `${时间}-${crypto.randomUUID()}`)
+}
+
+function 移动文件(源: string, 目标: string): void {
+  try {
+    fs.linkSync(源, 目标)
+  } catch (错误) {
+    if (错误 instanceof Error && 'code' in 错误 && 错误.code === 'EXDEV')
+      fs.copyFileSync(源, 目标, fs.constants.COPYFILE_EXCL)
+    else throw 错误
+  }
+  fs.unlinkSync(源)
 }
 
 function 移入恢复区(文件路径: string, 相对路径: string, 根目录: string): void {
   let 目标 = path.join(根目录, ...相对路径.split('/'))
   fs.mkdirSync(path.dirname(目标), { recursive: true })
-  fs.renameSync(文件路径, 目标)
+  移动文件(文件路径, 目标)
   console.log(`[保留本地版本] ${相对路径} -> ${path.relative(项目根目录, 目标)}`)
 }
 
 async function 下载一个(上下文: 操作上下文, 清单: 清单, 恢复根?: string): Promise<void> {
   let 目标 = path.resolve(项目根目录, ...清单.path.split('/'))
-  if (fs.existsSync(目标) === true) {
-    if (恢复根 === undefined) throw new Error(`拒绝覆盖本地文件: ${清单.path}`)
-    移入恢复区(目标, 清单.path, 恢复根)
-  }
+  if (fs.existsSync(目标) === true && 恢复根 === undefined) throw new Error(`拒绝覆盖本地文件: ${清单.path}`)
   let 临时根 = 创建临时目录()
   let 密文路径 = path.join(临时根, 'object.enc')
   let 明文路径 = path.join(临时根, 'plain')
@@ -219,7 +206,11 @@ async function 下载一个(上下文: 操作上下文, 清单: 清单, 恢复�
       throw new Error(`下载内容哈希与清单不一致: ${清单.path}`)
     }
     fs.mkdirSync(path.dirname(目标), { recursive: true })
-    fs.renameSync(明文路径, 目标)
+    if (fs.existsSync(目标) === true) {
+      if (恢复根 === undefined) throw new Error(`拒绝覆盖本地文件: ${清单.path}`)
+      移入恢复区(目标, 清单.path, 恢复根)
+    }
+    移动文件(明文路径, 目标)
     console.log(`[下载] ${清单.path} (来源: ${清单.remote.target})`)
   } finally {
     fs.rmSync(临时根, { recursive: true, force: true })
@@ -231,106 +222,40 @@ export type 拉选项 = {
   target?: string | undefined
   file?: string | undefined
   exact: boolean
+  concurrency?: number | undefined
 }
 
 export async function 拉取(配置: 外挂LFS配置, 选项: 拉选项): Promise<void> {
   let 上下文 = await 创建上下文(配置, 选项.scope)
   let 候选清单 = 选中清单(上下文, { target: 选项.target, file: 选项.file })
+  if (选项.scope === undefined && 选项.file === undefined)
+    候选清单 = 候选清单.filter((项) => 配置.managedPaths.find((范围) => 范围.scope === 项.scope)?.onDemand !== true)
   if (选项.file !== undefined && 候选清单.length === 0) {
     throw new Error(`清单中未找到匹配的文件: ${选项.file}`)
   }
 
   let 恢复根 = 选项.exact === true ? 恢复目录() : undefined
-  let 下载数 = 0
-  for (let 清单 of 候选清单) {
+  let 待下载 = 候选清单.filter((清单) => {
     let 文件 = 上下文.本地组.get(清单.path)
-    if (文件 !== undefined && 文件相同(文件, 清单) === true) continue
+    return 文件 === undefined || 文件相同(文件, 清单) === false
+  })
+  await 并发执行(待下载, 选项.concurrency ?? 默认并发数, async (清单): Promise<void> => {
     await 下载一个(上下文, 清单, 恢复根)
-    下载数 += 1
-  }
-  let 多余文件 = [...上下文.本地组.values()].filter((项) => 上下文.清单组.has(项.path) === false)
+  })
+  let 多余文件 = [...上下文.本地组.values()].filter(
+    (项) =>
+      上下文.清单组.has(项.path) === false &&
+      选项.target === undefined &&
+      (选项.file === undefined || 文件匹配模式(项.path, 选项.file)) &&
+      (选项.scope !== undefined ||
+        选项.file !== undefined ||
+        配置.managedPaths.find((范围) => 范围.scope === 项.scope)?.onDemand !== true),
+  )
   if (选项.exact === true && 恢复根 !== undefined) {
     for (let 文件 of 多余文件) 移入恢复区(文件.absolutePath, 文件.path, 恢复根)
   }
-  console.log(`拉取完成：下载 ${String(下载数)}，本地额外文件 ${String(多余文件.length)}。`)
+  console.log(`拉取完成：下载 ${String(待下载.length)}，本地额外文件 ${String(多余文件.length)}。`)
 }
 
-export type 列表选项 = { scope?: string | undefined; target?: string | undefined; file?: string | undefined }
-
-export async function 列表(配置: 外挂LFS配置, 选项: 列表选项): Promise<void> {
-  let 上下文 = await 创建上下文(配置, 选项.scope)
-  let 候选清单 = 选中清单(上下文, { target: 选项.target, file: 选项.file })
-  console.log('=== 外挂 LFS 文件清单 ===')
-  for (let 清单 of 候选清单) {
-    let 本地 = 上下文.本地组.get(清单.path)
-    let 状态: string
-    if (本地 === undefined) 状态 = '本地缺失'
-    else if (文件相同(本地, 清单) === true) 状态 = '已同步'
-    else 状态 = '本地已修改'
-    console.log(
-      `[${清单.remote.target}] [${状态}] ${清单.path} (${格式化文件大小(清单.plaintext.size)}, scope: ${清单.scope})`,
-    )
-  }
-  let 未登记组 = [...上下文.本地组.values()].filter(
-    (项) => 上下文.清单组.has(项.path) === false && (选项.file === undefined || 文件匹配模式(项.path, 选项.file)),
-  )
-  for (let 未登记 of 未登记组) {
-    console.log(`[未登记] [待上传] ${未登记.path} (${格式化文件大小(未登记.size)}, scope: ${未登记.scope})`)
-  }
-  console.log(`统计：清单共 ${String(候选清单.length)} 项，未登记 ${String(未登记组.length)} 项。`)
-}
-
-export type 状态选项 = { scope?: string | undefined; target?: string | undefined; file?: string | undefined }
-
-export async function 状态(配置: 外挂LFS配置, 选项: 状态选项): Promise<void> {
-  let 上下文 = await 创建上下文(配置, 选项.scope)
-  let 候选清单 = 选中清单(上下文, { target: 选项.target, file: 选项.file })
-  let 远端异常 = 0
-  for (let 清单 of 候选清单) {
-    let 仓库 = 上下文.仓库管理器.获取仓库(清单.remote.target)
-    let 元数据 = await 仓库.查询(清单)
-    if (元数据匹配(清单, 元数据) === false) {
-      console.log(`[远端异常] ${清单.path} (目标: ${清单.remote.target})`)
-      远端异常 += 1
-    }
-  }
-  let 已修改 = 候选清单.filter((项) => {
-    let 文件 = 上下文.本地组.get(项.path)
-    return 文件 === undefined || 文件相同(文件, 项) === false
-  }).length
-  let 未登记组 = [...上下文.本地组.values()].filter(
-    (项) => 上下文.清单组.has(项.path) === false && (选项.file === undefined || 文件匹配模式(项.path, 选项.file)),
-  )
-  console.log(
-    `状态：清单 ${String(候选清单.length)}，本地变化 ${String(已修改)}，未登记 ${String(未登记组.length)}，远端异常 ${String(远端异常)}。`,
-  )
-  if (远端异常 > 0) process.exitCode = 1
-}
-
-export type 校验选项 = { scope?: string | undefined; target?: string | undefined; file?: string | undefined }
-
-export async function 完整校验(配置: 外挂LFS配置, 选项: 校验选项): Promise<void> {
-  let 上下文 = await 创建上下文(配置, 选项.scope)
-  let 候选清单 = 选中清单(上下文, { target: 选项.target, file: 选项.file })
-  let 数量 = 0
-  for (let 清单 of 候选清单) {
-    let 临时根 = 创建临时目录()
-    let 密文路径 = path.join(临时根, 'object.enc')
-    let 明文路径 = path.join(临时根, 'plain')
-    try {
-      let 仓库 = 上下文.仓库管理器.获取仓库(清单.remote.target)
-      let 元数据 = await 仓库.下载(清单, 密文路径)
-      if (元数据匹配(清单, 元数据) === false) throw new Error(`远端对象元数据与清单不一致: ${清单.path}`)
-      await 解密文件(密文路径, 明文路径, 'object', 清单.id)
-      let 摘要 = await 计算文件摘要(明文路径)
-      if (摘要.size !== 清单.plaintext.size || 摘要.sha256 !== 清单.plaintext.sha256) {
-        throw new Error(`远端内容哈希与清单不一致: ${清单.path}`)
-      }
-      console.log(`[校验通过] ${清单.path} (目标: ${清单.remote.target})`)
-    } finally {
-      fs.rmSync(临时根, { recursive: true, force: true })
-    }
-    数量 += 1
-  }
-  console.log(`完整校验完成：${String(数量)} 个对象。`)
-}
+export { 列表, 完整校验, 状态 } from './reports'
+export type { 列表选项, 校验选项, 状态选项 } from './reports'

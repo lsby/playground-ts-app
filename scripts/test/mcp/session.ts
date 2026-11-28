@@ -7,6 +7,7 @@ import { z } from 'zod'
 
 import type { 苹果网络中转 } from '../../../src/model/ios-test'
 import type { 提交步骤附件, 流程步骤附件, 测试服务日志内容, 需求测试工具 } from '../../../src/model/test-requirement'
+import { 是动作未执行错误 } from '../../../src/test-tools/action-phase'
 import { 测试操作记录 } from '../../../src/test-tools/operation-record'
 import { 测试运行工具 } from '../../../src/test-tools/runtime'
 import { 停止测试进程 } from '../test-process'
@@ -14,7 +15,7 @@ import type { 测试服务 } from '../test-server'
 import type { 工具输出 } from './register-tool'
 import type { MCP测试工具宿主 } from './tools'
 
-type 调用结果<结果> = { 成功: true; 值: 结果 } | { 成功: false; 错误: string }
+type 调用结果<结果> = { 成功: true; 值: 结果 } | { 成功: false; 错误: string; 失败线索: { 明确未执行: boolean } }
 type 调用附件 = { 路径: string; 说明?: string }
 
 function 错误文本(错误: unknown): string {
@@ -187,7 +188,7 @@ export class MCP测试会话 implements MCP测试工具宿主 {
       })
       结果 = { 成功: true, 值 }
     } catch (错误) {
-      结果 = { 成功: false, 错误: 错误文本(错误) }
+      结果 = { 成功: false, 错误: 错误文本(错误), 失败线索: { 明确未执行: 是动作未执行错误(错误) } }
     }
     let 附件们 = await this.保存证据(序号, 证据们, 记录错误)
     return { 结果, 附件们, 取证错误们 }

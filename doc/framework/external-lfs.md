@@ -43,7 +43,7 @@
 配置说明：
 
 - `targets`：配置一个或多个命名的存储目标。每个目标指明 `provider`（`aliyun-oss` 或 `tencent-cos`）、云端独立前缀 `remotePrefix`，以及所绑定的环境变量名映射 `env`。
-- `managedPaths`：需要同步的本地目录及其稳定 scope。
+- `managedPaths`：需要同步的本地目录及其稳定 scope。可选的 `target` 为该范围的新文件指定默认目标，显式 `--target` 优先；已登记文件继续使用清单中的目标。可选的 `onDemand: true` 表示该范围按需拉取。
 - `exclude`：管辖目录内不应上传的文件 glob。
 
 `.external-lfs/config.json` 是项目配置，应提交 Git。未完成配置时命令会立即失败。
@@ -80,7 +80,7 @@ EXTERNAL_LFS_OSS_ACCESS_KEY_SECRET=替换为AccessKeySecret
 - 清单文件名是随机 UUID，文件的真实路径、SHA-256、归属存储目标（target）、云端 object key 和 versionId 都在加密清单内部。
 - **多目标路由机制**：
   - 每个文件在清单中持久记录其归属的存储目标名称。
-  - **新文件首次推送**：若配置了多个目标，必须显式通过 `--target <目标名称>`（或搭配 `--file <路径>`）指定；若只配置了一个目标，则自动使用该唯一目标。
+  - **新文件首次推送**：优先使用 `--target`，其次使用所属范围配置的 `target`；只有一个目标时自动使用它。多个目标且范围未配置目标时必须指定 `--target`。
   - **已有文件更新**：直接依据清单记录的目标上传，无需重复指定 `--target`。
   - **拉取与校验**：自动按每个文件清单中的存储目标连接对应的云凭据，支持全量一键同步或单文件精确拉取。
 
@@ -108,9 +108,12 @@ npm run task -- external-lfs:verify
 - `--file <路径或模式>` / `--pattern <模式>`：支持**单个具体文件**、**目录路径**或 **Glob 通配符**（如 `doc/private/*.p12`、`certs/`、`*.bin`），作用于 `list`、`push`、`pull`、`status` 或 `verify`。
 - `--target <目标名称>`：指定目标（用于过滤，或在多目标环境下首次 push 新文件时指定目标）。
 - `--scope <名称>`：按配置的 scope 过滤操作范围。
+- `--concurrency <数量>`：`push`、`pull`、`verify` 的并发数，范围为 1 至 64，默认为 4。任务失败时不再开始新的文件，已开始的任务完成后返回错误。
 - `--yes` / `-y`：（仅 push）跳过推送前的交互式二次确认。非交互式环境（如 CI/CD）必须显式传入此参数。
 - `--accept-deletions`：（仅 push）人工确认删除本地已登记文件，将对应清单从 Git 记录中移除（远端历史对象不删除）。
-- `--exact`：（仅 pull）精确同步，拉取前把冲突的本地文件以及多余的未登记文件移动到 `.external-lfs/recovery/` 暂存区。
+- `--exact`：（仅 pull）精确同步；下载并校验通过后，把冲突的本地文件移动到 `.external-lfs/recovery/`，然后放置下载内容。选中范围内多余的未登记文件也会移入恢复区；指定 `--target` 时不移动未登记文件。
+
+默认 `pull` 跳过 `onDemand` 范围；显式指定 `--scope` 或 `--file` / `--pattern` 时，匹配的按需文件会参与拉取。缺失的按需文件不会在 `push` 时被取消登记，即使传入 `--accept-deletions` 也会保留。已经拉取的按需文件修改后仍可正常推送。
 
 ### 推送二次确认机制
 

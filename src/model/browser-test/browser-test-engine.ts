@@ -5,12 +5,14 @@ import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
 
+import { 动作前执行 } from '../../test-tools/action-guard'
 import { 独占无头浏览器 } from '../../test-tools/browser-resource-lock'
 import { 检查目标唯一性 } from '../../test-tools/browser-target'
 import { 等待模板后点击, type 模板点击选项 } from '../../test-tools/template-match'
 import type { 落点探测结果 } from '../web-locate/candidates'
+import { 点击现场记录 } from '../web-locate/diagnostics'
 import { 地址一致 } from '../web-locate/page-url'
-import { 探测页面落点 } from '../web-locate/playwright'
+import { 探测页面落点, 诊断填写, 诊断点击, 诊断点击坐标 } from '../web-locate/playwright'
 import { 转换浏览器启动错误 } from './browser-install'
 import {
   浏览器请求挂起,
@@ -135,6 +137,7 @@ export class 浏览器测试引擎 {
   private 提示卡片: 测试提示卡片
   private 证据: 浏览器步骤证据记录器
   private 步骤作用域 = new AsyncLocalStorage<浏览器测试作用域配置>()
+  private readonly 点击现场 = new 点击现场记录()
   private 请求挂起: 浏览器请求挂起
   private 取消信号: AbortSignal
 
@@ -178,7 +181,7 @@ export class 浏览器测试引擎 {
   ): Promise<void> {
     this.证据.登记当前步骤()
     await 检查目标唯一性(目标)
-    await 浏览器断言(目标).toBeVisible(参数)
+    await this.点击现场.包裹(() => 浏览器断言(目标).toBeVisible(参数))
     if (this.证据.启用 === true && 目标.page() === this.页面) await this.证据.采集('断言通过', '目标已可见', 目标)
   }
 
@@ -188,7 +191,7 @@ export class 浏览器测试引擎 {
   ): Promise<void> {
     this.证据.登记当前步骤()
     await 检查目标唯一性(目标)
-    await 浏览器断言(目标).toBeHidden(参数)
+    await this.点击现场.包裹(() => 浏览器断言(目标).toBeHidden(参数))
     if (this.证据.启用 === true && 目标.page() === this.页面) await this.证据.采集('断言通过', '目标已隐藏')
   }
 
@@ -245,7 +248,7 @@ export class 浏览器测试引擎 {
     // 以 / 或 # 开头的字符串是路由地址，按规范地址比较（忽略 origin、查询串、随机编号），和 iOS、Android 一致；其他写法交给 Playwright
     let 条件 =
       typeof 地址 === 'string' && /^[/#]/u.test(地址) ? (实际: URL): boolean => 地址一致(实际.href, 地址) : 地址
-    await this.页面.waitForURL(条件, 参数)
+    await this.点击现场.包裹(() => this.页面.waitForURL(条件, 参数))
     if (this.证据.启用 === true) await this.证据.采集('等待达成', '已到达预期地址')
   }
 
@@ -322,14 +325,15 @@ export class 浏览器测试引擎 {
     await this.页面.keyboard.press(键, 参数)
   }
 
+  /** 点击一个视口坐标，返回点击前该坐标处最上层元素的描述。 */
   public async 点击坐标(
     水平位置: number,
     垂直位置: number,
     参数?: Parameters<Page['mouse']['click']>[2],
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     this.检查页面()
     if (this.证据.启用 === true) await this.证据.采集('操作前', '点击坐标前', { x: 水平位置, y: 垂直位置 })
-    await this.页面.mouse.click(水平位置, 垂直位置, 参数)
+    return await 诊断点击坐标(this.页面, { x: 水平位置, y: 垂直位置 }, 参数, this.点击现场)
   }
 
   public async 拖动画布(
@@ -400,7 +404,7 @@ export class 浏览器测试引擎 {
         let 图片 = await this.截图(undefined, { timeout: 超时毫秒 })
         return { 图片, 坐标宽: 视口?.width ?? 图片.readUInt32BE(16) }
       },
-      点击: async (x, y): Promise<void> => await this.点击坐标(x, y),
+      点击: async (x, y): Promise<void> => void (await this.点击坐标(x, y)),
       说明: '浏览器',
     })
   }
@@ -450,17 +454,22 @@ export class 浏览器测试引擎 {
     return await this.步骤作用域.run(当前, 执行)
   }
 
-  public async 点击(目标: Locator, 参数?: Parameters<Locator['click']>[0]): Promise<void> {
+  /**
+   * 点击目标，返回点击前该目标中心点处最上层元素的描述。
+   * 先等目标及祖先上的有限动画播完（循环动画跳过）；位置稳定和点击点没被别的层盖住由 Playwright 点击自带的可操作性检查负责。
+   * 总超时沿用 参数.timeout（默认 10 秒），分给动画等待、预检点击和真实点击。
+   */
+  public async 点击(目标: Locator, 参数?: Parameters<Locator['click']>[0]): Promise<string | undefined> {
     await this.操作动画(目标, 'rgb(255, 0, 0)', 参数?.timeout)
     if (参数?.trial !== true && this.证据.启用 === true)
       await this.证据.采集('操作前', '点击目标前', 目标, { 作用域: this.步骤作用域.getStore() })
-    await 目标.click(参数)
+    return await 诊断点击(this.页面, 目标, 参数, this.点击现场)
   }
 
   public async 输入(目标: Locator, 文本: string, 参数?: Parameters<Locator['fill']>[1]): Promise<void> {
     await this.操作动画(目标, 'rgb(0, 85, 255)', 参数?.timeout)
     if (this.证据.启用 === true) await this.证据.采集('操作前', '填写输入框前', 目标)
-    await 目标.fill(文本, 参数)
+    await 诊断填写(目标, 文本, 参数)
     await this.操作后等待()
   }
 
@@ -511,7 +520,12 @@ export class 浏览器测试引擎 {
     }
   }
 
-  private async 操作动画(目标: Locator, 颜色: string, 超时: number | undefined): Promise<void> {
+  /** 动作前的定位、唯一性检查和演示动画；失败都算动作没执行。 */
+  private 操作动画(目标: Locator, 颜色: string, 超时: number | undefined): Promise<void> {
+    return 动作前执行(() => this.执行操作动画(目标, 颜色, 超时))
+  }
+
+  private async 执行操作动画(目标: Locator, 颜色: string, 超时: number | undefined): Promise<void> {
     this.检查操作目标(目标)
     await 检查目标唯一性(目标)
     if (this.模式 === '自动') return

@@ -2,74 +2,47 @@ import { z } from 'zod'
 
 import { JSON值模式, JSON对象模式, type JSON值 } from '../data/json-value'
 import { 测试建议模型, type 测试建议 } from './model'
+import { 核对断言期望 } from './recording-assertion-check'
+import { 读取操作结果字段 } from './recording-result'
+import {
+  列出待确认,
+  导出阻止原因,
+  应用无效标记,
+  应用确认保留,
+  操作记录文档模型,
+  生成待确认错误,
+  计算插入断言后的步骤,
+  计算记录状态,
+  读回条目们,
+  逐条排除条目,
+  附带遗漏的断言,
+  type 逐条排除结果,
+} from './recording-support'
+import type {
+  JSON对象,
+  列出选项,
+  回放条目,
+  回放步骤选择,
+  完成字段,
+  导出回放步骤,
+  已解析回放步骤,
+  操作备注,
+  操作断言条目,
+  操作记录摘要,
+  操作记录文档,
+  操作记录条目,
+  操作调用条目,
+  操作调用结果,
+  断言选项,
+  记录建议,
+} from './recording-types'
 
 export type { JSON值 } from '../data/json-value'
-export type JSON对象 = { [键: string]: JSON值 }
+export type { 记录状态 } from './recording-support'
+export type * from './recording-types'
+export { 计算记录状态 }
 
-type 证据文件 = { path: string; description?: string }
-type 调用结论 = { status: 'passed'; result: JSON对象 } | { status: 'failed'; error: string }
-export type 操作调用结果 = 调用结论 & {
-  artifacts: readonly 证据文件[]
-  evidenceErrors: readonly string[]
-  增强?: 录制增强
-}
-
-type 记录建议 = Omit<测试建议, '改进方向'> & { 改进方向?: string }
-/**
- * 录制时 MCP 自动补充的回放信息：坐标点击识别出的元素定位、动作前后的页面地址变化、没有 DOM 时的图片模板。
- * 导出时据此生成按元素点击、等地址或等图片后点击的代码。
- */
-export type 录制增强 = {
-  定位?: { 种类: '选择器' | '文字'; 值: string; 说明: string }
-  /** 动作前后页面地址（pathname 加 hash）发生了变化。 */
-  地址变化?: { 前: string; 后: string }
-  /** 动作前后读取页面地址失败时的原因（动作本身仍算成功），方便排查为什么没有生成等地址。 */
-  地址读取错误?: string
-  模板?: {
-    /** 模板图片路径；录制文件里是相对于记录目录的路径，导出时已换成绝对路径。 */
-    文件: string
-    /** 截图像素与操作坐标单位之比。 */
-    比例: number
-    原坐标: { x: number; y: number }
-    落点: { x: number; y: number }
-  }
-}
-type 基本条目 = { id: number; notes: string | null; decision?: string | null; suggestions?: 记录建议[] }
-type 调用条目主体 = 基本条目 & { kind: 'call'; tool: string; arguments: JSON对象; start: string; 增强?: 录制增强 }
-type 完成字段 = 调用结论 & { end: string; artifacts: 证据文件[]; evidenceErrors: string[] }
-export type 操作调用条目 = 调用条目主体 & ({ status: 'pending' } | 完成字段)
-export type 断言期望来源 = { sourceId: number; path: Array<string | number> }
-export type 操作断言条目 = 基本条目 & {
-  kind: 'assertion'
-  sourceId: number
-  path: Array<string | number>
-  operator: 'deepEqual'
-  mergeWithPreviousAttachmentGroup?: boolean
-  createdAt: string
-} & ({ expected: JSON值; expectedFrom?: never } | { expected?: never; expectedFrom: 断言期望来源 })
-
-type 手动操作条目 = 基本条目 & { kind: 'manual'; description: string; createdAt: string }
-export type 回放条目 = 操作调用条目 | 操作断言条目
-export type 操作记录条目 = 回放条目 | 手动操作条目
-export type 操作记录摘要 = (
-  | (Pick<操作调用条目, 'id' | 'kind' | 'tool' | 'status' | 'start' | 'notes' | 'decision'> & { end?: string })
-  | Omit<操作断言条目, 'expected' | 'suggestions'>
-  | Omit<手动操作条目, 'suggestions'>
-) & { suggestionCount?: number; inReplay?: boolean }
-
-export type 回放步骤选择 = { 名称?: string | undefined; 条目编号们: readonly number[] }
-export type 导出回放步骤 = { 名称?: string | undefined; 条目们: 回放条目[]; 备注们: string[] }
-type 操作备注 = { id: number; operationIds: number[]; text: string }
-type 操作记录文档 = {
-  version: number
-  nextId: number
-  entries: 操作记录条目[]
-  replaySteps: { 名称?: string; 条目编号们: number[] }[]
-  notes: 操作备注[]
-}
-type 断言选项 = { 说明?: string | undefined; 并入上一组?: boolean | undefined; 期望来源?: 断言期望来源 | undefined }
-type 列出选项 = { 原始?: boolean | undefined; 在此编号后?: number | undefined }
-type 已解析回放步骤 = Omit<导出回放步骤, '备注们'>
+export { 读取操作结果字段 }
 
 let 结果路径模式 = z.array(z.union([z.string(), z.number().int().nonnegative().safe()]))
 
@@ -84,42 +57,35 @@ function 非空文本(值: string, 名称: string): string {
   return 内容
 }
 
-export function 读取操作结果字段(
-  结果们: ReadonlyMap<number, JSON对象>,
-  来源ID: number,
-  路径: readonly (string | number)[],
-): JSON值 {
-  let 值: JSON值 | undefined = 结果们.get(来源ID)
-  if (值 === undefined) throw new Error(`未获得操作 #${String(来源ID)} 的运行结果`)
-  for (let 片段 of 路径) {
-    if (typeof 片段 === 'number' && Array.isArray(值) && Object.hasOwn(值, 片段)) {
-      值 = 值[片段]
-    } else if (
-      typeof 片段 === 'string' &&
-      值 !== null &&
-      typeof 值 === 'object' &&
-      Array.isArray(值) === false &&
-      Object.hasOwn(值, 片段)
-    ) {
-      值 = 值[片段]
-    } else {
-      值 = undefined
-    }
-    if (值 === undefined) throw new Error(`操作 #${String(来源ID)} 的运行结果缺少路径 ${JSON.stringify(路径)}`)
-  }
-  return 值
-}
-
 /**
  * 测试录制保存一次探索中的现场操作和据此整理的回放草稿。
  * 它记录工具调用和人工补录，维护与操作关联的备注，以及回放步骤间的断言依赖。
  * 探索者可以查阅现场记录、编辑回放顺序与分组，并取出经过检查的导出步骤。
  */
 export class 测试录制 {
+  /** 从落盘的记录文件读回录制；上次还在运行的调用记为动作后失败，等测试方确认。 */
+  public static 从快照(文档: unknown, 恢复时间: string): 测试录制 {
+    let 版本 = z.object({ version: z.literal(4) }).safeParse(文档)
+    if (版本.success === false) throw new Error('录制格式必须是 version 4；旧格式请重新录制或使用 --fresh-record')
+    let 结构 = 操作记录文档模型.parse(文档)
+    let 录制 = new 测试录制()
+    录制.下一个编号 = 结构.nextId
+    // 完整 Schema 已校验全部条目；Zod 的可选属性类型包含 undefined，JSON 文件中该值无法存在。
+    录制.条目们 = 读回条目们(结构.entries as 操作记录条目[], 恢复时间)
+    录制.回放步骤 = 结构.replaySteps.map(({ 名称, 条目编号们 }) => ({
+      ...(名称 === undefined ? {} : { 名称 }),
+      条目编号们,
+    }))
+    录制.备注们 = 结构.notes
+    录制.导出时间 = 结构.exportedAt
+    return 录制
+  }
+
   private 下一个编号 = 1
   private 条目们: ReadonlyMap<number, 操作记录条目> = new Map()
   private 回放步骤: readonly 回放步骤选择[] = []
   private 备注们: readonly 操作备注[] = []
+  private 导出时间: string | undefined
 
   public 复制(): 测试录制 {
     let 副本 = new 测试录制()
@@ -127,12 +93,18 @@ export class 测试录制 {
     副本.条目们 = this.条目们
     副本.回放步骤 = this.回放步骤
     副本.备注们 = this.备注们
+    副本.导出时间 = this.导出时间
     return 副本
+  }
+
+  public 标记已导出(时间: string): void {
+    this.导出时间 = 时间
   }
 
   public 快照(): 操作记录文档 {
     return {
-      version: 3,
+      version: 4,
+      ...(this.导出时间 === undefined ? {} : { exportedAt: this.导出时间 }),
       nextId: this.下一个编号,
       entries: structuredClone([...this.条目们.values()]),
       replaySteps: this.获得回放草稿(),
@@ -155,6 +127,8 @@ export class 测试录制 {
     this.条目们 = new Map(this.条目们).set(id, 条目)
     this.回放步骤 = [...this.回放步骤, { 条目编号们: [id] }]
     this.下一个编号 = id + 1
+    // 导出之后又有新操作，这份记录就有了没导出的内容，重启后应该接续。
+    this.导出时间 = undefined
     return id
   }
 
@@ -172,13 +146,53 @@ export class 测试录制 {
         完成内容 = { ...证据, end, status: 'passed', result: this.复制对象(结果.result) }
         break
       case 'failed':
-        完成内容 = { ...证据, end, status: 'failed', error: 结果.error }
+        完成内容 = {
+          ...证据,
+          end,
+          status: 'failed',
+          error: 结果.error,
+          ...(结果.failurePhase === undefined ? {} : { failurePhase: 结果.failurePhase }),
+        }
         break
     }
-    this.条目们 = new Map(this.条目们).set(id, { ...当前, ...完成内容 })
+    let 完成后: 操作调用条目 = { ...当前, ...完成内容 }
+    this.条目们 = new Map(this.条目们).set(id, 完成后)
+    // 动作执行前就失败的调用一定没有副作用，自动移出回放草稿（原始记录和证据仍保留，可用 record_list 的 recording 视图查看）。
+    if (计算记录状态(完成后).state === '已排除') this.回放步骤 = this.去掉步骤条目(new Set([id]))
   }
 
-  public 列出(偏移: number, 数量: number, 选项?: 列出选项): { total: number; entries: 操作记录摘要[] } {
+  /** 测试方把记录标为「点错了/无效」并写原因，效果等同排除，原因保留在记录里。reason 为 null 取消标记（不自动回到回放草稿）。 */
+  /** 测试方把记录标为「点错了/无效」并写原因，效果等同排除，原因保留在记录里。reason 为 null 取消标记（不自动回到回放草稿）。 */
+  public 标记无效(ids: readonly number[], 原因: string | null, 时间: string): void {
+    this.检查批次编号(ids)
+    let 理由 = 原因 === null ? null : 非空文本(原因, '无效原因')
+    let 条目们 = 应用无效标记(this.条目们, ids, 理由, 时间)
+    if (理由 === null) this.条目们 = 条目们
+    else this.提交回放(this.去掉步骤条目(new Set(ids)), 条目们)
+  }
+
+  /** 测试方确认：动作后失败的记录保留（按已执行处理）。 */
+  public 确认保留(ids: readonly number[]): void {
+    this.检查批次编号(ids)
+    this.条目们 = 应用确认保留(this.条目们, ids)
+  }
+
+  /** 列出尚未处理的待确认记录：还在回放草稿里的才算，已用 record_remove 删掉的视为已处理。 */
+  public 获得待确认(范围编号们?: ReadonlySet<number>): 操作调用条目[] {
+    return 列出待确认(this.条目们, new Set(this.回放步骤.flatMap((步骤) => 步骤.条目编号们)), 范围编号们)
+  }
+
+  private 去掉步骤条目(编号们: ReadonlySet<number>): 回放步骤选择[] {
+    return this.回放步骤
+      .map((步骤) => ({ ...步骤, 条目编号们: 步骤.条目编号们.filter((id) => 编号们.has(id) === false) }))
+      .filter((步骤) => 步骤.条目编号们.length > 0)
+  }
+
+  public 列出(
+    偏移: number,
+    数量: number,
+    选项?: 列出选项,
+  ): { total: number; entries: 操作记录摘要[]; needsConfirmIds: number[] } {
     检查索引(偏移, '偏移量', 0)
     检查索引(数量, '条目数', 1)
     let 起始编号 = 选项?.在此编号后 ?? 0
@@ -190,6 +204,7 @@ export class 测试录制 {
     let 匹配编号们 = 编号们.filter((id) => id > 起始编号)
     return {
       total: 匹配编号们.length,
+      needsConfirmIds: this.获得待确认().map(({ id }) => id),
       entries: 匹配编号们
         .slice(偏移, 偏移 + 数量)
         .map((id) => ({
@@ -264,6 +279,15 @@ export class 测试录制 {
     this.提交回放(候选步骤)
   }
 
+  /** 批量排除，逐条处理，一条删不掉不影响别的，规则见 逐条排除条目。 */
+  public 逐条排除(ids: readonly number[]): 逐条排除结果 {
+    return 逐条排除条目(ids, {
+      查找: (id) => void this.查找条目(id),
+      在回放: (id) => this.回放步骤.some((步骤) => 步骤.条目编号们.includes(id)),
+      排除: (id) => this.排除([id]),
+    })
+  }
+
   public 恢复(ids: readonly number[]): void {
     this.检查批次编号(ids)
     let 已选编号们 = new Set(this.回放步骤.flatMap((步骤) => 步骤.条目编号们))
@@ -292,6 +316,7 @@ export class 测试录制 {
     this.条目们 = new Map()
     this.回放步骤 = []
     this.备注们 = []
+    this.导出时间 = undefined
   }
 
   public 添加断言(
@@ -318,14 +343,10 @@ export class 测试录制 {
       ...(选项.并入上一组 === undefined ? {} : { mergeWithPreviousAttachmentGroup: 选项.并入上一组 }),
       createdAt,
     }
-    let 来源位置 = this.定位回放步骤(来源ID)
-    let 期望位置 = 期望来源 === undefined ? -1 : this.定位回放步骤(期望来源.sourceId)
-    let 插入位置 = Math.max(来源位置, 期望位置) + 1
-    while (this.是同源单项断言步骤(this.回放步骤[插入位置], 来源ID)) 插入位置 += 1
-    let 候选步骤 = [...this.回放步骤]
-    候选步骤.splice(插入位置, 0, { 条目编号们: [id] })
+    let 候选步骤 = 计算插入断言后的步骤(this.回放步骤, this.条目们, id, 来源ID, 期望来源?.sourceId, 选项.放在此编号后)
     let 候选条目们 = new Map(this.条目们).set(id, 条目)
     this.验证结果引用(条目, 候选条目们, `断言 #${String(id)}`)
+    核对断言期望(条目, 候选条目们)
     this.提交回放(候选步骤, 候选条目们)
     this.下一个编号 = id + 1
     return id
@@ -376,19 +397,28 @@ export class 测试录制 {
     }))
   }
 
-  public 准备导出(步骤组: readonly 回放步骤选择[] = this.回放步骤): 导出回放步骤[] {
-    if (步骤组.length === 0) throw new Error('没有选中可导出的操作记录')
+  public 准备导出(步骤组?: readonly 回放步骤选择[]): 导出回放步骤[] {
+    let 选择组 = 步骤组 === undefined ? this.回放步骤 : 附带遗漏的断言(步骤组, this.回放步骤, this.条目们)
+    if (选择组.length === 0) throw new Error('没有选中可导出的操作记录')
     let 已纳入编号们 = new Set(this.回放步骤.flatMap((步骤) => 步骤.条目编号们))
-    let 解析步骤 = this.解析回放(步骤组, this.条目们)
-    return 解析步骤.map(({ 名称, 条目们 }, 索引) => {
+    let 解析步骤 = this.解析回放(选择组, this.条目们)
+    let 选中编号们 = new Set<number>()
+    let 解析结果 = 解析步骤.map(({ 名称, 条目们 }, 索引) => {
       let 步骤说明 = this.步骤说明(名称, 索引)
       for (let 条目 of 条目们) {
+        选中编号们.add(条目.id)
         let 操作说明 = `${步骤说明}的操作 #${String(条目.id)}`
         if (已纳入编号们.has(条目.id) === false) throw new Error(`${操作说明}未纳入回放草稿，请先恢复`)
         if (条目.kind !== 'call') continue
         if (条目.status === 'pending') throw new Error(`${操作说明}（${条目.tool}）尚未完成`)
-        if (条目.status === 'failed') throw new Error(`${操作说明}（${条目.tool}）执行失败：${条目.error}`)
+        let 阻止原因 = 导出阻止原因(条目)
+        if (阻止原因 !== undefined) throw new Error(`${操作说明}（${条目.tool}）${阻止原因}`)
       }
+      return { 名称, 条目们 }
+    })
+    let 待确认们 = this.获得待确认(选中编号们)
+    if (待确认们.length > 0) throw 生成待确认错误(待确认们)
+    return 解析结果.map(({ 名称, 条目们 }) => {
       let 当前编号们 = new Set(条目们.map((条目) => 条目.id))
       let 备注们 = this.备注们
         .filter(({ operationIds }) => operationIds.every((编号) => 当前编号们.has(编号)))
@@ -419,6 +449,7 @@ export class 测试录制 {
           id,
           kind,
           notes,
+          ...计算记录状态(条目),
           ...(decision === undefined ? {} : { decision }),
           tool,
           status,
@@ -466,14 +497,6 @@ export class 测试录制 {
     let 索引 = this.回放步骤.findIndex((步骤) => 步骤.条目编号们.includes(id))
     if (索引 < 0) throw new Error(`操作 #${String(id)} 未纳入回放草稿，请先恢复`)
     return 索引
-  }
-
-  private 是同源单项断言步骤(步骤: 回放步骤选择 | undefined, 来源ID: number): boolean {
-    if (步骤 === undefined || 步骤.名称 !== undefined || 步骤.条目编号们.length !== 1) return false
-    let [编号] = 步骤.条目编号们
-    if (编号 === undefined) return false
-    let 条目 = this.查找条目(编号)
-    return 条目.kind === 'assertion' && 条目.sourceId === 来源ID
   }
 
   private 步骤说明(名称: string | undefined, 索引: number): string {

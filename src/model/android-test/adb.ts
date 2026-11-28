@@ -5,7 +5,12 @@ export async function 执行ADB(参数: readonly string[], 取消信号: AbortSi
   取消信号.throwIfAborted()
   let 信号 = AbortSignal.any([取消信号, AbortSignal.timeout(超时毫秒)])
   return await new Promise<Buffer>((完成, 失败): void => {
-    let 进程 = spawn('adb', [...参数], { signal: 信号, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    let 进程 = spawn('adb', [...参数], {
+      signal: 信号,
+      killSignal: 'SIGKILL',
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
     let 输出: Buffer[] = []
     let 错误输出: Buffer[] = []
     let 已输出字节 = 0

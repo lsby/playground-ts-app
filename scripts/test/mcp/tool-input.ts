@@ -126,6 +126,13 @@ let 目标模型 = z.discriminatedUnion('by', [
 ])
 export type 目标描述 = z.infer<typeof 目标模型>
 
+export let 匹配方式模型 = z
+  .enum(['exact', 'contains'])
+  .optional()
+  .describe(
+    'How the text is matched: exact (default) needs the full text to be identical; contains accepts any text that includes the given value, case-sensitive. Use contains only when the text has a dynamic part such as a date or number (e.g. the fixed prefix of a sentence ending in a date). Prefer exact (the default) whenever the full text is stable. Supported for text, description and webText on the wait tool only; never for taps.',
+  )
+
 export let 无参数模型 = z.strictObject({})
 export let 会话模型 = z.strictObject({ name: z.string().trim().min(1).max(100).describe('Named browser session.') })
 let 超时模型 = z.int().min(1).default(10_000).describe('Timeout in milliseconds. Defaults to 10000.')

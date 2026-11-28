@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
+import { 默认并发数 } from './concurrency'
 import { 校验目标, 校验范围, 读取配置, 项目根目录 } from './config'
 import { 规范路径 } from './local-store'
 import { 列表, 完整校验, 拉取, 推送, 状态 } from './operations'
@@ -16,11 +17,12 @@ type 参数 = {
   exact: boolean
   acceptDeletions: boolean
   yes: boolean
+  concurrency: number
 }
 
 function 读取参数(): 参数 {
   let 命令 = 命令Schema.parse(process.argv[2])
-  let 结果: 参数 = { 命令, exact: false, acceptDeletions: false, yes: false }
+  let 结果: 参数 = { 命令, exact: false, acceptDeletions: false, yes: false, concurrency: 默认并发数 }
   let 参数组 = process.argv.slice(3)
   for (let 索引 = 0; 索引 < 参数组.length; 索引 += 1) {
     let 当前 = 参数组[索引]
@@ -36,12 +38,26 @@ function 读取参数(): 参数 {
       结果.yes = true
       continue
     }
-    if (当前 === '--config' || 当前 === '--scope' || 当前 === '--target' || 当前 === '--file' || 当前 === '--pattern') {
+    if (
+      当前 === '--config' ||
+      当前 === '--scope' ||
+      当前 === '--target' ||
+      当前 === '--file' ||
+      当前 === '--pattern' ||
+      当前 === '--concurrency'
+    ) {
       let 值 = 参数组[索引 + 1]
       if (值 === undefined) throw new Error(`${当前} 缺少参数值`)
       if (当前 === '--config') 结果.config = 值
       else if (当前 === '--scope') 结果.scope = 值
       else if (当前 === '--target') 结果.target = 值
+      else if (当前 === '--concurrency')
+        结果.concurrency = z
+          .string()
+          .regex(/^[1-9]\d*$/u)
+          .transform(Number)
+          .pipe(z.number().int().min(1).max(64))
+          .parse(值)
       else 结果.file = 规范路径(值)
       索引 += 1
       continue
@@ -73,9 +89,16 @@ async function 主函数(): Promise<void> {
     try {
       fs.writeFileSync(句柄, `${String(process.pid)}\n`)
       if (参数.命令 === 'push') {
-        await 推送(配置, { scope, target, file, acceptDeletions: 参数.acceptDeletions, yes: 参数.yes })
+        await 推送(配置, {
+          scope,
+          target,
+          file,
+          acceptDeletions: 参数.acceptDeletions,
+          yes: 参数.yes,
+          concurrency: 参数.concurrency,
+        })
       } else {
-        await 拉取(配置, { scope, target, file, exact: 参数.exact })
+        await 拉取(配置, { scope, target, file, exact: 参数.exact, concurrency: 参数.concurrency })
       }
     } finally {
       fs.closeSync(句柄)
@@ -92,7 +115,7 @@ async function 主函数(): Promise<void> {
       await 状态(配置, { scope, target, file })
       break
     case 'verify':
-      await 完整校验(配置, { scope, target, file })
+      await 完整校验(配置, { scope, target, file, concurrency: 参数.concurrency })
       break
   }
 }

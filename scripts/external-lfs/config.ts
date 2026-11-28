@@ -20,6 +20,10 @@ export function 读取配置(配置参数?: string): { 配置: 外挂LFS配置; 
   let 配置 = 外挂LFS配置Schema.parse(解析JSON文件(配置路径))
   let 范围组 = 配置.managedPaths.map((项) => 项.scope)
   if (new Set(范围组).size !== 范围组.length) throw new Error('managedPaths 的 scope 不能重复')
+  for (let 项 of 配置.managedPaths) {
+    if (项.target !== undefined && 配置.targets[项.target] === undefined)
+      throw new Error(`未知 scope 目标: ${项.target}`)
+  }
   if (配置.keyFile !== '.project-config.key') throw new Error('第一版仅支持根目录 .project-config.key')
   return { 配置, 配置路径 }
 }

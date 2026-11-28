@@ -161,7 +161,7 @@ export abstract class 按钮基类 extends 组件基类<按钮事件, 监听按�
     this.按钮元素.disabled = this.获得实际禁用()
     this.按钮元素.setAttribute('aria-busy', this.配置.加载中 === true ? 'true' : 'false')
     this.按钮元素.setAttribute('aria-disabled', this.获得实际禁用() === true ? 'true' : 'false')
-    应用样式(this.按钮元素, this.获得按钮样式对象())
+    应用样式(this.按钮元素, { ...this.获得按钮样式对象(), ...this.配置.元素样式 })
   }
 
   private 同步内容(): void {

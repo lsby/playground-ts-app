@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { lstat, mkdir, open, rename, rm, writeFile } from 'node:fs/promises'
+import { cp, lstat, mkdir, open, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { setTimeout as 等待 } from 'node:timers/promises'
 
@@ -19,6 +19,7 @@ import {
 export type {
   JSON值,
   JSON对象,
+  失败阶段,
   录制增强,
   操作断言条目,
   操作记录摘要,
@@ -26,6 +27,7 @@ export type {
   操作调用条目,
   操作调用结果,
   断言期望来源,
+  记录状态,
 } from '../model/test-requirement/recording'
 
 async function 替换记录文件(临时路径: string, 记录路径: string): Promise<void> {
@@ -53,6 +55,41 @@ type 列出选项 = Parameters<测试录制['列出']>[2]
 
 /** 将一次测试录制的操作串行提交到开发套件的记录文件。 */
 export class 测试操作记录 {
+  /**
+   * 在报告根目录里找最近一次没导出的记录文件：按目录名里的时间从新到旧，跳过空记录，
+   * 遇到第一份有内容的记录就停，它已导出则不接续。当前输出目录本身不算。
+   */
+  public static async 查找可接续记录(报告根目录: string, 当前输出目录: string): Promise<string | undefined> {
+    let 目录们: string[]
+    try {
+      目录们 = (await readdir(报告根目录, { withFileTypes: true }))
+        .filter((项) => 项.isDirectory())
+        .map((项) => path.join(报告根目录, 项.name))
+    } catch (错误) {
+      if (错误 instanceof Error && 'code' in 错误 && 错误.code === 'ENOENT') return undefined
+      throw 错误
+    }
+    let 时间 = (目录: string): number => {
+      let 数值 = Number.parseInt(path.basename(目录), 10)
+      return Number.isNaN(数值) ? 0 : 数值
+    }
+    目录们.sort((甲, 乙) => 时间(乙) - 时间(甲))
+    for (let 目录 of 目录们) {
+      if (path.resolve(目录) === path.resolve(当前输出目录)) continue
+      let 文件 = path.join(目录, 'operations.json')
+      let 录制: 测试录制
+      try {
+        录制 = 测试录制.从快照(JSON.parse(await readFile(文件, 'utf8')), new Date().toISOString())
+      } catch (错误) {
+        if (错误 instanceof Error && 'code' in 错误 && 错误.code === 'ENOENT') continue
+        throw new Error(`无法接续录制 ${文件}，请检查记录或使用 --fresh-record 开始新录制`, { cause: 错误 })
+      }
+      if (录制.快照().entries.length === 0) continue
+      return 录制.快照().exportedAt === undefined ? 文件 : undefined
+    }
+    return undefined
+  }
+
   public readonly 文件路径: string
   private 录制: 测试录制 | undefined
   private 队列 = Promise.resolve()
@@ -62,17 +99,48 @@ export class 测试操作记录 {
     this.文件路径 = path.join(输出目录, 'operations.json')
   }
 
-  public 初始化(): Promise<void> {
-    return this.排队(async (): Promise<void> => {
-      if (this.录制 !== undefined) return
+  /**
+   * 创建记录文件。传入上次未导出的记录文件路径时，把它读回来继续用（含图片模板），
+   * 上次还在运行的调用记为动作后失败，等测试方确认。返回接续信息，没有接续时为 undefined。
+   */
+  public 初始化(接续文件?: string): Promise<{ 来源: string; 条目数: number; 待确认数: number } | undefined> {
+    return this.排队(async () => {
+      if (this.录制 !== undefined) return undefined
       try {
         await lstat(this.文件路径)
         throw new Error(`操作记录已存在：${this.文件路径}`)
       } catch (错误) {
         if (错误 instanceof Error === false || 'code' in 错误 === false || 错误.code !== 'ENOENT') throw 错误
       }
-      await this.提交(new 测试录制())
+      if (接续文件 === undefined) {
+        await this.提交(new 测试录制())
+        return undefined
+      }
+      let 录制 = 测试录制.从快照(JSON.parse(await readFile(接续文件, 'utf8')), new Date().toISOString())
+      let 来源模板 = path.join(path.dirname(接续文件), 'templates')
+      try {
+        await cp(来源模板, path.join(path.dirname(this.文件路径), 'templates'), { recursive: true })
+      } catch (错误) {
+        if (错误 instanceof Error === false || 'code' in 错误 === false || 错误.code !== 'ENOENT') throw 错误
+      }
+      await this.提交(录制)
+      return { 来源: 接续文件, 条目数: 录制.快照().entries.length, 待确认数: 录制.获得待确认().length }
     })
+  }
+
+  public 标记无效(编号们: readonly number[], 原因: string | null): Promise<void> {
+    let 时间 = new Date().toISOString()
+    return this.编辑((录制) => 录制.标记无效(编号们, 原因, 时间))
+  }
+
+  public 确认保留(编号们: readonly number[]): Promise<void> {
+    return this.编辑((录制) => 录制.确认保留(编号们))
+  }
+
+  /** 导出成功后记下时间，之后 dev:test 重启不再自动接续这份记录。 */
+  public 标记已导出(): Promise<void> {
+    let 时间 = new Date().toISOString()
+    return this.编辑((录制) => 录制.标记已导出(时间))
   }
 
   public 开始(工具: string, 参数: JSON对象): Promise<number> {
@@ -85,7 +153,11 @@ export class 测试操作记录 {
     return this.编辑((录制) => 录制.完成(id, 结果, 时间))
   }
 
-  public 列出(偏移: number, 数量: number, 选项?: 列出选项): Promise<{ total: number; entries: 操作记录摘要[] }> {
+  public 列出(
+    偏移: number,
+    数量: number,
+    选项?: 列出选项,
+  ): Promise<{ total: number; entries: 操作记录摘要[]; needsConfirmIds: number[] }> {
     return this.排队(() => this.获得录制().列出(偏移, 数量, 选项))
   }
 
@@ -123,6 +195,10 @@ export class 测试操作记录 {
 
   public 排除(编号们: readonly number[]): Promise<void> {
     return this.编辑((录制) => 录制.排除(编号们))
+  }
+
+  public 逐条排除(编号们: readonly number[]): Promise<ReturnType<测试录制['逐条排除']>> {
+    return this.编辑((录制) => 录制.逐条排除(编号们))
   }
 
   public 恢复(编号们: readonly number[]): Promise<void> {

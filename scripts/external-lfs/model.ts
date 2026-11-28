@@ -63,7 +63,16 @@ export let 外挂LFS配置Schema = z
       .record(目标名称Schema, 目标配置Schema)
       .refine((值) => Object.keys(值).length > 0, '至少配置一个存储目标'),
     managedPaths: z
-      .array(z.object({ path: 相对路径Schema, scope: z.string().regex(/^[a-z0-9][a-z0-9-]*$/u) }).strict())
+      .array(
+        z
+          .object({
+            path: 相对路径Schema,
+            scope: z.string().regex(/^[a-z0-9][a-z0-9-]*$/u),
+            target: 目标名称Schema.optional(),
+            onDemand: z.boolean().optional(),
+          })
+          .strict(),
+      )
       .min(1),
     exclude: z.array(z.string().min(1)),
   })

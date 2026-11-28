@@ -8,6 +8,7 @@ import { z } from 'zod'
 
 import { 检查浏览器已安装 } from '../../src/model/browser-test/browser-install'
 import { 读取移动测试配置 } from '../../src/test-tools/mobile-config'
+import { 测试操作记录 } from '../../src/test-tools/operation-record'
 
 import { 苹果网络中转, 计算苹果中转端口 } from '../../src/model/ios-test/network-relay'
 import { 项目根目录 } from '../task/model/task-common'
@@ -85,6 +86,7 @@ async function 运行开发套件(
   苹果设备: string | undefined,
   带检查监听: boolean,
   读取环境: 测试开发环境读取器,
+  全新记录: boolean,
 ): Promise<void> {
   if (安卓设备 !== undefined && 苹果设备 !== undefined) throw new Error('--device 和 --ios-device 不能同时使用')
   if (安卓设备 !== undefined || 苹果设备 !== undefined) {
@@ -238,7 +240,13 @@ async function 运行开发套件(
         配置.WEB_HMR_PORT,
         苹果中转,
       )
-      await 会话.操作记录.初始化()
+      // 上次 dev:test 的记录随时落盘，没导出的会在这里接续（--fresh-record 不接续）；上次还在运行的调用记为待确认
+      let 接续文件 = 全新记录 ? undefined : await 测试操作记录.查找可接续记录(报告根目录, 输出目录)
+      let 接续 = await 会话.操作记录.初始化(接续文件)
+      if (接续 !== undefined)
+        console.log(
+          `[操作记录] 已接续上次未导出的记录（${String(接续.条目数)} 条，其中待确认 ${String(接续.待确认数)} 条）：${接续.来源}`,
+        )
       if (已取消() === false) MCP = await 启动测试MCP(会话, MCP配置.端口)
     }
     if (已取消()) return
@@ -292,6 +300,7 @@ export async function 执行测试开发套件(读取环境: 测试开发环境�
         device: { type: 'string' },
         'ios-device': { type: 'string' },
         'with-checks': { type: 'boolean' },
+        'fresh-record': { type: 'boolean' },
       },
     })
     let 安卓设备 = values.device === undefined ? undefined : z.string().trim().min(1).parse(values.device)
@@ -301,12 +310,20 @@ export async function 执行测试开发套件(读取环境: 测试开发环境�
         values['replay-build'] === true ||
         安卓设备 !== undefined ||
         苹果设备 !== undefined ||
-        values['with-checks'] === true
+        values['with-checks'] === true ||
+        values['fresh-record'] === true
       )
         throw new Error('--stop 不能与其他选项一起使用')
       await 请求关闭开发套件(z.string().uuid().parse(values.stop))
     } else
-      await 运行开发套件(values['replay-build'] === true, 安卓设备, 苹果设备, values['with-checks'] === true, 读取环境)
+      await 运行开发套件(
+        values['replay-build'] === true,
+        安卓设备,
+        苹果设备,
+        values['with-checks'] === true,
+        读取环境,
+        values['fresh-record'] === true,
+      )
   } catch (错误) {
     console.error(inspect(错误, { depth: null }))
     process.exitCode = 1

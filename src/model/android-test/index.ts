@@ -2,8 +2,11 @@ import { readFile } from 'node:fs/promises'
 import { setTimeout as 等待 } from 'node:timers/promises'
 import { z } from 'zod'
 
+import { 动作前执行 } from '../../test-tools/action-guard'
+import { 标记动作已执行 } from '../../test-tools/action-phase'
 import { 等待模板后点击, type 模板点击选项 } from '../../test-tools/template-match'
 import { 屏幕转网页坐标, 比例是否一致, type 落点探测结果 } from '../web-locate/candidates'
+import { 格式化原生歧义建议 } from '../web-locate/diagnostics'
 import { 执行ADB } from './adb'
 import { 解析安卓屏幕密度 } from './density'
 import { 权限活动来自测试应用 } from './foreground'
@@ -18,6 +21,9 @@ export type { 安卓启动选项 } from './notification-preflight'
 export { 确认OCR程序, 确认WindowsOCR程序 } from './ocr'
 export type { 安卓界面元素, 安卓目标 } from './types'
 
+/** 清空输入框时最多退格的字符数（ADB 没有「全选清除」的通用命令，用退格逐字删） */
+let 输入框清空退格次数 = 200
+
 let 权限窗口 = new Set([
   'com.android.permissioncontroller/com.android.permissioncontroller.permission.ui.GrantPermissionsActivity',
   'com.google.android.permissioncontroller/com.android.permissioncontroller.permission.ui.GrantPermissionsActivity',
@@ -30,7 +36,11 @@ let 系统分享窗口 = new Set([
   'com.android.intentresolver/com.android.intentresolver.ChooserActivityLauncher',
 ])
 let PNG签名 = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
-let 安卓目标模型 = z.object({ 按: z.enum(['文字', '描述', '资源ID', '网页文字', '网页选择器']), 值: z.string().min(1) })
+let 安卓目标模型 = z.object({
+  按: z.enum(['文字', '描述', '资源ID', '网页文字', '网页选择器']),
+  值: z.string().min(1),
+  匹配: z.enum(['精确', '包含']).optional(),
+})
 
 export class 安卓测试引擎 {
   private readonly 网页: 安卓网页会话
@@ -124,28 +134,62 @@ export class 安卓测试引擎 {
     return 元素们.filter((元素) => 元素.包名 === this.应用配置.包名 || this.是权限包(窗口, 元素.包名))
   }
 
-  public async 点击(目标: 安卓目标, 超时毫秒 = 10_000): Promise<void> {
+  /** 点击目标，返回点击前坐标处最上层元素的描述（只有网页目标和坐标点击能取到）。 */
+  public async 点击(目标: 安卓目标, 超时毫秒 = 10_000): Promise<string | undefined> {
     目标 = 安卓目标模型.parse(目标)
+    if (目标.匹配 === '包含') throw new Error('点击不支持包含匹配，请用精确文字或选择器，避免点错')
     this.检查超时(超时毫秒)
     if (目标.按 === '网页文字' || 目标.按 === '网页选择器') {
-      await this.网页.点击({ 按: 目标.按, 值: 目标.值 }, 超时毫秒)
-      return
+      return await this.网页.点击({ 按: 目标.按, 值: 目标.值 }, 超时毫秒)
     }
-    let 元素 = await this.等待目标(目标, true, 超时毫秒)
-    if (元素 === undefined) throw new Error('目标不存在')
-    let { 左, 上, 右, 下 } = 元素.范围
-    if (左 >= 右 || 上 >= 下) throw new Error('目标没有可点击的屏幕区域')
-    await this.点击坐标(Math.floor((左 + 右) / 2), Math.floor((上 + 下) / 2))
+    let 点 = await 动作前执行(async () => {
+      let 元素 = await this.等待目标(目标, true, 超时毫秒)
+      if (元素 === undefined) throw new Error('目标不存在')
+      let { 左, 上, 右, 下 } = 元素.范围
+      if (左 >= 右 || 上 >= 下) throw new Error('目标没有可点击的屏幕区域')
+      return { x: Math.floor((左 + 右) / 2), y: Math.floor((上 + 下) / 2) }
+    })
+    await this.点击屏幕坐标(点.x, 点.y)
+    return undefined
   }
 
-  public async 点击坐标(x: number, y: number): Promise<void> {
+  public async 点击坐标(x: number, y: number): Promise<string | undefined> {
+    let 描述 = await this.记录屏幕点现场(x, y)
     await this.点击屏幕坐标(x, y)
+    return 描述
+  }
+
+  /** 失败现场用：WebView 里页面可见文字（innerText，最多约 3000 字）。 */
+  public async 读取网页可见文字(): Promise<string> {
+    return await this.网页.读取可见文字()
+  }
+
+  /**
+   * 点击一个屏幕坐标（物理像素）前，记下该处 WebView 里最上层元素；不在 WebView 内记为原生界面。
+   * 只是诊断，失败不影响点击，返回 undefined。
+   */
+  private async 记录屏幕点现场(x: number, y: number): Promise<string | undefined> {
+    try {
+      let 视口 = await this.网页.读取视口()
+      let 范围 = 解析安卓网页控件范围(await this.读取界面XML(this.取消信号))
+      范围 ??= { 左: 0, 上: 0, 宽: 视口.宽 * 视口.密度, 高: 视口.高 * 视口.密度 }
+      if (比例是否一致(范围, 视口) === false) return undefined
+      let 点 = 屏幕转网页坐标({ x, y }, 范围, 视口)
+      if (点 === undefined) return '原生界面（该坐标不在 WebView 内）'
+      return await this.网页.记录点击落点(点)
+    } catch {
+      this.取消信号.throwIfAborted()
+      return undefined
+    }
   }
 
   public async 点击截图文字(文字: string): Promise<{ x: number; y: number }> {
-    if ((await this.确认前台()) !== this.应用配置.启动组件) throw new Error('Android OCR 点击需要测试应用处于前台')
-    let 图片 = await this.截图()
-    let { x, y } = await 寻找截图文字(await this.获得OCR程序(), 图片, 文字, this.取消信号)
+    let { 图片, x, y } = await 动作前执行(async () => {
+      if ((await this.确认前台()) !== this.应用配置.启动组件) throw new Error('Android OCR 点击需要测试应用处于前台')
+      let 截图 = await this.截图()
+      return { 图片: 截图, ...(await 寻找截图文字(await this.获得OCR程序(), 截图, 文字, this.取消信号)) }
+    })
+    await this.记录屏幕点现场(x, y)
     await this.点击屏幕坐标(x, y, 图片)
     return { x, y }
   }
@@ -178,9 +222,18 @@ export class 安卓测试引擎 {
         let 图片 = await this.截图()
         return { 图片, 坐标宽: 图片.readUInt32BE(16) }
       },
-      点击: async (x, y): Promise<void> => await this.点击屏幕坐标(x, y),
+      点击: async (x, y): Promise<void> => {
+        await this.记录屏幕点现场(x, y)
+        await this.点击屏幕坐标(x, y)
+      },
       说明: 'Android ',
     })
+  }
+
+  /** 只刷新网页：当前 WebView 整页重新加载，不重启 App，等新文档加载完成再返回。 */
+  public async 重新加载网页(超时毫秒 = 30_000): Promise<void> {
+    this.检查超时(超时毫秒)
+    await this.网页.重新加载(超时毫秒)
   }
 
   /** WebView 当前的页面地址。 */
@@ -214,9 +267,13 @@ export class 安卓测试引擎 {
   }
 
   private async 点击屏幕坐标(x: number, y: number, OCR截图?: Buffer): Promise<void> {
-    let 窗口 = await this.检查坐标们([{ x, y }], OCR截图)
-    if (OCR截图 !== undefined && 窗口 !== this.应用配置.启动组件) throw new Error('Android OCR 识别期间前台窗口已改变')
+    await 动作前执行(async () => {
+      let 窗口 = await this.检查坐标们([{ x, y }], OCR截图)
+      if (OCR截图 !== undefined && 窗口 !== this.应用配置.启动组件)
+        throw new Error('Android OCR 识别期间前台窗口已改变')
+    })
     await this.运行(['shell', 'input', 'tap', String(x), String(y)])
+    标记动作已执行()
   }
 
   public async 滑动(x1: number, y1: number, x2: number, y2: number, 耗时毫秒 = 300): Promise<void> {
@@ -227,18 +284,37 @@ export class 安卓测试引擎 {
       { x: x2, y: y2 },
     ])
     await this.运行(['shell', 'input', 'swipe', String(x1), String(y1), String(x2), String(y2), String(耗时毫秒)])
+    标记动作已执行()
   }
 
   public async 返回(): Promise<void> {
     await this.确认前台()
     await this.运行(['shell', 'input', 'keyevent', 'KEYCODE_BACK'])
+    标记动作已执行()
   }
 
-  public async 输入(文字: string): Promise<void> {
-    if (/^[A-Za-z0-9_.,@:/+ -]+$/u.test(文字) === false)
-      throw new Error('ADB 文本输入目前只支持英文字母、数字、空格和 _ . , @ : / + -')
-    await this.确认前台()
-    await this.运行(['shell', 'input', 'text', 文字.replaceAll(' ', '%s')])
+  /** 向当前获得焦点的输入框输入文字，默认在已有文字后追加；`清空` 为 true 时先清空再输入，此时文字可以为空（只清空）。 */
+  public async 输入(文字: string, 选项: { 清空?: boolean } = {}): Promise<void> {
+    let 清空 = 选项.清空 === true
+    await 动作前执行(async () => {
+      if (文字 === '' && 清空 === false) throw new Error('Android 输入内容不能为空；要清空输入框请把清空设为 true')
+      if (文字 !== '' && /^[A-Za-z0-9_.,@:/+ -]+$/u.test(文字) === false)
+        throw new Error('ADB 文本输入目前只支持英文字母、数字、空格和 _ . , @ : / + -')
+      await this.确认前台()
+    })
+    if (清空) {
+      // 光标移到末尾后连续退格，一条命令发完；最多清掉 输入框清空退格次数 个字符
+      await this.运行([
+        'shell',
+        'input',
+        'keyevent',
+        'KEYCODE_MOVE_END',
+        ...Array.from({ length: 输入框清空退格次数 }, (): string => 'KEYCODE_DEL'),
+      ])
+      标记动作已执行()
+    }
+    if (文字 !== '') await this.运行(['shell', 'input', 'text', 文字.replaceAll(' ', '%s')])
+    标记动作已执行()
   }
 
   public async 验证可见(目标: 安卓目标, 超时毫秒 = 10_000): Promise<void> {
@@ -281,9 +357,15 @@ export class 安卓测试引擎 {
 
   private async 验证目标(目标: 安卓目标, 应可见: boolean, 超时毫秒: number): Promise<void> {
     目标 = 安卓目标模型.parse(目标)
+    if (目标.匹配 === '包含' && 目标.按 !== '文字' && 目标.按 !== '描述' && 目标.按 !== '网页文字')
+      throw new Error(`${目标.按}不支持包含匹配，只有文字、描述、网页文字可以`)
     this.检查超时(超时毫秒)
     if (目标.按 === '网页文字' || 目标.按 === '网页选择器') {
-      await this.网页.验证({ 按: 目标.按, 值: 目标.值 }, 应可见, 超时毫秒)
+      await this.网页.验证(
+        { 按: 目标.按, 值: 目标.值, ...(目标.匹配 === '包含' ? { 匹配: '包含' as const } : {}) },
+        应可见,
+        超时毫秒,
+      )
       return
     }
     await this.等待目标(目标, 应可见, 超时毫秒)
@@ -300,9 +382,9 @@ export class 安卓测试引擎 {
           if (元素.范围.左 >= 元素.范围.右 || 元素.范围.上 >= 元素.范围.下) return false
           switch (目标.按) {
             case '文字':
-              return 元素.文字 === 目标.值
+              return 目标.匹配 === '包含' ? 元素.文字.includes(目标.值) : 元素.文字 === 目标.值
             case '描述':
-              return 元素.描述 === 目标.值
+              return 目标.匹配 === '包含' ? 元素.描述.includes(目标.值) : 元素.描述 === 目标.值
             case '资源ID':
               return 元素.资源ID === 目标.值
             case '网页文字':
@@ -310,7 +392,22 @@ export class 安卓测试引擎 {
               throw new Error('网页目标不能用于 Android 界面树')
           }
         })
-        if (匹配们.length > 1 && 应可见) throw new Error(`Android 目标匹配到多个元素：${目标.按}=${目标.值}`)
+        if (匹配们.length > 1 && 应可见)
+          throw new Error(
+            `Android 目标匹配到多个元素：${目标.按}=${目标.值}${目标.匹配 === '包含' ? '（包含匹配）' : ''}\n${格式化原生歧义建议(
+              匹配们
+                .slice(0, 8)
+                .map((元素, 序号) => ({
+                  序号,
+                  类型: `位置(${String(元素.范围.左)},${String(元素.范围.上)})`,
+                  文字: 元素.文字,
+                  名称: 元素.描述,
+                  标识: 元素.资源ID,
+                })),
+              匹配们.length,
+              '资源ID',
+            )}`,
+          )
         if (匹配们.length === 0 && 应可见 === false) return undefined
         if (匹配们.length === 1 && 应可见) return 匹配们[0]
         await 等待(250, undefined, { signal: 信号 })
@@ -318,7 +415,12 @@ export class 安卓测试引擎 {
     } catch (错误) {
       this.取消信号.throwIfAborted()
       if (超时信号.aborted)
-        throw new Error(`Android 等待目标${应可见 ? '可见' : '隐藏'}超时：${目标.按}=${目标.值}`, { cause: 错误 })
+        throw this.网页.附加点击现场(
+          new Error(
+            `Android 等待目标${应可见 ? '可见' : '隐藏'}超时：${目标.按}=${目标.值}${目标.匹配 === '包含' ? '（包含匹配）' : ''}`,
+            { cause: 错误 },
+          ),
+        )
       throw 错误
     }
   }

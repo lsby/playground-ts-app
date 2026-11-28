@@ -14,6 +14,16 @@ services:
     volumes:
       - ../../db:/opt/app/db
       - ../../.env/.env.development.web:/opt/app/.env/.env.development.web:ro
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:' + process.env.APP_PORT + '/api/system/health', { signal: AbortSignal.timeout(4000) }).then((response)=>{if(!response.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     logging:
       options:
         max-size: '100m'

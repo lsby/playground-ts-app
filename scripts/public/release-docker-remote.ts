@@ -1,6 +1,5 @@
 import { spawn } from 'child_process'
 import * as fs from 'fs'
-import inquirer from 'inquirer'
 import { NodeSSH } from 'node-ssh'
 import * as path from 'path'
 import { z } from 'zod'
@@ -10,7 +9,10 @@ import { 写入发布信息, 创建发布信息, 删除发布信息, 发布信�
 import { 执行数据库预演与准备, 执行新服务失败回滚 } from './tools/database-preflight'
 import { 执行数据库同步 } from './tools/database-sync'
 import { 获得非回滚旧镜像列表 } from './tools/docker-image'
+import { 获取Docker打包选项 } from './tools/docker-package'
 import { 日志类 } from './tools/model'
+import { 解析Docker发布参数 } from './tools/remote-release-options'
+import { 准备部署已上传包, 获得上传包路径, 记录已上传包 } from './tools/remote-upload-info'
 import {
   上传文件,
   保留Compose服务镜像,
@@ -24,7 +26,6 @@ import {
   获取Compose命令,
   获取Compose服务镜像快照,
   获取Compose镜像列表,
-  获取完整忽略名单,
   获得安全远程项目根目录,
   获得相对环境文件路径,
   转义PosixShell参数,
@@ -33,7 +34,6 @@ import {
 
 let 本地根目录 = path.resolve(import.meta.dirname, '../', '../')
 let 服务器配置组 = 读取部署服务器配置(本地根目录)
-let 服务器列表 = 服务器配置组.map((配置) => ({ name: 配置.name, value: 配置 }))
 
 // 读取项目名称
 let 包信息模式 = z.object({ name: z.string() }).passthrough()
@@ -59,7 +59,8 @@ async function 执行本地命令(命令: string, 选项?: { 工作目录?: stri
       进程.stderr.on('data', (数据) => process.stderr.write(数据))
     }
 
-    进程.on('close', (退出码) => {
+    进程.once('error', reject)
+    进程.once('close', (退出码) => {
       if (退出码 === 0) resolve()
       else reject(new Error(`本地命令执行失败，退出码: ${退出码}`))
     })
@@ -67,109 +68,18 @@ async function 执行本地命令(命令: string, 选项?: { 工作目录?: stri
 }
 
 async function 主函数(): Promise<void> {
-  let { 目标服务器, 模式, 环境, 使用缓存, 复用本地构建, 确认 } = (await inquirer.prompt([
-    { type: 'list', name: '目标服务器', message: '请选择目标服务器:', choices: 服务器列表 },
-    {
-      type: 'list',
-      name: '模式',
-      message: '请选择操作模式:',
-      choices: [
-        { name: '打包镜像 (build)', value: 'build' },
-        { name: '运行项目 (run)', value: 'run' },
-        { name: '查看日志 (logs)', value: 'logs' },
-        { name: '重启项目 (restart)', value: 'restart' },
-        { name: '重新部署 (redeploy)', value: 'redeploy' },
-        { name: '停止运行 (stop)', value: 'stop' },
-        { name: '删除项目 (delete)', value: 'delete' },
-        { name: '同步数据到本地 (sync-to-local)', value: 'sync-to-local' },
-        { name: '同步数据到服务器 (sync-to-server)', value: 'sync-to-server' },
-      ],
-      default: 'run',
-    },
-    {
-      type: 'list',
-      name: '环境',
-      message: '请选择环境:',
-      choices: [
-        { name: '开发环境 (development)', value: 'development' },
-        { name: '生产环境 (production)', value: 'production' },
-      ],
-      default: 'development',
-      when: (待回答: any): boolean => 待回答.模式 !== 'delete',
-    },
-    {
-      type: 'confirm',
-      name: '使用缓存',
-      message: '是否使用镜像缓存?',
-      default: true,
-      when: (待回答: any): boolean => ['build', 'run', 'redeploy'].includes(待回答.模式),
-    },
-    {
-      type: 'confirm',
-      name: '复用本地构建',
-      message: '是否复用本地构建产物 (dist) 以免去服务器编译?',
-      default: true,
-      when: (待回答: any): boolean => ['build', 'run', 'redeploy'].includes(待回答.模式),
-    },
-    {
-      type: 'confirm',
-      name: '确认',
-      message: (待回答: any): string => {
-        if (待回答.模式 === 'run' || 待回答.模式 === 'redeploy') {
-          let 提示消息 = [
-            `运行模式将使用项目打包内容覆盖部署根目录下的 ${项目名称}/run/${待回答.环境} 中的同名文件`,
-            '这通常是预期的, 但请确保您了解后果:',
-            '- 打包内容会覆盖运行目录中的同名文件',
-            '- 远程新生成的文件及外部持久化数据不受影响',
-            '⚠️ 风险提示: 若打包内容中包含会在运行时修改的文件(如 SQLite 数据库), 部署后这些文件将被打包中的初始版本重置, 导致远程积累的数据丢失',
-          ]
-
-          if (待回答.模式 === 'redeploy') {
-            提示消息 = [
-              `彻底重部署模式将完全删除部署根目录下的 ${项目名称}/run/${待回答.环境}`,
-              '这将导致:',
-              '- 强制停止并移除当前容器和关联镜像',
-              '- 删除运行目录下的所有文件 (包括不在项目仓库中的数据/持久化文件等)',
-              '- 之后从零开始重新部署',
-              '🚨 警告: 这是一个不可逆的操作, 远程未备份的数据将永久丢失!',
-            ]
-          }
-          return 提示消息.join('\n') + '\n您确定要继续吗?'
-        }
-
-        if (待回答.模式 === 'delete') {
-          return (
-            [
-              `🚨 警告: 此操作将从服务器彻底删除该项目的所有痕迹!`,
-              `项目根目录: <部署根目录>/${项目名称}`,
-              '操作包含:',
-              '- 停止所有运行中的容器 (跨环境)',
-              '- 清理所有关联镜像',
-              '- 彻底删除远程目录 (build, run, upload)',
-              '这是一个极其危险的操作, 不可撤销!',
-            ].join('\n') + '\n您确认要这么做吗?'
-          )
-        }
-        if (待回答.模式 === 'sync-to-server') {
-          return `🚨 警告: 此操作将使用本地数据库覆盖服务器上的数据库!\n服务器文件将先备份, 但这仍是一个敏感操作。\n您确认要继续吗?`
-        }
-        return ''
-      },
-      when: (待回答: any): boolean => ['run', 'redeploy', 'delete', 'sync-to-server'].includes(待回答.模式),
-      default: true,
-    },
-  ] as any)) as {
-    目标服务器: (typeof 服务器列表)[number]['value']
-    模式: string
-    环境: string
-    使用缓存?: boolean
-    复用本地构建?: boolean
-    确认?: boolean
-  }
-
-  if (确认 === false) {
-    return
-  }
+  let {
+    服务器名称,
+    模式,
+    环境: 选定环境,
+    使用缓存,
+    复用本地构建,
+    跟随日志,
+    压缩包哈希,
+  } = 解析Docker发布参数(process.argv.slice(2))
+  let 目标服务器 = 服务器配置组.find((配置) => 配置.name === 服务器名称)
+  if (目标服务器 === undefined) throw new Error(`找不到部署服务器: ${服务器名称}`)
+  let 环境 = 选定环境 ?? 'all'
   let { host: 服务器地址, useMirror: 是否使用镜像 } = 目标服务器
 
   let 镜像参数 = 是否使用镜像
@@ -185,8 +95,15 @@ async function 主函数(): Promise<void> {
   let sshClient = new NodeSSH()
 
   try {
-    日志.打印(`🚀 [${模式}] [${(环境 as string | undefined) ?? 'all'}] 开始连接服务器 [${服务器地址}]...`)
-    await sshClient.connect({ host: 目标服务器.host, username: 目标服务器.username, password: 目标服务器.password })
+    日志.打印(`🚀 [${模式}] [${环境}] 开始连接服务器 [${服务器地址}]...`)
+    await sshClient.connect({
+      host: 目标服务器.host,
+      username: 目标服务器.username,
+      password: 目标服务器.password,
+      keepaliveInterval: 10000,
+      keepaliveCountMax: 6,
+      readyTimeout: 30000,
+    })
     日志.打印(`✅ 已连接到 服务器 [${服务器地址}]`)
 
     let compose命令 = await 获取Compose命令(sshClient)
@@ -200,7 +117,20 @@ async function 主函数(): Promise<void> {
       项目名称,
     )
     let 远程上传目录 = path.posix.resolve(远程项目根目录, 'upload')
-    let 远程压缩包路径: string = path.posix.resolve(远程上传目录, `${项目名称}.tar.gz`)
+    let 远程压缩包路径 = path.posix.resolve(远程上传目录, `${项目名称}.tar.gz`)
+    if (模式 === 'run-uploaded') {
+      远程压缩包路径 = 获得上传包路径(
+        远程上传目录,
+        项目名称,
+        z.enum(['development', 'production']).parse(选定环境),
+        压缩包哈希,
+      )
+      复用本地构建 = await 准备部署已上传包(sshClient, 日志, 远程压缩包路径, 环境, 项目名称, 压缩包哈希)
+      镜像参数 = 镜像参数.replace(
+        /--build-arg SKIP_BUILD=(true|false)/u,
+        `--build-arg SKIP_BUILD=${String(复用本地构建)}`,
+      )
+    }
     let 远程构建目录 =
       typeof 环境 === 'string'
         ? path.posix.resolve(远程项目根目录, 'build', 环境)
@@ -212,7 +142,7 @@ async function 主函数(): Promise<void> {
         : path.posix.resolve(远程项目根目录, 'run')
     let 远程运行部署目录: string = path.posix.resolve(远程运行目录, 'deploy')
 
-    if (['build', 'run', 'redeploy'].includes(模式)) {
+    if (['build', 'run', 'redeploy', 'upload', 'run-uploaded'].includes(模式)) {
       await 准备Docker构建空间(sshClient, 远程部署根目录, 日志)
     }
 
@@ -254,8 +184,8 @@ async function 主函数(): Promise<void> {
     }
 
     // ====================
-    // 步骤: 打包并上传 (仅 build, run, rededeploy 模式需要)
-    if (模式 === 'build' || 模式 === 'run' || 模式 === 'redeploy') {
+    // 步骤: 打包并上传
+    if (模式 === 'build' || 模式 === 'run' || 模式 === 'redeploy' || 模式 === 'upload') {
       let Docker环境 = z.enum(['development', 'production']).parse(环境)
       let 环境文件名表 = { development: '.env/.env.development.web', production: '.env/.env.production.web' }
       let envFile = 环境文件名表[Docker环境]
@@ -267,7 +197,8 @@ async function 主函数(): Promise<void> {
         日志.打印(`📦 正在本地生成、检查并预构建项目 (使用 ${envFile}，避免服务器内存溢出假死)...`)
         await 执行本地命令(`npm run task -- build:all --env ${envFile}`, { 工作目录: 本地根目录 })
       }
-      let 发布信息路径 = 写入发布信息(本地根目录, 创建发布信息(本地根目录, envFile))
+      let 本次发布信息 = 创建发布信息(本地根目录, envFile)
+      let 发布信息路径 = 写入发布信息(本地根目录, 本次发布信息)
       日志.打印(`✅ 已生成 Docker 构建发布信息: ${发布信息路径}`)
 
       日志.打印(`🧹 清理旧的本地压缩包`)
@@ -276,33 +207,37 @@ async function 主函数(): Promise<void> {
       }
 
       日志.打印(`📦 正在打包项目 (根目录: ${本地根目录})...`)
-      let 忽略名单 = 获取完整忽略名单(本地根目录)
-      let 强制包含文件组: string[] = [发布信息文件名]
-      let 覆盖文本文件组: Array<{ 相对路径: string; 内容: string }> = [
-        { 相对路径: 打包环境文件, 内容: 读取环境文件明文(本地根目录, envFile) },
-      ]
-      let Docker忽略文件相对路径 = '.dockerignore'
-      let Docker忽略内容 = fs
-        .readFileSync(path.resolve(本地根目录, Docker忽略文件相对路径), 'utf8')
-        .replaceAll('\r\n', '\n')
-      if (复用本地构建 === true) {
-        忽略名单 = 忽略名单.filter((项) => {
-          return 项 !== 'dist' && 项 !== 'dist/**' && 项 !== '/dist' && 项 !== '/dist/**'
+      let { 包含名单, 忽略名单, Docker忽略内容 } = 获取Docker打包选项(本地根目录, Docker环境, 复用本地构建)
+      await 压缩项目({
+        输出路径: 本地压缩包路径,
+        源码目录: 本地根目录,
+        忽略名单,
+        包含名单,
+        日志,
+        强制包含文件组: [发布信息文件名],
+        覆盖文本文件组: [
+          { 相对路径: 打包环境文件, 内容: 读取环境文件明文(本地根目录, envFile) },
+          { 相对路径: '.dockerignore', 内容: Docker忽略内容 },
+        ],
+      })
+      if (模式 === 'upload') {
+        远程压缩包路径 = await 记录已上传包({
+          sshClient,
+          日志,
+          本地压缩包路径,
+          远程上传目录,
+          项目名称,
+          环境: Docker环境,
+          发布信息: 本次发布信息,
+          复用本地构建,
         })
-        Docker忽略内容 = `${Docker忽略内容.trimEnd()}\n\n# 远程部署复用本地构建产物\n!dist\n!dist/**\n`
+      } else {
+        日志.打印(`🧹 清理并创建远程上传目录...`)
+        await 执行远程命令(sshClient, `mkdir -p -- ${转义PosixShell参数(远程上传目录)}`)
+
+        日志.打印(`⬆️ 正在上传压缩包...`)
+        await 上传文件(sshClient, 本地压缩包路径, 远程压缩包路径)
       }
-      忽略名单.push(Docker忽略文件相对路径)
-      覆盖文本文件组.push({ 相对路径: Docker忽略文件相对路径, 内容: Docker忽略内容 })
-      await 压缩项目({ 输出路径: 本地压缩包路径, 源码目录: 本地根目录, 忽略名单, 日志, 强制包含文件组, 覆盖文本文件组 })
-
-      日志.打印(`🧹 清理并创建远程上传目录...`)
-      await 执行远程命令(
-        sshClient,
-        `rm -rf -- ${转义PosixShell参数(远程上传目录)} && mkdir -p -- ${转义PosixShell参数(远程上传目录)}`,
-      )
-
-      日志.打印(`⬆️ 正在上传压缩包...`)
-      await 上传文件(sshClient, 本地压缩包路径, 远程压缩包路径)
 
       日志.打印(`🧹 清理本地压缩包`)
       if (fs.existsSync(本地压缩包路径) === true) {
@@ -339,7 +274,7 @@ async function 主函数(): Promise<void> {
     // ====================
     // 模式: 运行项目 (run/redeploy)
     // ====================
-    if (模式 === 'run' || 模式 === 'redeploy') {
+    if (模式 === 'run' || 模式 === 'redeploy' || 模式 === 'run-uploaded') {
       let docker文件目录 = path.posix.resolve(远程运行部署目录, 环境)
 
       日志.打印(`📂 确保远程运行目录存在: ${远程运行目录}`)
@@ -401,7 +336,15 @@ async function 主函数(): Promise<void> {
             { 工作目录: docker文件目录 },
           )
           日志.打印(`🩺 正在验证新服务是否稳定就绪...`)
-          await 等待Compose应用就绪(sshClient, docker文件目录, 项目名称, 环境, compose命令, 相对环境文件)
+          await 等待Compose应用就绪(
+            sshClient,
+            docker文件目录,
+            项目名称,
+            环境,
+            compose命令,
+            相对环境文件,
+            '/api/system/health',
+          )
           日志.打印(`✅ 新服务已连续通过健康检查。`)
         } catch (启动错误) {
           try {
@@ -559,7 +502,7 @@ async function 主函数(): Promise<void> {
     // ====================
     // 模式: 查看日志
     // ====================
-    if (模式 === 'logs' || 模式 === 'run' || 模式 === 'restart' || 模式 === 'redeploy') {
+    if (模式 === 'logs' || (跟随日志 === true && ['run', 'run-uploaded', 'restart', 'redeploy'].includes(模式))) {
       let docker文件目录 = path.posix.resolve(远程运行部署目录, 环境)
       let 相对环境文件 = 获得相对环境文件路径(环境)
       日志.打印('--- 正在同步服务器实时日志 (按 Ctrl+C 退出) ---')

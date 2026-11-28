@@ -13,7 +13,6 @@ let 允许规则表 = new Map<string, ReadonlySet<string>>([
   ['scripts/external-lfs/operations.ts', new Set(['TASK_INTERACTION_002'])],
   ['scripts/git-hooks/check-staged-files.ts', new Set(['TASK_INTERACTION_002'])],
   ['scripts/public/release-docker-local.ts', new Set(['TASK_INTERACTION_001'])],
-  ['scripts/public/release-docker-remote.ts', new Set(['TASK_INTERACTION_001'])],
   ['scripts/setup/github-config-key.ts', new Set(['TASK_INTERACTION_001'])],
   ['scripts/setup/init-ports.ts', new Set(['TASK_INTERACTION_001'])],
   ['scripts/setup/preinstall.mjs', new Set(['TASK_INTERACTION_002'])],

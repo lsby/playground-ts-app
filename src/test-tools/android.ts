@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { 安卓测试引擎, 执行ADB, type 安卓启动选项 } from '../model/android-test'
 import type { 提交步骤附件 } from '../model/test-requirement'
 import { 压缩步骤截图 } from './evidence-image'
+import { 生成失败现场附件, 登记失败取证 } from './failure-scene'
 import { 读取移动测试配置 } from './mobile-config'
 
 type 步骤记录 = {
@@ -82,7 +83,7 @@ export class 需求测试安卓设备 {
         if (需要收尾截图()) await this.采集(当前, `${范围}结束时的手机画面`)
         return 结果
       } catch (错误) {
-        if (需要收尾截图()) await this.采集(当前, `${范围}失败时的手机画面`)
+        if (登记失败取证(错误)) await this.采集失败现场(当前, `${范围}失败时的手机画面`)
         throw 错误
       } finally {
         当前.已结束 = true
@@ -152,6 +153,30 @@ export class 需求测试安卓设备 {
       步骤.提交([{ 类型: '图片', 内容类型: 'image/webp', 内容: 图片.toString('base64'), 说明 }])
     } catch (错误) {
       步骤.记录错误(new Error('Android 步骤取证失败', { cause: 错误 }))
+    }
+  }
+
+  private async 采集失败现场(步骤: 步骤记录, 说明: string): Promise<void> {
+    if (步骤.已使用 === false || this.引擎 === undefined || this.参数.取消信号.aborted) return
+    try {
+      let 图片 = await 压缩步骤截图(await this.引擎.截图())
+      let 网页文字: { 文字: string } | { 原因: string }
+      try {
+        let 文字 = await this.引擎.读取网页可见文字()
+        网页文字 = 文字.trim() === '' ? { 原因: '页面没有可见文字' } : { 文字 }
+      } catch (错误) {
+        网页文字 = { 原因: 错误 instanceof Error ? 错误.message : String(错误) }
+      }
+      步骤.提交(
+        生成失败现场附件({
+          图片Base64: 图片.toString('base64'),
+          说明,
+          网页文字,
+          文字标题: '失败时的网页可见文字（最多 3000 字）：',
+        }),
+      )
+    } catch (错误) {
+      步骤.记录错误(new Error('Android 失败现场取证失败', { cause: 错误 }))
     }
   }
 

@@ -13,7 +13,7 @@ export async function 准备单元测试参数(上下文: 任务准备上下文)
   if (是否已指定过滤器(上下文.参数) === true) return { 参数: 上下文.参数 }
   if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) return { 参数: [...上下文.参数, '--all'] }
   let 回答 = await inquirer.prompt<{ 过滤器: string }>([
-    { type: 'input', name: '过滤器', message: '请输入要运行的接口路径正则:', default: '.*' },
+    { type: 'input', name: '过滤器', message: '请输入单元测试筛选正则（接口路径或手写测试相对路径）:', default: '.*' },
   ])
   let 过滤器 = 回答.过滤器.trim() === '' ? '.*' : 回答.过滤器.trim()
   return { 参数: [...上下文.参数, '--filter', 过滤器] }

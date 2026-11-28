@@ -9,6 +9,7 @@ import {
   安卓输入模型,
   安卓配色模型,
   转换安卓目标,
+  转换安卓等待目标,
 } from '../mcp/android-input'
 import { 无参数模型 } from '../mcp/tool-input'
 import { 生成增强点击语句, type 模板资源 } from './enhanced-click-code'
@@ -130,18 +131,23 @@ export function 生成安卓调用代码(
     case 'android_back':
       无参数模型.parse(参数)
       return { ...基本, 语句们: [引擎, 'await 引擎.返回()', ...保存结果('{ pressed: true }')] }
+    case 'android_reload':
+      无参数模型.parse(参数)
+      return { ...基本, 语句们: [引擎, 'await 引擎.重新加载网页()', ...保存结果('{ reloaded: true }')] }
     case 'android_fill': {
-      let { value } = 安卓输入模型.parse(参数)
-      return { ...基本, 语句们: [引擎, `await 引擎.输入(${字面量(value)})`, ...保存结果('{ filled: true }')] }
+      let { value, clear } = 安卓输入模型.parse(参数)
+      let 选项 = clear ? ', { 清空: true }' : ''
+      return { ...基本, 语句们: [引擎, `await 引擎.输入(${字面量(value)}${选项})`, ...保存结果('{ filled: true }')] }
     }
     case 'android_wait': {
-      let { target, state } = 安卓等待模型.parse(参数)
+      let 等待参数 = 安卓等待模型.parse(参数)
+      let { state } = 等待参数
       return {
         ...基本,
         类型: '观察',
         语句们: [
           引擎,
-          `await 引擎.${state === 'visible' ? '验证可见' : '验证隐藏'}(${字面量(转换安卓目标(target))}, ${String(推算回放超时(条目))})`,
+          `await 引擎.${state === 'visible' ? '验证可见' : '验证隐藏'}(${字面量(转换安卓等待目标(等待参数))}, ${String(推算回放超时(条目))})`,
           ...保存结果(`{ state: ${字面量(state)} }`),
         ],
       }

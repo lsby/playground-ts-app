@@ -404,7 +404,7 @@ export function 注册测试工具(server: McpServer, 宿主: MCP测试工具宿
 
   注册(
     'browser_wait',
-    'Wait for a locator to become visible or hidden. Fails on timeout.',
+    'Wait for a locator to become visible or hidden. Fails on timeout. Text and label locators already match substrings (case-insensitive) unless exact=true, so use the default for text with dynamic parts such as dates.',
     目标操作模型.extend({ state: z.enum(['visible', 'hidden']) }),
     ({ name, target, state, timeoutMs }) =>
       宿主.执行(async (工具): Promise<工具输出> => {

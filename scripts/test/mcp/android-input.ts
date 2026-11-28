@@ -1,7 +1,7 @@
 import { z } from 'zod-mcp'
 
 import type { 安卓目标 } from '../../../src/model/android-test'
-import { 画面观察字段 } from './tool-input'
+import { 匹配方式模型, 画面观察字段 } from './tool-input'
 
 export let 安卓仅观察开关模型 = z.strictObject({ ...画面观察字段 })
 
@@ -26,15 +26,40 @@ export let 安卓滑动模型 = z.strictObject({
   durationMs: z.int().min(1).max(60_000).default(300),
   ...画面观察字段,
 })
-export let 安卓输入模型 = z.strictObject({
-  value: z.string().min(1).describe('Synthetic ASCII test data only. This value is recorded in plaintext.'),
-  ...画面观察字段,
-})
-export let 安卓等待模型 = z.strictObject({
-  target: 安卓目标模型,
-  timeoutMs: 安卓超时模型,
-  state: z.enum(['visible', 'hidden']),
-})
+export let 安卓输入模型 = z
+  .strictObject({
+    value: z
+      .string()
+      .describe(
+        'Synthetic ASCII test data only. This value is recorded in plaintext. May be an empty string only when clear is true (just clears the field).',
+      ),
+    clear: z
+      .boolean()
+      .default(false)
+      .describe(
+        'false (default): append to the text already in the focused field. true: clear the focused field first (moves the cursor to the end and deletes up to 200 characters), then type value; use it to overwrite text or to test an emptied field (value "").',
+      ),
+    ...画面观察字段,
+  })
+  .superRefine((值, 上下文): void => {
+    if (值.value === '' && 值.clear === false)
+      上下文.addIssue({ code: 'custom', path: ['value'], message: 'value may be empty only when clear is true.' })
+  })
+export let 安卓等待模型 = z
+  .strictObject({
+    target: 安卓目标模型,
+    timeoutMs: 安卓超时模型,
+    state: z.enum(['visible', 'hidden']),
+    match: 匹配方式模型,
+  })
+  .superRefine((值, 上下文): void => {
+    if (值.match === 'contains' && ['text', 'description', 'webText'].includes(值.target.by) === false)
+      上下文.addIssue({
+        code: 'custom',
+        path: ['match'],
+        message: 'contains only works with text, description and webText.',
+      })
+  })
 export let 安卓配色模型 = z.strictObject({ colorScheme: z.enum(['light', 'dark']), ...画面观察字段 })
 export let 安卓打开模型 = z.strictObject({
   ...画面观察字段,
@@ -45,6 +70,12 @@ export let 安卓打开模型 = z.strictObject({
       'Allow an unsettled notification permission only when testing the permission prompt. Never dismisses existing dialogs or changes permissions.',
     ),
 })
+
+/** 等待用的目标：match 为 contains 时带上 匹配: '包含'，精确匹配（默认）不加字段，保证已有录制和导出不变。 */
+export function 转换安卓等待目标(参数: z.infer<typeof 安卓等待模型>): 安卓目标 {
+  let 目标 = 转换安卓目标(参数.target)
+  return 参数.match === 'contains' ? { ...目标, 匹配: '包含' } : 目标
+}
 
 export function 转换安卓目标(目标: z.infer<typeof 安卓目标模型>): 安卓目标 {
   switch (目标.by) {

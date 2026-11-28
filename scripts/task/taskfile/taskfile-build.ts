@@ -1,4 +1,4 @@
-import { Parcel基础参数, 测试环境文件 } from '../model/task-common'
+import { Parcel基础参数, 测试环境文件, 测试调试环境 } from '../model/task-common'
 import { 命令, 定义任务 } from '../model/task-runner'
 
 export let 构建任务表 = 定义任务({
@@ -44,8 +44,15 @@ export let 构建任务表 = 定义任务({
     需要环境文件: true,
   },
   'build:web:test': {
-    说明: '生成并构建 Web 测试前端',
+    说明: '复用或重新构建 Web 测试前端',
     环境文件: 测试环境文件,
-    依赖: ['generate:all', 'clean:web-test', 'bundle:web-test'],
+    环境变量: 测试调试环境,
+    运行: 命令('tsx', 'scripts/test/prepare-web-build.ts'),
+  },
+  'build:web:test:bundle': {
+    说明: '清理并打包 Web 测试前端',
+    环境文件: 测试环境文件,
+    依赖: ['clean:web-test', 'bundle:web-test'],
+    公开: false,
   },
 })
