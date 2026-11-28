@@ -2,6 +2,7 @@ import { Electron生产环境文件, Sea生产环境文件, Web生产环境文�
 import { 命令, 定义任务 } from '../model/task-runner'
 import { 准备Electron发布参数 } from '../prepare/release-electron'
 import { 准备发布版本参数 } from '../prepare/release-version'
+import { 准备网站发布参数 } from '../prepare/release-web'
 
 export let 发布任务表 = 定义任务({
   // capacitor
@@ -25,14 +26,14 @@ export let 发布任务表 = 定义任务({
   'public:web:oss': {
     说明: '构建并按确认参数同步纯前端网站至阿里云 OSS',
     运行: 命令('tsx', 'scripts/public/release-oss-aliyun.ts'),
-    公开: false,
+    准备运行: 准备网站发布参数,
     传递参数: true,
   },
   'public:web:github-pages': {
     说明: '构建并发布纯前端网站至 GitHub Pages',
     运行: 命令('tsx', 'scripts/public/release-github-pages.ts'),
     传递参数: true,
-    公开: false,
+    准备运行: 准备网站发布参数,
   },
   'build:web:publish': {
     说明: '按已启用平台和公共路径构建网站发布产物',

@@ -42,8 +42,13 @@ export function 获取平台配置(平台: 网站平台, 配置: 网站配置): 
   }
 }
 
-export function 校验发布参数(): { 仅构建: boolean; 仅上传: boolean; 确认: boolean; 删除: boolean } {
-  let 参数 = process.argv.slice(2).filter((值): boolean => 值 !== '--')
+export function 校验发布参数(参数列表: string[] = process.argv.slice(2)): {
+  仅构建: boolean
+  仅上传: boolean
+  确认: boolean
+  删除: boolean
+} {
+  let 参数 = 参数列表.filter((值): boolean => 值 !== '--')
   if (参数.some((值): boolean => ['--build-only', '--upload-only', '--yes', '-y', '--delete'].includes(值) === false))
     throw new 网站发布错误('仅支持 --build-only、--upload-only、--yes、--delete')
   let 仅构建 = 参数.includes('--build-only')
