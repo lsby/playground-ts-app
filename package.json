@@ -28,7 +28,7 @@
     "preinstall": "node scripts/setup/preinstall.mjs",
     "postinstall": "node scripts/setup/postinstall.mjs",
     "prepare": "husky",
-    "release:all": "tsx scripts/task/index.ts release:all",
+    "release:all": "tsx scripts/task/index.ts release:all --",
     "setup:all": "tsx scripts/task/index.ts setup:all --",
     "task": "tsx scripts/task/index.ts",
     "test:integration": "tsx scripts/task/index.ts test:integration --",

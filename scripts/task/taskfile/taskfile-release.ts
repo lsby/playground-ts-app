@@ -94,6 +94,7 @@ export let 发布任务表 = 定义任务({
     说明: '构建、提交、打标签并推送新版本',
     环境文件: Web生产环境文件,
     依赖: ['release:version', 'release:verify'],
+    参数传递目标: 'release:version',
     运行: 命令('tsx', 'scripts/release/release.ts'),
   },
   'release:push': {

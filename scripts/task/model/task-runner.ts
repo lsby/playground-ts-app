@@ -5,6 +5,7 @@ import dotenv from 'dotenv'
 import fs from 'fs'
 import path from 'path'
 import { 读取环境文件明文 } from '../../setup/env-crypto-core.mjs'
+import { 获得参数传递目标 } from './task-parameters'
 
 export type 命令配置 = { 程序: string; 参数: string[] }
 export type 任务准备上下文 = {
@@ -25,6 +26,7 @@ export type 任务配置 = {
   工作目录?: string
   运行?: 命令配置 | 命令配置[]
   传递参数?: boolean
+  参数传递目标?: string
   准备运行?: (上下文: 任务准备上下文) => Promise<任务准备结果>
   运行时终端输入?: boolean
   需要环境文件?: boolean
@@ -194,6 +196,7 @@ async function 执行命令配置(
 
 function 检查任务表(任务表: 任务表类型): void {
   for (let [任务名称, 任务] of Object.entries(任务表)) {
+    获得参数传递目标(任务表, 任务名称)
     for (let 依赖名称 of 任务.依赖 ?? []) {
       if (任务表[依赖名称] === undefined) throw new Error(`任务 ${任务名称} 依赖了不存在的任务: ${依赖名称}`)
     }
@@ -212,6 +215,7 @@ function 打印执行计划(
   准备参数表?: ReadonlyMap<string, string[]>,
 ): void {
   console.log(`执行计划: ${根任务名称}`)
+  let 参数传递目标 = 获得参数传递目标(任务表, 根任务名称)
   if (选项.环境文件 !== undefined) console.log(`显式环境文件: ${选项.环境文件}`)
   let 访问 = (任务名称: string, 前缀: string, 是否最后一项: boolean, 路径: string[]): void => {
     if (路径.includes(任务名称) === true) throw new Error(`检测到循环依赖: ${[...路径, 任务名称].join(' -> ')}`)
@@ -237,8 +241,7 @@ function 打印执行计划(
       if (当前命令 === undefined) throw new Error(`任务 ${任务名称} 的命令索引越界: ${索引}`)
       let 附加参数 =
         索引 === 命令组.length - 1
-          ? (准备参数表?.get(任务名称) ??
-            (任务名称 === 根任务名称 && 任务.传递参数 === true ? (选项.传递参数 ?? []) : []))
+          ? (准备参数表?.get(任务名称) ?? (任务名称 === 参数传递目标 ? (选项.传递参数 ?? []) : []))
           : []
       console.log(`${子前缀}   $ ${格式化命令(当前命令, 附加参数)}`)
     }
@@ -273,13 +276,18 @@ function 收集任务节点(
   return 节点组
 }
 
-async function 准备任务参数(节点组: 任务节点[], 根任务名称: string, 选项: 执行选项): Promise<Map<string, string[]>> {
+async function 准备任务参数(
+  节点组: 任务节点[],
+  根任务名称: string,
+  选项: 执行选项,
+  参数传递目标: string | undefined,
+): Promise<Map<string, string[]>> {
   let 准备参数表 = new Map<string, string[]>()
   let 是否存在准备器 = 节点组.some((节点) => 节点.任务.准备运行 !== undefined)
   if (是否存在准备器 === true) console.log('[task] 开始收集整条任务链的运行选项')
   for (let 节点 of 节点组) {
     选项.取消信号?.throwIfAborted()
-    let 原始参数 = 节点.名称 === 根任务名称 && 节点.任务.传递参数 === true ? [...(选项.传递参数 ?? [])] : []
+    let 原始参数 = 节点.名称 === 参数传递目标 ? [...(选项.传递参数 ?? [])] : []
     if (节点.任务.准备运行 === undefined) {
       准备参数表.set(节点.名称, 原始参数)
       continue
@@ -314,7 +322,7 @@ export async function 执行任务(任务表: 任务表类型, 根任务名称: 
   let 根上下文: 执行上下文 = { 环境变量: 根环境变量, 标识: 获得环境标识(根环境变量) }
   if (选项.环境文件 !== undefined) 根上下文 = 加载环境文件(根上下文, 选项.环境文件)
   let 节点组 = 收集任务节点(任务表, 根任务名称, 根上下文, 选项.环境文件 !== undefined)
-  let 准备参数表 = await 准备任务参数(节点组, 根任务名称, 选项)
+  let 准备参数表 = await 准备任务参数(节点组, 根任务名称, 选项, 获得参数传递目标(任务表, 根任务名称))
   if (选项.仅准备 === true) {
     打印执行计划(任务表, 根任务名称, 选项, 准备参数表)
     return
