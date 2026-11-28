@@ -43,7 +43,7 @@ export class 用户信息组件 extends 组件基类<发出事件类型, 监听�
       文本: '退出登录',
       点击处理函数: async (): Promise<void> => {
         await API管理器.清除token()
-        window.location.assign('/login.html')
+        window.location.assign('./login.html')
       },
     })
     容器.appendChild(退出按钮)

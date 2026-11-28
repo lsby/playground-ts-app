@@ -33,7 +33,7 @@ export class 演示登录组件 extends 组件基类<发出事件类型, 监听�
             userPassword: 数据.password,
           })
           await API管理器.设置token(响应.token)
-          window.location.assign('/demo/index.html')
+          window.location.assign('./index.html')
         } catch (错误) {
           结果.textContent = 错误 instanceof Error ? 错误.message : '登录失败'
         }

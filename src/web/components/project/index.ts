@@ -31,7 +31,7 @@ export class 首页组件 extends 组件基类<发出事件类型, 监听事件�
         文本: '退出登录',
         点击处理函数: async (): Promise<void> => {
           await API管理器.清除token()
-          window.location.assign('/login.html')
+          window.location.assign('./login.html')
         },
       }),
     )

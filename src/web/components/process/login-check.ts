@@ -26,6 +26,6 @@ export class 检查登录组件 extends 组件基类<发出事件类型, 监听�
 
   private 跳转登录页(): void {
     let 当前路径 = encodeURIComponent(window.location.pathname + window.location.search)
-    window.location.assign(`/login.html?redirect=${当前路径}`)
+    window.location.assign(`./login.html?redirect=${当前路径}`)
   }
 }

@@ -163,12 +163,12 @@ export class 登录组件 extends 组件基类<发出事件类型, 监听事件�
   }
 
   private 获得安全重定向(): string {
-    let 目标 = new URLSearchParams(window.location.search).get('redirect') ?? '/index.html'
+    let 目标 = new URLSearchParams(window.location.search).get('redirect') ?? './index.html'
     try {
-      let url = new URL(目标, window.location.origin)
-      return url.origin === window.location.origin ? `${url.pathname}${url.search}${url.hash}` : '/index.html'
+      let url = new URL(目标, window.location.href)
+      return url.origin === window.location.origin ? `${url.pathname}${url.search}${url.hash}` : './index.html'
     } catch {
-      return '/index.html'
+      return './index.html'
     }
   }
 
